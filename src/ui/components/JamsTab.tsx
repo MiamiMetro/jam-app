@@ -13,6 +13,8 @@ import {
   Power,
   PowerOff,
   Lock,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useJams, useMyRoom, useCreateRoom, useUpdateRoom, useActivateRoom, useDeactivateRoom } from "@/hooks/useJams";
@@ -55,6 +57,7 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
 
   const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
   const [isEditRoomOpen, setIsEditRoomOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const handleSearchChange = useCallback((query: string) => {
     const params: Record<string, string> = {};
@@ -158,11 +161,11 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
         <h2 className="text-sm font-semibold text-muted-foreground">Jams</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto px-5 pb-3">
 
       {/* My Room Section */}
       {!isGuest && user && (
-        <div className="mb-6">
+        <div className="mb-4">
           {myRoomLoading ? (
             <div className="p-4 rounded-lg glass-solid">
               <p className="text-sm text-muted-foreground">Loading your room...</p>
@@ -289,35 +292,29 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
         const activeRooms = rooms.filter(r => r.isEnabled);
         if (onlineFriends.length === 0 || activeRooms.length === 0) return null;
         return (
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+          <div className="mb-4">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
               Friends Jamming Now
             </h3>
-            <div className="flex gap-3 overflow-x-auto pb-1">
+            <div className="flex flex-wrap gap-2">
               {onlineFriends.slice(0, 6).map((friend, index) => {
                 if (!friend) return null;
                 const friendStatus = onlineStatusById.get(String(friend.id)) ?? "online";
-                // Assign friend to a room (round-robin for mock display)
                 const friendRoom = activeRooms[index % activeRooms.length];
                 return (
                   <button
                     key={friend.id}
                     onClick={() => navigate(`/jam/${friendRoom.id}`)}
-                    className="flex flex-col items-center gap-1.5 p-3 rounded-lg glass-solid hover:glass-strong transition-all duration-200 cursor-pointer min-w-[80px] hover:ring-1 hover:ring-primary/20"
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg glass-solid hover:glass-strong transition-all duration-200 cursor-pointer hover:ring-1 hover:ring-primary/20"
                   >
-                    <Avatar size="default" className={`ring-2 ${getPresenceRingClass(friendStatus)}`}>
+                    <Avatar size="xs" className={`h-5 w-5 ring-1.5 ${getPresenceRingClass(friendStatus)}`}>
                       <AvatarImage src={friend.avatar_url || ""} alt={friend.username} />
-                      <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+                      <AvatarFallback className="bg-muted text-muted-foreground text-[8px]">
                         {friend.username.substring(0, 2).toUpperCase()}
                       </AvatarFallback>
-                      <AvatarBadge className={getPresenceBadgeClass(friendStatus)} />
                     </Avatar>
-                    <span className="text-xs font-medium truncate w-full text-center">
-                      {friend.username}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground/60 truncate w-full text-center">
-                      in {friendRoom.name}
-                    </span>
+                    <span className="text-xs font-medium">{friend.username}</span>
+                    <span className="text-[10px] text-muted-foreground">in {friendRoom.name}</span>
                   </button>
                 );
               })}
@@ -335,6 +332,20 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
             onSearch={handleSearchChange}
             className="flex-1"
           />
+          <div className="flex items-center gap-0.5 p-0.5 rounded-md glass-solid flex-shrink-0">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${viewMode === "grid" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${viewMode === "list" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <List className="h-3.5 w-3.5" />
+            </button>
+          </div>
           {!isGuest && user && !myRoom && !myRoomLoading && (
             <Button variant="default" size="sm" className="flex-shrink-0" onClick={() => setIsCreateRoomOpen(true)}>
               <Plus className="h-3.5 w-3.5 mr-1" />
@@ -350,27 +361,29 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
           Live Rooms
         </h3>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-stagger">
-        {roomsLoading ? (
-          <div className="col-span-full">
-            <LoadingState message="Loading jams..." />
-          </div>
-        ) : filteredRooms.length === 0 ? (
-          <div className="col-span-full">
-            <EmptyState
-              icon={Music}
-              title={searchQuery ? "No jams found" : "No active jams"}
-              description={searchQuery
-                ? "Try adjusting your search"
-                : "Create your room to start jamming!"}
-            />
-          </div>
-        ) : (
-          filteredRooms.map((room) => (
+      {roomsLoading ? (
+        <LoadingState message="Loading jams..." />
+      ) : filteredRooms.length === 0 ? (
+        <EmptyState
+          icon={Music}
+          title={searchQuery ? "No jams found" : "No active jams"}
+          description={searchQuery
+            ? "Try adjusting your search"
+            : "Create your room to start jamming!"}
+        />
+      ) : viewMode === "grid" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-stagger">
+          {filteredRooms.map((room) => (
             <RoomCard key={room.id} room={room} onClick={handleRoomClick} />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {filteredRooms.map((room) => (
+            <RoomCard key={room.id} room={room} onClick={handleRoomClick} variant="list" />
+          ))}
+        </div>
+      )}
       </div>
     </div>
   );

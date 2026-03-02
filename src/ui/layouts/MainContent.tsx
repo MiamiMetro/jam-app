@@ -1,9 +1,10 @@
 // MainContent.tsx — Content area with React Router Outlet + persistent JamRoom
-import { useEffect, useRef, useState, startTransition, lazy, Suspense } from "react";
+import { useEffect, useRef, lazy, Suspense } from "react";
 import { useLocation, Outlet } from "react-router-dom";
 import { Spinner } from "@/components/ui/spinner";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useUIStore } from "@/stores/uiStore";
 
 const JamRoom = lazy(() => import("@/pages/JamRoom"));
 
@@ -16,29 +17,20 @@ export default function MainContent() {
   const jamRoomMatch = location.pathname.match(/^\/jam\/(.+)$/);
   const urlRoomId = jamRoomMatch ? jamRoomMatch[1] : null;
 
-  const [persistedRoomId, setPersistedRoomId] = useState<string | null>(() => {
-    return localStorage.getItem("currentJamRoomId");
-  });
+  const currentJamRoomId = useUIStore((s) => s.currentJamRoomId);
+  const setCurrentJamRoomId = useUIStore((s) => s.setCurrentJamRoomId);
 
-  const jamRoomId = urlRoomId || persistedRoomId;
+  const jamRoomId = urlRoomId || currentJamRoomId;
 
+  // Only set the store when ENTERING a room (URL changes to a new room ID).
+  // Don't re-set when store was explicitly cleared by leave handler.
+  const prevUrlRoomId = useRef<string | null>(null);
   useEffect(() => {
-    if (urlRoomId && urlRoomId !== persistedRoomId) {
-      localStorage.setItem("currentJamRoomId", urlRoomId);
-      startTransition(() => {
-        setPersistedRoomId(urlRoomId);
-      });
+    if (urlRoomId && urlRoomId !== prevUrlRoomId.current) {
+      setCurrentJamRoomId(urlRoomId);
     }
-  }, [urlRoomId, persistedRoomId]);
-
-  useEffect(() => {
-    const storedRoomId = localStorage.getItem("currentJamRoomId");
-    if (storedRoomId !== persistedRoomId) {
-      startTransition(() => {
-        setPersistedRoomId(storedRoomId);
-      });
-    }
-  }, [location.pathname]);
+    prevUrlRoomId.current = urlRoomId;
+  }, [urlRoomId, setCurrentJamRoomId]);
 
   useScrollRestoration(scrollContainerRef as React.RefObject<HTMLElement>);
 

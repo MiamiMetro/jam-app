@@ -24,10 +24,11 @@ import {
   VolumeX,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
+import { useUIStore } from "@/stores/uiStore";
 import { useJam, useUpdateRoomActivity } from "@/hooks/useJams";
 import type { RoomParticipant } from "@/hooks/useJams";
 import { useAllUsers } from "@/hooks/useUsers";
-import { useHLSPlayer } from "@/hooks/useHLSPlayer";
+import { usePlayer } from "@/contexts/PlayerContext";
 import { Timestamp } from "@/components/Timestamp";
 import { LoadingState } from "@/components/LoadingState";
 import { EmptyState } from "@/components/EmptyState";
@@ -57,8 +58,8 @@ function JamRoom({ roomId }: JamRoomProps = {}) {
   const [isPerforming, setIsPerforming] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // HLS stream player
-  const hlsPlayer = useHLSPlayer(room?.streamUrl);
+  // HLS stream player (shared via context so StatusBar can control it too)
+  const hlsPlayer = usePlayer();
   const [messages, setMessages] = useState<Array<{
     id: string;
     userId: string;
@@ -115,10 +116,11 @@ function JamRoom({ roomId }: JamRoomProps = {}) {
     updateActivityMutation.mutate(roomIdToUse);
   }, [message, isGuest, roomIdToUse, user, updateActivityMutation]);
 
+  const setCurrentJamRoomId = useUIStore((s) => s.setCurrentJamRoomId);
   const handleLeaveRoom = useCallback(() => {
-    localStorage.removeItem("currentJamRoomId");
+    setCurrentJamRoomId(null);
     navigate("/jams");
-  }, [navigate]);
+  }, [navigate, setCurrentJamRoomId]);
 
   const handleJoinClient = useCallback(async () => {
     try {

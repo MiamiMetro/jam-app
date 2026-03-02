@@ -1,11 +1,14 @@
-// AppLayout.tsx — Two-panel layout: NavSidebar | MainContent (Outlet + JamRoom)
-import { useEffect } from "react";
+// AppLayout.tsx — Two-panel layout: NavSidebar | MainContent (Outlet + JamRoom) + StatusBar
+import { useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import NavSidebar from "@/components/navigation/NavSidebar";
 import MainContent from "@/layouts/MainContent";
 import AuthModalRoot from "@/components/auth/AuthModalRoot";
 import { useUIStore } from "@/stores/uiStore";
 import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
+import { PlayerProvider } from "@/contexts/PlayerContext";
+
+const StatusBar = lazy(() => import("@/components/navigation/StatusBar"));
 
 export default function AppLayout() {
   const { theme, setTheme } = useUIStore();
@@ -51,12 +54,19 @@ export default function AppLayout() {
   }, [theme]);
 
   return (
-    <div className="flex h-screen bg-background text-foreground app-bg">
-      <NavSidebar />
-      <div className="content-column flex-1 flex flex-col bg-background overflow-hidden relative z-10">
-        <MainContent />
+    <PlayerProvider>
+      <div className="flex flex-col h-screen bg-background text-foreground app-bg">
+        <div className="flex flex-1 min-h-0">
+          <NavSidebar />
+          <div className="content-column flex-1 flex flex-col bg-background overflow-hidden relative z-10">
+            <MainContent />
+          </div>
+        </div>
+        <Suspense fallback={null}>
+          <StatusBar />
+        </Suspense>
+        <AuthModalRoot />
       </div>
-      <AuthModalRoot />
-    </div>
+    </PlayerProvider>
   );
 }

@@ -8,6 +8,8 @@ interface UIState {
   rightPanelOpen: boolean;
   setRightPanelOpen: (open: boolean) => void;
   toggleRightPanel: () => void;
+  currentJamRoomId: string | null;
+  setCurrentJamRoomId: (id: string | null) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -38,6 +40,15 @@ export const useUIStore = create<UIState>((set) => ({
       localStorage.setItem('rightPanelOpen', String(next));
       return { rightPanelOpen: next };
     });
+  },
+  currentJamRoomId: localStorage.getItem('currentJamRoomId'),
+  setCurrentJamRoomId: (id) => {
+    if (id) {
+      localStorage.setItem('currentJamRoomId', id);
+    } else {
+      localStorage.removeItem('currentJamRoomId');
+    }
+    set({ currentJamRoomId: id });
   },
 }));
 

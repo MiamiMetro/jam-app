@@ -2,6 +2,7 @@
 import { lazy, useEffect, Suspense } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import AppLayout from "@/layouts/AppLayout";
+import { useUIStore } from "@/stores/uiStore";
 import { useDeepLink } from "@/hooks/useDeepLink";
 
 const FeedTab = lazy(() => import("@/components/FeedTab"));
@@ -50,7 +51,7 @@ function App() {
 
   // Clear jam room ID on app startup
   useEffect(() => {
-    localStorage.removeItem("currentJamRoomId");
+    useUIStore.getState().setCurrentJamRoomId(null);
   }, []);
 
   return (

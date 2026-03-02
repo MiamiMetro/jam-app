@@ -36,7 +36,7 @@ import { api } from "../../../../convex/_generated/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useUIStore } from "@/stores/uiStore";
 import { useAuthModalStore } from "@/stores/authModalStore";
-import { useJam } from "@/hooks/useJams";
+
 import { useFriends } from "@/hooks/useFriends";
 import { useOnlineUsers } from "@/hooks/useUsers";
 import { usePresenceStore, type PresenceStatus } from "@/stores/presenceStore";
@@ -94,8 +94,6 @@ export default function NavSidebar() {
   const setManualPresenceStatus = usePresenceStore((state) => state.setManualStatus);
   const setCurrentPresenceStatus = usePresenceStore((state) => state.setCurrentStatus);
 
-  const persistedRoomId = localStorage.getItem("currentJamRoomId");
-  const { data: currentRoom } = useJam(persistedRoomId || "");
   const { data: friends = [] } = useFriends();
   const { data: onlineUsers = [] } = useOnlineUsers();
 
@@ -110,7 +108,7 @@ export default function NavSidebar() {
     return location.pathname === item.path;
   };
 
-  const isRoomActive = location.pathname.startsWith("/jam/");
+
 
   const toggleTheme = useCallback(() => {
     const currentTheme =
@@ -264,27 +262,6 @@ export default function NavSidebar() {
           );
         })}
 
-        {/* Active room indicator */}
-        {currentRoom && (
-          <button
-            onClick={() => navigate(`/jam/${persistedRoomId}`)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer relative ${
-              isRoomActive
-                ? "bg-primary/12 text-primary shadow-inset-primary"
-                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground "
-            }`}
-          >
-            {isRoomActive && (
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full bg-primary" />
-            )}
-            <Music className="h-5 w-5" />
-            <span className="truncate flex-1 text-left">{currentRoom.name}</span>
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 animate-pulse" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-            </span>
-          </button>
-        )}
       </nav>
 
       {/* Online Friends */}
