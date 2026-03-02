@@ -4,6 +4,8 @@ import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-
 import AppLayout from "@/layouts/AppLayout";
 import { useUIStore } from "@/stores/uiStore";
 import { useDeepLink } from "@/hooks/useDeepLink";
+import { PlayerProvider } from "@/contexts/PlayerContext";
+import { PostAudioProvider } from "@/contexts/PostAudioContext";
 
 const FeedTab = lazy(() => import("@/components/FeedTab"));
 const JamsTab = lazy(() => import("@/components/JamsTab"));
@@ -55,32 +57,34 @@ function App() {
   }, []);
 
   return (
-    <>
-      <Routes location={backgroundLocation || location}>
-        <Route path="/" element={<RootRedirect />} />
-        <Route element={<AppLayout />}>
-          <Route path="/feed" element={<FeedTab />} />
-          <Route path="/jams" element={<JamsTab />} />
-          <Route path="/friends" element={<FriendsTab />} />
-          <Route path="/communities" element={<CommunitiesTab />} />
-          <Route path="/community/:id" element={<CommunitiesTab />} />
-          <Route path="/profile/:username" element={<Profile />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/post/:id" element={<Post />} />
-          <Route path="/jam/:id" element={<JamRouteSlot />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
-      </Routes>
+    <PlayerProvider>
+      <PostAudioProvider>
+        <Routes location={backgroundLocation || location}>
+          <Route path="/" element={<RootRedirect />} />
+          <Route element={<AppLayout />}>
+            <Route path="/feed" element={<FeedTab />} />
+            <Route path="/jams" element={<JamsTab />} />
+            <Route path="/friends" element={<FriendsTab />} />
+            <Route path="/communities" element={<CommunitiesTab />} />
+            <Route path="/community/:id" element={<CommunitiesTab />} />
+            <Route path="/profile/:username" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/post/:id" element={<Post />} />
+            <Route path="/jam/:id" element={<JamRouteSlot />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Routes>
 
-      {/* Post modal — rendered on top when navigating from feed */}
-      {backgroundLocation && (
-        <Suspense fallback={null}>
-          <Routes>
-            <Route path="/post/:id" element={<PostModal />} />
-          </Routes>
-        </Suspense>
-      )}
-    </>
+        {/* Post modal — rendered on top when navigating from feed */}
+        {backgroundLocation && (
+          <Suspense fallback={null}>
+            <Routes>
+              <Route path="/post/:id" element={<PostModal />} />
+            </Routes>
+          </Suspense>
+        )}
+      </PostAudioProvider>
+    </PlayerProvider>
   );
 }
 

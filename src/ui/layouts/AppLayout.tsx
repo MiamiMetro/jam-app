@@ -6,8 +6,6 @@ import MainContent from "@/layouts/MainContent";
 import AuthModalRoot from "@/components/auth/AuthModalRoot";
 import { useUIStore } from "@/stores/uiStore";
 import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
-import { PlayerProvider } from "@/contexts/PlayerContext";
-import { PostAudioProvider } from "@/contexts/PostAudioContext";
 
 const StatusBar = lazy(() => import("@/components/navigation/StatusBar"));
 
@@ -55,21 +53,17 @@ export default function AppLayout() {
   }, [theme]);
 
   return (
-    <PlayerProvider>
-    <PostAudioProvider>
-      <div className="flex flex-col h-screen bg-background text-foreground app-bg">
-        <div className="flex flex-1 min-h-0">
-          <NavSidebar />
-          <div className="content-column flex-1 flex flex-col bg-background overflow-hidden relative z-10">
-            <MainContent />
-          </div>
+    <div className="flex flex-col h-screen bg-background text-foreground app-bg">
+      <div className="flex flex-1 min-h-0">
+        <NavSidebar />
+        <div className="content-column flex-1 flex flex-col bg-background overflow-hidden relative z-10">
+          <MainContent />
         </div>
-        <Suspense fallback={null}>
-          <StatusBar />
-        </Suspense>
-        <AuthModalRoot />
       </div>
-    </PostAudioProvider>
-    </PlayerProvider>
+      <Suspense fallback={null}>
+        <StatusBar />
+      </Suspense>
+      <AuthModalRoot />
+    </div>
   );
 }
