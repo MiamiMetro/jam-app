@@ -221,7 +221,7 @@ export default function NavSidebar() {
     <div className="w-[220px] min-w-[220px] surface-elevated flex flex-col h-full select-none relative z-10">
       {/* Brand + drag region */}
       <div className="drag-region titlebar-sidebar-pad">
-        <div className="px-5 pt-4 pb-3">
+        <div className="px-5 pt-3 pb-3">
           <div className="no-drag flex items-center gap-2 cursor-pointer group" onClick={() => navigate("/")}>
             <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/15 group-hover:bg-primary/20 transition-colors">
               <Logo className="w-4 h-4 opacity-90 group-hover:opacity-100 transition-opacity" />
