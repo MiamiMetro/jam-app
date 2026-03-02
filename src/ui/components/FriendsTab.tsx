@@ -368,7 +368,9 @@ function FriendsTab() {
             />
           </ErrorBoundary>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+          <div className="flex-1 flex flex-col">
+            <div className="page-header caption-safe py-3 flex-shrink-0" />
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
             <div className="h-14 w-14 rounded-full bg-muted/30 flex items-center justify-center mb-3">
               <MessageCircle className="h-7 w-7 text-muted-foreground/30" />
             </div>
@@ -400,6 +402,7 @@ function FriendsTab() {
                   </span>
                 )}
               </Button>
+            </div>
             </div>
           </div>
         )}
