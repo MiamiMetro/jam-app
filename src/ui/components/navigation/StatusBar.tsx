@@ -129,7 +129,7 @@ export default function StatusBar() {
 
       {/* Separator between jam room and post audio */}
       {showJamRoom && showPostAudio && (
-        <span className="w-px h-3.5 bg-border/50" />
+        <span className="w-0.5 h-4 bg-foreground/20 rounded-full mx-1" />
       )}
 
       {/* Post audio mini-player */}

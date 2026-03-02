@@ -248,8 +248,8 @@ function JamRoom({ roomId }: JamRoomProps = {}) {
                       size="icon"
                       className="h-14 w-14 rounded-full glass-solid hover:bg-foreground/[0.06] flex-shrink-0"
                       onClick={() => {
-                        if (!hlsPlayer.isPlaying && postAudio.currentTrack) {
-                          postAudio.stop();
+                        if (!hlsPlayer.isPlaying && postAudio.isPlaying) {
+                          postAudio.pause();
                         }
                         hlsPlayer.togglePlayPause();
                       }}

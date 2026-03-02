@@ -583,7 +583,7 @@ function Profile() {
                   <EmptyState icon={Music} title="No recent activities" />
                 ) : (
                   <div className="divide-y divide-border/50">
-                    {activityPosts.map((post: FrontendPost) => (
+                    {activityPosts.filter((post: FrontendPost) => !post.isDeleted).map((post: FrontendPost) => (
                       <div key={post.id} className="hover:bg-foreground/[0.03] transition-colors">
                         <PostCard
                           post={post}

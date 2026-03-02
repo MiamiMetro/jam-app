@@ -111,27 +111,6 @@ function Post() {
     );
   }
 
-  if (post.isDeleted) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="page-header caption-safe px-5 py-3 border-b border-border flex items-center gap-2 shrink-0">
-          <button className="no-drag cursor-pointer text-muted-foreground hover:text-foreground transition-colors" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <h2 className="text-sm font-semibold text-muted-foreground">Post by {post.author.username}</h2>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-6">
-          <p className="text-base italic text-muted-foreground/60">
-            ♪ this post was removed
-            <span className="not-italic ml-2 text-sm text-muted-foreground/40">
-              • <Timestamp date={post.timestamp}>{formatTimeAgo(post.timestamp)}</Timestamp>
-            </span>
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const communityName = getCommunityName(post.community);
 
   return (
@@ -155,110 +134,121 @@ function Post() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto w-full">
         {/* Post content */}
-        <div className="p-6">
-          <div className="flex gap-4">
-            <button
-              onClick={() => handleAuthorClick(post.author.username)}
-              className="flex-shrink-0 cursor-pointer p-0 border-0 bg-transparent hover:opacity-80 transition-opacity self-start"
-            >
-              <Avatar size="lg" className="ring-2 ring-border">
-                <AvatarImage src={post.author.avatar || ""} alt={post.author.username} />
-                <AvatarFallback className="bg-muted text-muted-foreground text-lg">
-                  {post.author.username.substring(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <button
-                  onClick={() => handleAuthorClick(post.author.username)}
-                  className="font-heading font-bold text-lg hover:underline cursor-pointer"
-                >
-                  {post.author.username}
-                </button>
-                {post.isGlobal ? (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                    Global
-                  </span>
-                ) : communityName ? (
+        {post.isDeleted ? (
+          <div className="px-6 py-5 border-l-2 border-l-transparent">
+            <p className="text-sm italic text-muted-foreground/60">
+              ♪ this post was removed
+              <span className="not-italic ml-2 text-xs text-muted-foreground/40">
+                • <Timestamp date={post.timestamp}>{formatTimeAgo(post.timestamp)}</Timestamp>
+              </span>
+            </p>
+          </div>
+        ) : (
+          <div className="p-6">
+            <div className="flex gap-4">
+              <button
+                onClick={() => handleAuthorClick(post.author.username)}
+                className="shrink-0 cursor-pointer p-0 border-0 bg-transparent hover:opacity-80 transition-opacity self-start"
+              >
+                <Avatar size="lg" className="ring-2 ring-border">
+                  <AvatarImage src={post.author.avatar || ""} alt={post.author.username} />
+                  <AvatarFallback className="bg-muted text-muted-foreground text-lg">
+                    {post.author.username.substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <button
-                    onClick={() => post.community && handleCommunityClick(post.community)}
-                    className="text-xs px-2 py-0.5 rounded-full glass-solid hover:bg-foreground/[0.06] transition-colors flex items-center gap-1"
+                    onClick={() => handleAuthorClick(post.author.username)}
+                    className="font-heading font-bold text-lg hover:underline cursor-pointer"
                   >
-                    <HashIcon className="h-3 w-3" />
-                    {communityName}
+                    {post.author.username}
                   </button>
-                ) : null}
-                <Timestamp date={post.timestamp} className="text-xs text-muted-foreground">
-                  • {formatTimeAgo(post.timestamp)}
-                </Timestamp>
+                  {post.isGlobal ? (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                      Global
+                    </span>
+                  ) : communityName ? (
+                    <button
+                      onClick={() => post.community && handleCommunityClick(post.community)}
+                      className="text-xs px-2 py-0.5 rounded-full glass-solid hover:bg-foreground/6 transition-colors flex items-center gap-1"
+                    >
+                      <HashIcon className="h-3 w-3" />
+                      {communityName}
+                    </button>
+                  ) : null}
+                  <Timestamp date={post.timestamp} className="text-xs text-muted-foreground">
+                    • {formatTimeAgo(post.timestamp)}
+                  </Timestamp>
+                </div>
               </div>
             </div>
-          </div>
 
-          {post.content && (
-            <div className="text-base mt-4 leading-relaxed">
-              <AutoLinkedText text={post.content} className="whitespace-pre-wrap wrap-break-word block mb-4" linkClassName="text-blue-500 hover:text-blue-600 underline" />
-            </div>
-          )}
+            {post.content && (
+              <div className="text-base mt-4 leading-relaxed">
+                <AutoLinkedText text={post.content} className="whitespace-pre-wrap wrap-break-word block mb-4" linkClassName="text-blue-500 hover:text-blue-600 underline" />
+              </div>
+            )}
 
-          {/* Audio player */}
-          {post.audioFile && (
-            <div className="pt-2 border-t border-border/20">
-              <AudioPlayer
-                postId={post.id}
-                audioFile={post.audioFile}
-                authorName={post.author.username}
-                isGuest={isGuest}
-                variant="post"
-              />
-            </div>
-          )}
+            {/* Audio player */}
+            {post.audioFile && (
+              <div className="pt-2 border-t border-border/20">
+                <AudioPlayer
+                  postId={post.id}
+                  audioFile={post.audioFile}
+                  authorName={post.author.username}
+                  isGuest={isGuest}
+                  variant="post"
+                />
+              </div>
+            )}
 
-          {/* Actions */}
-          <div className="flex items-center gap-6 mt-5 pt-4 border-t border-border/30">
-            <div className="flex items-center gap-1">
+            {/* Actions */}
+            <div className="flex items-center gap-6 mt-5 pt-4 border-t border-border/30">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleLikePost}
+                  className={`flex items-center gap-2 text-sm transition-all cursor-pointer active:scale-90 ${
+                    post.isLiked
+                      ? "text-red-500 hover:text-red-600"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Heart className={`h-5 w-5 transition-transform ${post.isLiked ? "fill-current" : ""}`} />
+                </button>
+                <button
+                  onClick={() => post.likes > 0 && setLikersOpen(true)}
+                  className={`text-sm transition-colors ${post.likes > 0 ? "hover:underline cursor-pointer" : "cursor-default"} ${post.isLiked ? "text-red-500" : "text-muted-foreground"}`}
+                >
+                  {post.likes}
+                </button>
+              </div>
+              <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MessageCircle className="h-5 w-5" />
+                <span>{post.comments}</span>
+              </span>
               <button
-                onClick={handleLikePost}
-                className={`flex items-center gap-2 text-sm transition-all cursor-pointer active:scale-90 ${
-                  post.isLiked
-                    ? "text-red-500 hover:text-red-600"
-                    : "text-muted-foreground hover:text-foreground"
+                onClick={handleShare}
+                className={`flex items-center gap-2 text-sm transition-colors cursor-pointer ${
+                  copied ? "text-green-500" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Heart className={`h-5 w-5 transition-transform ${post.isLiked ? "fill-current" : ""}`} />
+                {copied ? <Check className="h-5 w-5" /> : <Share2 className="h-5 w-5" />}
+                {copied && <span>Copied!</span>}
               </button>
-              <button
-                onClick={() => post.likes > 0 && setLikersOpen(true)}
-                className={`text-sm transition-colors ${post.likes > 0 ? "hover:underline cursor-pointer" : "cursor-default"} ${post.isLiked ? "text-red-500" : "text-muted-foreground"}`}
-              >
-                {post.likes}
-              </button>
+              {!isGuest && user?.username === post.author.username && (
+                <button
+                  onClick={() => deletePostMutation.mutate(post.id)}
+                  className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                  title="Delete post"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
-            <span className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MessageCircle className="h-5 w-5" />
-              <span>{post.comments}</span>
-            </span>
-            <button
-              onClick={handleShare}
-              className={`flex items-center gap-2 text-sm transition-colors cursor-pointer ${
-                copied ? "text-green-500" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {copied ? <Check className="h-5 w-5" /> : <Share2 className="h-5 w-5" />}
-              {copied && <span>Copied!</span>}
-            </button>
-            {!isGuest && user?.username === post.author.username && (
-              <button
-                onClick={() => deletePostMutation.mutate(post.id)}
-                className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
-                title="Delete post"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
           </div>
-        </div>
+        )}
 
         {/* Comments Section */}
         <div className="border-t border-border">
