@@ -27,6 +27,7 @@ import type * as profiles from "../profiles.js";
 import type * as rateLimiter from "../rateLimiter.js";
 import type * as roomMessages from "../roomMessages.js";
 import type * as rooms from "../rooms.js";
+import type * as shared from "../shared.js";
 import type * as uploadSessions from "../uploadSessions.js";
 import type * as users from "../users.js";
 
@@ -56,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   rateLimiter: typeof rateLimiter;
   roomMessages: typeof roomMessages;
   rooms: typeof rooms;
+  shared: typeof shared;
   uploadSessions: typeof uploadSessions;
   users: typeof users;
 }>;

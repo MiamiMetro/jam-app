@@ -5,9 +5,9 @@ import { useAuthStore } from "@/stores/authStore";
 import { useConvexAuthStore } from "./useConvexAuth";
 import { useProfileStore } from "./useEnsureProfile";
 
-// Re-export from single source of truth
-export { ROOM_GENRES } from "../../../convex/rooms";
-export type { RoomGenre } from "../../../convex/rooms";
+// Re-export from shared constants (safe for browser import)
+export { ROOM_GENRES } from "../../../convex/shared";
+export type { RoomGenre } from "../../../convex/shared";
 
 // ============================================
 // Query Hooks

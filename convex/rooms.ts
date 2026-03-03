@@ -30,24 +30,7 @@ const presence = new Presence(components.presence);
 const MOCK_STREAM_URL =
   "https://virtual-channel.unified-streaming.com/demo_channel-stable.isml/.m3u8";
 
-export const ROOM_GENRES = [
-  "LoFi",
-  "Rock",
-  "Metal",
-  "Electronic",
-  "Jazz",
-  "Hip Hop",
-  "Indie",
-  "Classical",
-  "R&B",
-  "Reggae",
-  "Ambient",
-  "House",
-  "Pop",
-  "Acoustic",
-] as const;
-
-export type RoomGenre = (typeof ROOM_GENRES)[number];
+export { ROOM_GENRES, type RoomGenre } from "./shared";
 
 /** Presence room ID for a jam room */
 function roomPresenceId(roomId: string) {
