@@ -15,7 +15,6 @@ import {
   validateTextLength,
   sanitizeText,
   acquireUniqueLock,
-  releaseUniqueLock,
   validateCommunityHandle,
   MAX_LENGTHS,
   MIN_LENGTHS,

@@ -42,6 +42,8 @@ export default defineSchema({
     text: v.optional(v.string()),
     audioUrl: v.optional(v.string()),
     audioObjectKey: v.optional(v.string()),
+    audioTitle: v.optional(v.string()),
+    audioDuration: v.optional(v.number()),
     // Optional community association
     communityId: v.optional(v.id("communities")),
     // Denormalized counts for O(1) read performance
@@ -67,6 +69,8 @@ export default defineSchema({
     text: v.optional(v.string()),
     audioUrl: v.optional(v.string()),
     audioObjectKey: v.optional(v.string()),
+    audioTitle: v.optional(v.string()),
+    audioDuration: v.optional(v.number()),
     // Denormalized counts for O(1) read performance
     likesCount: v.optional(v.number()),
     repliesCount: v.optional(v.number()),

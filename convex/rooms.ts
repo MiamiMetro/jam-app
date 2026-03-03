@@ -1,7 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import {
   requireAuth,
@@ -30,6 +30,7 @@ const presence = new Presence(components.presence);
 const MOCK_STREAM_URL =
   "https://virtual-channel.unified-streaming.com/demo_channel-stable.isml/.m3u8";
 
+import { ROOM_GENRES } from "./shared";
 export { ROOM_GENRES, type RoomGenre } from "./shared";
 
 /** Presence room ID for a jam room */
@@ -189,7 +190,7 @@ export const getParticipants = query({
             is_guest: true,
           };
         }
-        const profile = await ctx.db.get(u.userId as any);
+        const profile = await ctx.db.get(u.userId as Id<"profiles">);
         return {
           profile_id: u.userId,
           profile: profile ? formatPublicProfileIdentity(profile) : null,
@@ -245,8 +246,8 @@ export const getFriendsInRooms = query({
       if (!roomPresence) continue;
 
       // Extract the actual room ID from "room:{id}"
-      const actualRoomId = roomPresence.roomId.replace("room:", "");
-      const room = await ctx.db.get(actualRoomId as any);
+      const actualRoomId = roomPresence.roomId.replace("room:", "") as Id<"rooms">;
+      const room = await ctx.db.get(actualRoomId);
       if (!room || !room.isActive) continue;
 
       const friendProfile = await ctx.db.get(friendship.friendId);

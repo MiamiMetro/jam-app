@@ -5,6 +5,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuthStore } from "@/stores/authStore";
 import { usePosts, useCreatePost, useToggleLike, useDeletePost } from "@/hooks/usePosts";
 import { useActiveRooms } from "@/hooks/useRooms";
+import { useSuggestedFriends, useRequestFriend, useCancelFriendRequest, useSentFriendRequests } from "@/hooks/useFriends";
 import { PostCard } from "@/components/PostCard";
 import { ComposePost } from "@/components/ComposePost";
 import { EmptyState } from "@/components/EmptyState";
@@ -14,13 +15,6 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { formatTimeAgo } from "@/lib/postUtils";
 import { Music, Rss, Hash, Users, UserPlus, X, Check } from "lucide-react";
-
-const SUGGESTED_FRIENDS = [
-  { id: "sf1", username: "BeatMaker", avatar: "" },
-  { id: "sf2", username: "SynthWave", avatar: "" },
-  { id: "sf3", username: "JazzCat", avatar: "" },
-  { id: "sf4", username: "LoFiKing", avatar: "" },
-];
 
 interface FeedTabProps {
   onGuestAction?: () => void;
@@ -35,17 +29,23 @@ function FeedTab({ onGuestAction }: FeedTabProps) {
   const createPostMutation = useCreatePost();
   const toggleLikeMutation = useToggleLike();
   const deletePostMutation = useDeletePost();
-  const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
+  const { data: suggestedFriends } = useSuggestedFriends();
+  const { hasPendingRequest } = useSentFriendRequests();
+  const requestFriendMutation = useRequestFriend();
+  const cancelRequestMutation = useCancelFriendRequest();
   const [justSent, setJustSent] = useState<string | null>(null);
 
   const handleSendRequest = (friendId: string) => {
-    setSentRequests(prev => new Set(prev).add(friendId));
-    setJustSent(friendId);
-    setTimeout(() => setJustSent(null), 1500);
+    requestFriendMutation.mutate(friendId, {
+      onSuccess: () => {
+        setJustSent(friendId);
+        setTimeout(() => setJustSent(null), 1500);
+      },
+    });
   };
 
   const handleCancelRequest = (friendId: string) => {
-    setSentRequests(prev => { const next = new Set(prev); next.delete(friendId); return next; });
+    cancelRequestMutation.mutate(friendId);
   };
 
   const handleAuthorClick = (username: string) => {
@@ -236,13 +236,13 @@ function FeedTab({ onGuestAction }: FeedTabProps) {
         })()}
 
         {/* Suggested Friends */}
-        {!isGuest && (
+        {!isGuest && suggestedFriends.length > 0 && (
           <div>
             <h3 className="text-xs font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               Suggested
             </h3>
             <div className="space-y-1">
-              {SUGGESTED_FRIENDS.map(friend => (
+              {suggestedFriends.map(friend => (
                 <div
                   key={friend.id}
                   className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
@@ -252,7 +252,7 @@ function FeedTab({ onGuestAction }: FeedTabProps) {
                     className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                   >
                     <Avatar size="sm" className="h-8 w-8 ring-1 ring-border flex-shrink-0">
-                      <AvatarImage src={friend.avatar} alt={friend.username} />
+                      <AvatarImage src={friend.avatar_url} alt={friend.username} />
                       <AvatarFallback className="bg-muted text-muted-foreground text-xs">
                         {friend.username.substring(0, 2).toUpperCase()}
                       </AvatarFallback>
@@ -264,7 +264,7 @@ function FeedTab({ onGuestAction }: FeedTabProps) {
                       <Check className="h-3 w-3" />
                       Sent!
                     </span>
-                  ) : sentRequests.has(friend.id) ? (
+                  ) : hasPendingRequest(friend.id) ? (
                     <Button
                       variant="ghost"
                       size="icon-xs"

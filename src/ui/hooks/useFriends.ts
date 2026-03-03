@@ -1,4 +1,4 @@
-import { useMutation, usePaginatedQuery } from "convex/react";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -255,5 +255,22 @@ export const useSentFriendRequests = () => {
     refetch: () => {},
     error: null,
     hasPendingRequest,
+  };
+};
+
+export const useSuggestedFriends = () => {
+  const { isGuest } = useAuthStore();
+  const { isProfileReady } = useProfileStore();
+  const { isAuthSet } = useConvexAuthStore();
+  const canQuery = !isGuest && isAuthSet && isProfileReady;
+
+  const result = useQuery(
+    api.friends.getSuggested,
+    canQuery ? { limit: 5 } : "skip"
+  );
+
+  return {
+    data: result ?? [],
+    isLoading: result === undefined && canQuery,
   };
 };

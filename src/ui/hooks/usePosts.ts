@@ -6,6 +6,23 @@ import { useAuthStore } from "@/stores/authStore";
 import { useR2Upload } from "@/hooks/useR2Upload";
 import type { Comment, Post } from "@/lib/api/types";
 
+/** Extract duration (seconds) from an audio File using a temporary Audio element. */
+function getAudioDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const audio = new Audio(url);
+    audio.addEventListener("loadedmetadata", () => {
+      const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+      URL.revokeObjectURL(url);
+      resolve(duration);
+    });
+    audio.addEventListener("error", () => {
+      URL.revokeObjectURL(url);
+      resolve(0);
+    });
+  });
+}
+
 export interface FrontendPost {
   id: string;
   author: {
@@ -23,7 +40,6 @@ export interface FrontendPost {
   timestamp: Date;
   likes: number;
   isLiked?: boolean;
-  shares?: number;
   comments?: number;
   communityId?: string | null;
   communityHandle?: string | null;
@@ -71,14 +87,13 @@ function convertPost(post: Post): FrontendPost {
     audioFile: post.audio_url
       ? {
           url: post.audio_url,
-          title: "Audio",
-          duration: 0,
+          title: post.audio_title || "Audio",
+          duration: post.audio_duration || 0,
         }
       : undefined,
     timestamp: new Date(post.created_at),
     likes: post.likes_count || 0,
     isLiked: post.is_liked || false,
-    shares: 0,
     comments: post.comments_count || 0,
     communityId: post.community_id ?? null,
     communityHandle: post.community_handle ?? null,
@@ -104,8 +119,8 @@ function convertComment(comment: Comment): FrontendComment {
     audioFile: comment.audio_url
       ? {
           url: comment.audio_url,
-          title: "Audio",
-          duration: 0,
+          title: comment.audio_title || "Audio",
+          duration: comment.audio_duration || 0,
         }
       : undefined,
     timestamp: new Date(comment.created_at),
@@ -211,15 +226,22 @@ export const useCreateComment = () => {
     setIsPending(true);
     try {
       let audioUrl: string | undefined;
+      let audioDuration: number | undefined;
       if (variables.audioFile) {
-        const uploaded = await uploadFile("audio", variables.audioFile);
+        const [uploaded, duration] = await Promise.all([
+          uploadFile("audio", variables.audioFile),
+          getAudioDuration(variables.audioFile),
+        ]);
         audioUrl = uploaded.url;
+        audioDuration = duration || undefined;
       }
 
       const result = await createComment({
         postId: variables.postId as Id<"posts">,
         text: variables.content || undefined,
         audioUrl,
+        audioTitle: variables.audioFile?.name?.replace(/\.[^/.]+$/, "") || undefined,
+        audioDuration,
       });
       return convertComment(result);
     } finally {
@@ -247,13 +269,20 @@ export const useCreatePost = () => {
     setIsPending(true);
     try {
       let audioUrl: string | undefined;
+      let audioDuration: number | undefined;
       if (variables.audioFile) {
-        const uploaded = await uploadFile("audio", variables.audioFile);
+        const [uploaded, duration] = await Promise.all([
+          uploadFile("audio", variables.audioFile),
+          getAudioDuration(variables.audioFile),
+        ]);
         audioUrl = uploaded.url;
+        audioDuration = duration || undefined;
       }
       const result = await createPost({
         text: variables.content || undefined,
         audio_url: audioUrl,
+        audio_title: variables.audioFile?.name?.replace(/\.[^/.]+$/, "") || undefined,
+        audio_duration: audioDuration,
         community_id: variables.communityId ? (variables.communityId as Id<"communities">) : undefined,
       });
       return convertPost(result);
@@ -431,14 +460,21 @@ export const useCreateReply = () => {
     setIsPending(true);
     try {
       let audioUrl: string | undefined;
+      let audioDuration: number | undefined;
       if (variables.audioFile) {
-        const uploaded = await uploadFile("audio", variables.audioFile);
+        const [uploaded, duration] = await Promise.all([
+          uploadFile("audio", variables.audioFile),
+          getAudioDuration(variables.audioFile),
+        ]);
         audioUrl = uploaded.url;
+        audioDuration = duration || undefined;
       }
       const result = await replyMutation({
         parentId: variables.parentId as Id<"comments">,
         text: variables.content || undefined,
         audioUrl,
+        audioTitle: variables.audioFile?.name?.replace(/\.[^/.]+$/, "") || undefined,
+        audioDuration,
       });
       return convertComment(result);
     } finally {

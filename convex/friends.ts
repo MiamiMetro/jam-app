@@ -351,6 +351,83 @@ export const getRequestsPaginated = query({
  * Get sent pending requests with recipient user data using native Convex pagination.
  * This is the preferred endpoint for Convex-first frontend pagination.
  */
+/**
+ * Get suggested friends: recent active users who are not already
+ * friends or pending with the current user.
+ * Returns up to `limit` suggestions (default 5).
+ */
+export const getSuggested = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const profile = await getCurrentProfile(ctx);
+    if (!profile) return [];
+
+    const limit = args.limit ?? 5;
+
+    // Collect all user IDs we should exclude (self + any friend/pending relationship)
+    const excludeIds = new Set<string>([profile._id]);
+
+    const myFriendships = await ctx.db
+      .query("friends")
+      .withIndex("by_user", (q) => q.eq("userId", profile._id))
+      .collect();
+    for (const f of myFriendships) {
+      excludeIds.add(f.friendId);
+    }
+
+    const incomingFriendships = await ctx.db
+      .query("friends")
+      .withIndex("by_friend", (q) => q.eq("friendId", profile._id))
+      .collect();
+    for (const f of incomingFriendships) {
+      excludeIds.add(f.userId);
+    }
+
+    // Also exclude blocked users (both directions)
+    const blockedByMe = await ctx.db
+      .query("blocks")
+      .withIndex("by_blocker", (q) => q.eq("blockerId", profile._id))
+      .collect();
+    for (const b of blockedByMe) {
+      excludeIds.add(b.blockedId);
+    }
+
+    const blockedMe = await ctx.db
+      .query("blocks")
+      .withIndex("by_blocked", (q) => q.eq("blockedId", profile._id))
+      .collect();
+    for (const b of blockedMe) {
+      excludeIds.add(b.blockerId);
+    }
+
+    // Scan recent profiles and pick first `limit` not in excludeIds
+    const suggestions: Array<{
+      id: string;
+      username: string;
+      display_name: string;
+      avatar_url: string;
+    }> = [];
+
+    // Take a reasonable batch to filter from (50 should be plenty for small app)
+    const candidates = await ctx.db
+      .query("profiles")
+      .order("desc")
+      .take(50);
+
+    for (const candidate of candidates) {
+      if (suggestions.length >= limit) break;
+      if (excludeIds.has(candidate._id)) continue;
+      if (!isDiscoverableAccountState(candidate.accountState)) continue;
+
+      suggestions.push(formatPublicProfileIdentity(candidate));
+    }
+
+    return suggestions;
+  },
+});
+
 export const getSentRequestsWithDataPaginated = query({
   args: {
     paginationOpts: paginationOptsValidator,

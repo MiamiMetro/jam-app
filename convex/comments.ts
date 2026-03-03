@@ -73,6 +73,8 @@ async function formatComment(
       url: comment.audioUrl,
       objectKey: comment.audioObjectKey,
     }),
+    audio_title: isDeleted ? null : (comment.audioTitle ?? null),
+    audio_duration: isDeleted ? null : (comment.audioDuration ?? null),
     created_at: new Date(comment._creationTime).toISOString(),
     author: author
       ? formatPublicProfileIdentity(author)
@@ -94,10 +96,12 @@ export const create = mutation({
     postId: v.id("posts"),
     text: v.optional(v.string()),
     audioUrl: v.optional(v.string()),
+    audioTitle: v.optional(v.string()),
+    audioDuration: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const profile = await requireAuth(ctx);
-    
+
     // Rate limit: 10 comments per minute
     await checkRateLimit(ctx, "createComment", profile._id);
 
@@ -160,6 +164,8 @@ export const create = mutation({
       text,
       audioUrl: nextAudioUrl,
       audioObjectKey: nextAudioObjectKey,
+      audioTitle: args.audioTitle,
+      audioDuration: args.audioDuration,
       likesCount: 0,
       repliesCount: 0,
       nextReplySequence: 0, // Initialize counter for this comment's replies
@@ -182,6 +188,8 @@ export const reply = mutation({
     parentId: v.id("comments"),
     text: v.optional(v.string()),
     audioUrl: v.optional(v.string()),
+    audioTitle: v.optional(v.string()),
+    audioDuration: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const profile = await requireAuth(ctx);
@@ -243,6 +251,8 @@ export const reply = mutation({
       text,
       audioUrl: nextAudioUrl,
       audioObjectKey: nextAudioObjectKey,
+      audioTitle: args.audioTitle,
+      audioDuration: args.audioDuration,
       likesCount: 0,
       repliesCount: 0,
       nextReplySequence: 0, // Initialize counter for this comment's replies

@@ -16,10 +16,6 @@ import {
   Settings,
   RefreshCw,
   AlertTriangle,
-  Guitar,
-  Mic,
-  Piano,
-  Drum,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -40,13 +36,6 @@ import { usePostAudio } from "@/contexts/PostAudioContext";
 import { Timestamp } from "@/components/Timestamp";
 import { LoadingState } from "@/components/LoadingState";
 import { EmptyState } from "@/components/EmptyState";
-
-const instrumentIcons: Record<string, React.ReactNode> = {
-  Guitar: <Guitar className="h-3.5 w-3.5" />,
-  Vocals: <Mic className="h-3.5 w-3.5" />,
-  Keyboard: <Piano className="h-3.5 w-3.5" />,
-  Drums: <Drum className="h-3.5 w-3.5" />,
-};
 
 interface JamRoomProps {
   roomHandle?: string;
@@ -149,11 +138,11 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   }, [messages]);
 
   const performers = useMemo(
-    () => participants.filter((p) => p.role === "performer"),
+    () => participants.filter((p) => (p.role as string) === "performer"),
     [participants]
   );
   const listeners = useMemo(
-    () => participants.filter((p) => p.role === "listener"),
+    () => participants.filter((p) => (p.role as string) === "listener"),
     [participants]
   );
   const isHost = !isGuest && user && room && room.host_id === user.id;

@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

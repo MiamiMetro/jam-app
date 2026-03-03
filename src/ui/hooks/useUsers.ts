@@ -39,8 +39,8 @@ function convertUser(profile: {
     genres: profile.genres ?? [],
     dm_privacy: profile.dm_privacy ?? "friends",
     account_state: profile.account_state ?? "active",
-    state_changed_at: profile.state_changed_at ?? new Date().toISOString(),
-    created_at: profile.created_at ?? new Date().toISOString(),
+    state_changed_at: profile.state_changed_at ?? "",
+    created_at: profile.created_at ?? "",
   };
 }
 
@@ -115,7 +115,7 @@ export interface UIConversation {
   isGroup: boolean;
   name?: string;
   participantCount?: number;
-  otherUser?: User;
+  otherUser?: { id: Id<"profiles">; username: string; display_name: string; avatar_url: string };
   lastMessage?: {
     id: string;
     senderId?: string;
@@ -146,14 +146,6 @@ function convertConversation(conv: {
           username: conv.other_user.username,
           display_name: conv.other_user.display_name ?? "",
           avatar_url: conv.other_user.avatar_url ?? "",
-          banner_url: "",
-          bio: "",
-          instruments: [],
-          genres: [],
-          dm_privacy: "friends",
-          account_state: "active",
-          state_changed_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
         }
       : undefined,
     hasUnread: conv.hasUnread,

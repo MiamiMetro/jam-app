@@ -72,6 +72,8 @@ async function formatPost(
       url: post.audioUrl,
       objectKey: post.audioObjectKey,
     }),
+    audio_title: isDeleted ? null : (post.audioTitle ?? null),
+    audio_duration: isDeleted ? null : (post.audioDuration ?? null),
     created_at: new Date(post._creationTime).toISOString(),
     author: author
       ? formatPublicProfileIdentity(author)
@@ -95,6 +97,8 @@ export const create = mutation({
   args: {
     text: v.optional(v.string()),
     audio_url: v.optional(v.string()),
+    audio_title: v.optional(v.string()),
+    audio_duration: v.optional(v.number()),
     community_id: v.optional(v.id("communities")),
   },
   handler: async (ctx, args) => {
@@ -149,6 +153,8 @@ export const create = mutation({
       text: text,
       audioUrl: nextAudioUrl,
       audioObjectKey: nextAudioObjectKey,
+      audioTitle: args.audio_title,
+      audioDuration: args.audio_duration,
       communityId: args.community_id,
       likesCount: 0,
       commentsCount: 0,
