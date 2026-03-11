@@ -24,10 +24,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useProfileCatalog, useUpdateProfile, useUser } from "@/hooks/useUsers";
 import { useR2Upload } from "@/hooks/useR2Upload";
 import { useUserPosts, useToggleLike, useDeletePost, type FrontendPost } from "@/hooks/usePosts";
-import { useFriends, useRequestFriend, useSentFriendRequests, useDeleteFriend } from "@/hooks/useFriends";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
+import { useFriends, useFriendsCount, useRequestFriend, useSentFriendRequests, useDeleteFriend } from "@/hooks/useFriends";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadMoreButton } from "@/components/LoadMoreButton";
 import { PostCard } from "@/components/PostCard";
@@ -65,10 +62,7 @@ function Profile() {
     isFetchingNextPage: isLoadingMoreFriends,
   } = useFriends(undefined, profileUser?.id);
   const { data: currentUserFriends = [] } = useFriends();
-  const friendsCount = useQuery(
-    api.friends.getCount,
-    profileUser ? { userId: profileUser.id as Id<"profiles"> } : "skip"
-  );
+  const friendsCount = useFriendsCount(profileUser?.id);
 
   const requestFriendMutation = useRequestFriend();
   const deleteFriendMutation = useDeleteFriend();

@@ -258,6 +258,14 @@ export const useSentFriendRequests = () => {
   };
 };
 
+export const useFriendsCount = (userId?: Id<"profiles"> | string) => {
+  const result = useQuery(
+    api.friends.getCount,
+    userId ? { userId: userId as Id<"profiles"> } : "skip"
+  );
+  return result ?? 0;
+};
+
 export const useSuggestedFriends = () => {
   const { isGuest } = useAuthStore();
   const { isProfileReady } = useProfileStore();
