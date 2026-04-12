@@ -1,10 +1,10 @@
 import { usePaginatedQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
-export function usePosts() {
+export function useProfilePosts(username: string | undefined) {
   const { results, status, loadMore } = usePaginatedQuery(
-    api.posts.getFeedPaginated,
-    {},
+    api.posts.getByUsernamePaginated,
+    username ? { username } : "skip",
     { initialNumItems: 10 }
   );
 

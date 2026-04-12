@@ -1,26 +1,19 @@
-import { StyleSheet, Text, View, ActivityIndicator, SafeAreaView } from 'react-native'
-import React from 'react'
-import PostList from '@/components/posts/PostList';
+import { StyleSheet, SafeAreaView } from "react-native";
+import React from "react";
+import PostList from "@/components/posts/PostList";
 import { usePosts } from "@/hooks/usePosts";
 
-
 const HomeScreen = () => {
-  const { posts, isLoading, isLoadingMore, loadMore } = usePosts();
+  const { posts, isLoading, isLoadingMore, canLoadMore, loadMore } = usePosts();
 
-   if (isLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-      </View>
-    );
-  }
-  
-   return (
+  return (
     <SafeAreaView style={styles.container}>
       <PostList
         posts={posts}
+        isLoading={isLoading}
+        isLoadingMore={isLoadingMore}
         onEndReached={() => {
-          if (!isLoadingMore) {
+          if (canLoadMore && !isLoadingMore) {
             loadMore(10);
           }
         }}
@@ -29,15 +22,10 @@ const HomeScreen = () => {
   );
 };
 
-export default HomeScreen
+export default HomeScreen;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

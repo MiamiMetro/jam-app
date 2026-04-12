@@ -1,14 +1,32 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
+import React from "react";
+import { SafeAreaView, StyleSheet } from "react-native";
+import JamList from "@/components/jams/JamList";
+import { useRooms } from "@/hooks/useRooms";
 
 const JamScreen = () => {
+  const { rooms, isLoading, isLoadingMore, canLoadMore, loadMore } = useRooms();
+
   return (
-    <View>
-      <Text>JamScreen</Text>
-    </View>
-  )
-}
+    <SafeAreaView style={styles.container}>
+      <JamList
+        rooms={rooms}
+        isLoading={isLoading}
+        isLoadingMore={isLoadingMore}
+        onEndReached={() => {
+          if (canLoadMore && !isLoadingMore) {
+            loadMore(10);
+          }
+        }}
+      />
+    </SafeAreaView>
+  );
+};
 
-export default JamScreen
+export default JamScreen;
 
-const styles = StyleSheet.create({})
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+});

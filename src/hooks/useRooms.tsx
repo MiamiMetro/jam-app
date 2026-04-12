@@ -1,15 +1,15 @@
 import { usePaginatedQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
-export function usePosts() {
+export function useRooms() {
   const { results, status, loadMore } = usePaginatedQuery(
-    api.posts.getFeedPaginated,
+    api.rooms.listActivePaginated,
     {},
     { initialNumItems: 10 }
   );
 
   return {
-    posts: results,
+    rooms: results,
     isLoading: status === "LoadingFirstPage",
     isLoadingMore: status === "LoadingMore",
     canLoadMore: status === "CanLoadMore",

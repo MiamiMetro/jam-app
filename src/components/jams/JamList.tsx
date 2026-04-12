@@ -1,16 +1,16 @@
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
-import type { PostFeedItem } from "@/types";
-import PostItem from "./PostItem";
+import type { RoomFeedItem } from "@/types";
+import JamItem from "./JamItem";
 
 type Props = {
-  posts: PostFeedItem[];
+  rooms: RoomFeedItem[];
   isLoading?: boolean;
   isLoadingMore?: boolean;
   onEndReached?: () => void;
 };
 
-export default function PostList({
-  posts,
+export default function JamList({
+  rooms,
   isLoading = false,
   isLoadingMore = false,
   onEndReached,
@@ -19,15 +19,15 @@ export default function PostList({
     return (
       <View style={styles.centerState}>
         <ActivityIndicator />
-        <Text style={styles.stateText}>Posts are loading...</Text>
+        <Text style={styles.stateText}>Active jams are loading...</Text>
       </View>
     );
   }
 
-  if (posts.length === 0) {
+  if (rooms.length === 0) {
     return (
       <View style={styles.centerState}>
-        <Text style={styles.stateText}>No posts yet.</Text>
+        <Text style={styles.stateText}>No active jams right now.</Text>
       </View>
     );
   }
@@ -35,11 +35,11 @@ export default function PostList({
   return (
     <FlatList
       contentContainerStyle={styles.content}
-      data={posts}
+      data={rooms}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <PostItem post={item} />}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
+      renderItem={({ item }) => <JamItem room={item} />}
       ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
     />
   );

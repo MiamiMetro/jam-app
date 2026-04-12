@@ -17,6 +17,10 @@ export type Post = NonNullable<PostQueryReturn>;
 type PostFeedReturn = FunctionReturnType<typeof api.posts.getFeedPaginated>;
 export type PostFeedItem = PostFeedReturn["page"][number];
 
+// Infer Room feed item type (Convex format - single source of truth)
+type RoomsFeedReturn = FunctionReturnType<typeof api.rooms.listActivePaginated>;
+export type RoomFeedItem = RoomsFeedReturn["page"][number];
+
 // Infer Comment type from comments query (Convex format - single source of truth)
 type CommentsQueryReturn = FunctionReturnType<typeof api.comments.getByPostPaginated>;
 export type Comment = CommentsQueryReturn["page"][number];
@@ -32,6 +36,11 @@ export type Conversation = ConversationsQueryReturn["page"][number];
 // Infer Community type from community queries (Convex format - single source of truth)
 type CommunityQueryReturn = FunctionReturnType<typeof api.communities.getByHandle>;
 export type CommunityItem = NonNullable<CommunityQueryReturn>;
+
+// Infer profile posts feed item type (Convex format - single source of truth)
+type ProfilePostsReturn = FunctionReturnType<typeof api.posts.getByUsernamePaginated>;
+export type ProfilePostItem = ProfilePostsReturn["page"][number];
+
 
 // Re-export Convex utility types for direct use
 // Note: TypeScript may warn these are unused, but they ARE used via re-export throughout the codebase
