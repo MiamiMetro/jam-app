@@ -1,5 +1,6 @@
 import { createClient, type GenericCtx } from "@convex-dev/better-auth";
 import { convex, crossDomain } from "@convex-dev/better-auth/plugins";
+import { expo } from "@better-auth/expo";
 import { components } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
 import { betterAuth } from "better-auth/minimal";
@@ -14,14 +15,14 @@ const siteUrls = [process.env.SITE_URL, process.env.VITE_SITE_URL]
   .flatMap((value) => value.split(",").map((url) => url.trim()))
   .filter((value) => value.length > 0);
 
-const trustedOrigins =
+const webOrigins =
   siteUrls.length > 0 ? siteUrls : ["http://localhost:5173"];
 
 export const authComponent = createClient<DataModel>(components.betterAuth);
 
 export const createAuth = (ctx: GenericCtx<DataModel>) =>
   betterAuth({
-    trustedOrigins,
+    trustedOrigins: [...webOrigins, "jam://"],
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: true,
@@ -37,7 +38,8 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
       },
     },
     plugins: [
-      crossDomain({ siteUrl: trustedOrigins[0] }),
+      expo(),
+      crossDomain({ siteUrl: webOrigins[0] }),
       convex({ authConfig }),
     ],
   });
