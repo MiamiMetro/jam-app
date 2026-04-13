@@ -56,7 +56,9 @@ export default function AppLayout() {
     <div className="flex flex-col h-screen bg-background text-foreground app-bg">
       <div className="flex flex-1 min-h-0">
         <NavSidebar />
-        <div className="content-column flex-1 flex flex-col bg-background overflow-hidden relative z-10">
+        <div className="content-column flex-1 flex flex-col bg-background min-h-0 relative z-10">
+          {/* Windows drag bar — allows window movement by dragging this thin strip */}
+          <div className="drag-region h-[36px] shrink-0 electron-windows-only" />
           <MainContent />
         </div>
       </div>

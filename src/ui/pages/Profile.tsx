@@ -8,10 +8,13 @@ import {
   ArrowLeft,
   CalendarDays,
   ChevronRight,
+  Guitar,
   Music,
   Star,
   UserMinus,
   UserPlus,
+  Users as UsersIcon,
+  MapPin,
   X,
 } from "lucide-react";
 import {
@@ -25,6 +28,7 @@ import { useProfileCatalog, useUpdateProfile, useUser } from "@/hooks/useUsers";
 import { useR2Upload } from "@/hooks/useR2Upload";
 import { useUserPosts, useToggleLike, useDeletePost, type FrontendPost } from "@/hooks/usePosts";
 import { useFriends, useFriendsCount, useRequestFriend, useSentFriendRequests, useDeleteFriend } from "@/hooks/useFriends";
+import { useUserBandListings } from "@/hooks/useBands";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadMoreButton } from "@/components/LoadMoreButton";
 import { PostCard } from "@/components/PostCard";
@@ -63,6 +67,7 @@ function Profile() {
   } = useFriends(undefined, profileUser?.id);
   const { data: currentUserFriends = [] } = useFriends();
   const friendsCount = useFriendsCount(profileUser?.id);
+  const { data: userBandListings = [] } = useUserBandListings(profileUser?.id);
 
   const requestFriendMutation = useRequestFriend();
   const deleteFriendMutation = useDeleteFriend();
@@ -380,11 +385,10 @@ function Profile() {
           <Button
             variant="outline"
             size="sm"
-            className={`no-drag transition-all duration-200 ${
-              stopPreviewAnimPhase === "hidden"
+            className={`no-drag transition-all duration-200 ${stopPreviewAnimPhase === "hidden"
                 ? "opacity-0 -translate-y-1 scale-95"
                 : "opacity-100 translate-y-0 scale-100"
-            }`}
+              }`}
             onClick={handleStopPreview}
           >
             Stop Preview
@@ -400,7 +404,7 @@ function Profile() {
       </div>
 
       <div className="flex-1 flex min-h-0">
-        <div className="w-[320px] min-w-[320px] border-r border-border flex flex-col">
+        <div className="w-[320px] min-w-[320px] border-r border-border flex flex-col min-h-0">
           <div className="px-5 pt-5 flex-shrink-0">
             <div className="-mt-14 relative z-10 h-30 w-30 rounded-full border-4 border-background overflow-hidden ring-2 ring-primary/30 shadow-glow-primary-lg mb-4">
               <Avatar className="h-full w-full">
@@ -412,143 +416,174 @@ function Profile() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 pb-5">
-          <h1 className="text-xl font-heading font-bold min-w-0 wrap-break-word">
-            {visibleDisplayName || profileUser.username}
-          </h1>
+          <div className="flex-1 overflow-y-auto px-5 pb-5 min-h-0">
+            <h1 className="text-xl font-heading font-bold min-w-0 wrap-break-word">
+              {visibleDisplayName || profileUser.username}
+            </h1>
 
-          <div className="flex items-center gap-2">
-            {visibleDisplayName && visibleDisplayName !== profileUser.username && (
-              <span className="text-sm text-muted-foreground">@{profileUser.username}</span>
-            )}
-            {isOwnProfile && !isPreviewing && (
-              <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                <Star className="h-3 w-3" />
-                You
-              </span>
-            )}
-          </div>
-
-          <p className="text-sm text-muted-foreground mt-3 mb-3 wrap-break-word whitespace-pre-wrap">
-            {visibleBio.trim() || "No bio yet."}
-          </p>
-
-          <div className={`flex items-center text-sm pb-4 border-b border-border/50 ${showFriendActionRow ? "mb-4" : "mb-0"}`}>
-            <button
-              onClick={() => setActiveTab("posts")}
-              className={`flex items-center gap-1.5 transition-colors cursor-pointer pb-1 border-b-2 ${
-                activeTab === "posts"
-                  ? "text-foreground border-b-primary"
-                  : "text-muted-foreground hover:text-foreground border-b-transparent"
-              }`}
-            >
-              <span className="font-semibold text-primary">{userPosts.length}</span>
-              <span>Posts</span>
-            </button>
-            <span className="mx-3 text-border">&middot;</span>
-            <button
-              onClick={() => setActiveTab("friends")}
-              className={`flex items-center gap-1.5 transition-colors cursor-pointer pb-1 border-b-2 ${
-                activeTab === "friends"
-                  ? "text-foreground border-b-primary"
-                  : "text-muted-foreground hover:text-foreground border-b-transparent"
-              }`}
-            >
-              <span className="font-semibold text-primary">{friendsCount ?? profileUserFriends.length}</span>
-              <span>Friends</span>
-            </button>
-          </div>
-
-          {!isOwnProfile && mutualFriends.length > 0 && (
-            <div className="flex items-center gap-2 mb-4">
-              <AvatarGroup>
-                {mutualFriends.slice(0, 3).map((friend: User) => (
-                  <Avatar key={friend.id} size="xs" className="h-5 w-5">
-                    <AvatarImage src={friend.avatar_url || ""} alt={friend.username} />
-                    <AvatarFallback className="bg-muted text-muted-foreground text-[8px]">
-                      {friend.username.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                ))}
-              </AvatarGroup>
-              <span className="text-xs text-muted-foreground">
-                {mutualFriends.length} mutual friend{mutualFriends.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-          )}
-
-          {showFriendActionRow && (
-            <div className="mb-4">
-              {isOwnProfile && !isPreviewing ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    resetEditDraft();
-                    setIsEditOpen(true);
-                  }}
-                >
-                  Edit Profile
-                </Button>
-              ) : isFriend ? (
-                <Button onClick={handleUnfriend} size="sm" variant="outline" className="w-full">
-                  <UserMinus className="h-4 w-4 mr-2" />
-                  Unfriend
-                </Button>
-              ) : hasSentRequest ? (
-                <Button onClick={handleCancelRequest} size="sm" variant="outline" className="w-full">
-                  <UserMinus className="h-4 w-4 mr-2" />
-                  Cancel Request
-                </Button>
-              ) : (
-                <Button onClick={handleAddFriend} size="sm" className="w-full glow-primary">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Add Friend
-                </Button>
+            <div className="flex items-center gap-2">
+              {visibleDisplayName && visibleDisplayName !== profileUser.username && (
+                <span className="text-sm text-muted-foreground">@{profileUser.username}</span>
+              )}
+              {isOwnProfile && !isPreviewing && (
+                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                  <Star className="h-3 w-3" />
+                  You
+                </span>
               )}
             </div>
-          )}
 
-          <div className={`pt-4 ${showFriendActionRow ? "border-t border-border/50" : ""}`}>
-            <div className="flex items-center gap-2 mb-3">
-              <Music className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Musician</span>
+            <p className="text-sm text-muted-foreground mt-3 mb-3 wrap-break-word whitespace-pre-wrap">
+              {visibleBio.trim() || "No bio yet."}
+            </p>
+
+            <div className={`flex items-center text-sm pb-4 border-b border-border/50 ${showFriendActionRow ? "mb-4" : "mb-0"}`}>
+              <button
+                onClick={() => setActiveTab("posts")}
+                className={`flex items-center gap-1.5 transition-colors cursor-pointer pb-1 border-b-2 ${activeTab === "posts"
+                    ? "text-foreground border-b-primary"
+                    : "text-muted-foreground hover:text-foreground border-b-transparent"
+                  }`}
+              >
+                <span className="font-semibold text-primary">{userPosts.length}</span>
+                <span>Posts</span>
+              </button>
+              <span className="mx-3 text-border">&middot;</span>
+              <button
+                onClick={() => setActiveTab("friends")}
+                className={`flex items-center gap-1.5 transition-colors cursor-pointer pb-1 border-b-2 ${activeTab === "friends"
+                    ? "text-foreground border-b-primary"
+                    : "text-muted-foreground hover:text-foreground border-b-transparent"
+                  }`}
+              >
+                <span className="font-semibold text-primary">{friendsCount ?? profileUserFriends.length}</span>
+                <span>Friends</span>
+              </button>
             </div>
-            {visibleInstruments.length === 0 && visibleGenres.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No musician profile yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {visibleInstruments.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {visibleInstruments.map((instrument: string) => (
-                      <span key={instrument} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                        {instrument}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {visibleGenres.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {visibleGenres.map((genre: string) => (
-                      <span key={genre} className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[11px] font-medium">
-                        {genre}
-                      </span>
-                    ))}
-                  </div>
+
+            {!isOwnProfile && mutualFriends.length > 0 && (
+              <div className="flex items-center gap-2 mb-4">
+                <AvatarGroup>
+                  {mutualFriends.slice(0, 3).map((friend: User) => (
+                    <Avatar key={friend.id} size="xs" className="h-5 w-5">
+                      <AvatarImage src={friend.avatar_url || ""} alt={friend.username} />
+                      <AvatarFallback className="bg-muted text-muted-foreground text-[8px]">
+                        {friend.username.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  ))}
+                </AvatarGroup>
+                <span className="text-xs text-muted-foreground">
+                  {mutualFriends.length} mutual friend{mutualFriends.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+            )}
+
+            {showFriendActionRow && (
+              <div className="mb-4">
+                {isOwnProfile && !isPreviewing ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      resetEditDraft();
+                      setIsEditOpen(true);
+                    }}
+                  >
+                    Edit Profile
+                  </Button>
+                ) : isFriend ? (
+                  <Button onClick={handleUnfriend} size="sm" variant="outline" className="w-full">
+                    <UserMinus className="h-4 w-4 mr-2" />
+                    Unfriend
+                  </Button>
+                ) : hasSentRequest ? (
+                  <Button onClick={handleCancelRequest} size="sm" variant="outline" className="w-full">
+                    <UserMinus className="h-4 w-4 mr-2" />
+                    Cancel Request
+                  </Button>
+                ) : (
+                  <Button onClick={handleAddFriend} size="sm" className="w-full glow-primary">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Friend
+                  </Button>
                 )}
               </div>
             )}
-          </div>
 
-          {profileUser.created_at && (
-            <div className="flex items-center gap-1.5 mt-4 pt-4 border-t border-border/50 text-xs text-muted-foreground">
-              <CalendarDays className="h-3 w-3" />
-              <Timestamp date={profileUser.created_at}>
-                Member since {new Date(profileUser.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-              </Timestamp>
+            <div className={`pt-4 ${showFriendActionRow ? "border-t border-border/50" : ""}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <Music className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Musician</span>
+              </div>
+              {visibleInstruments.length === 0 && visibleGenres.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No musician profile yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {visibleInstruments.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {visibleInstruments.map((instrument: string) => (
+                        <span key={instrument} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                          {instrument}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {visibleGenres.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {visibleGenres.map((genre: string) => (
+                        <span key={genre} className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[11px] font-medium">
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Bands Section */}
+            {userBandListings.length > 0 && (
+              <div className="pt-4 mt-4 border-t border-border/50">
+                <div className="flex items-center gap-2 mb-3">
+                  <Guitar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bands</span>
+                </div>
+                <div className="space-y-2.5">
+                  {userBandListings.map((listing) => (
+                    <div
+                      key={listing.id}
+                      className="rounded-lg bg-muted/30 border border-border/50 px-3 py-2.5 transition-colors hover:bg-muted/50"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-sm truncate">{listing.band_name}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <UsersIcon className="h-3 w-3" />
+                          {listing.current_members}/{listing.max_members}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {listing.region}
+                        </span>
+                        {listing.genre && <span>• {listing.genre}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {profileUser.created_at && (
+              <div className="flex items-center gap-1.5 mt-4 pt-4 border-t border-border/50 text-xs text-muted-foreground">
+                <CalendarDays className="h-3 w-3" />
+                <Timestamp date={profileUser.created_at}>
+                  Member since {new Date(profileUser.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                </Timestamp>
+              </div>
+            )}
           </div>
         </div>
 
@@ -556,21 +591,19 @@ function Profile() {
           <div className="flex border-b border-border flex-shrink-0">
             <button
               onClick={() => setActiveTab("posts")}
-              className={`px-5 py-3 text-sm font-medium transition-colors cursor-pointer ${
-                activeTab === "posts"
+              className={`px-5 py-3 text-sm font-medium transition-colors cursor-pointer ${activeTab === "posts"
                   ? "text-foreground"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               Activities
             </button>
             <button
               onClick={() => setActiveTab("friends")}
-              className={`px-5 py-3 text-sm font-medium transition-colors cursor-pointer ${
-                activeTab === "friends"
+              className={`px-5 py-3 text-sm font-medium transition-colors cursor-pointer ${activeTab === "friends"
                   ? "text-foreground"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               Friends
               <span className="ml-1.5 text-xs text-muted-foreground">({friendsCount ?? profileUserFriends.length})</span>
@@ -804,11 +837,10 @@ function Profile() {
                       type="button"
                       onClick={() => toggleTag(instrument, editInstruments, setEditInstruments)}
                       disabled={!selected && editInstruments.length >= 8}
-                      className={`px-2 py-1 rounded-full text-xs border transition-colors ${
-                        selected
+                      className={`px-2 py-1 rounded-full text-xs border transition-colors ${selected
                           ? "bg-primary/10 border-primary/30 text-primary"
                           : "bg-background border-border text-muted-foreground hover:text-foreground"
-                      }`}
+                        }`}
                     >
                       {instrument}
                     </button>
@@ -859,11 +891,10 @@ function Profile() {
                       type="button"
                       onClick={() => toggleTag(genre, editGenres, setEditGenres)}
                       disabled={!selected && editGenres.length >= 8}
-                      className={`px-2 py-1 rounded-full text-xs border transition-colors ${
-                        selected
+                      className={`px-2 py-1 rounded-full text-xs border transition-colors ${selected
                           ? "bg-primary/10 border-primary/30 text-primary"
                           : "bg-background border-border text-muted-foreground hover:text-foreground"
-                      }`}
+                        }`}
                     >
                       {genre}
                     </button>

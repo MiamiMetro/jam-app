@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as bands from "../bands.js";
 import type * as blocks from "../blocks.js";
 import type * as comments from "../comments.js";
 import type * as communities from "../communities.js";
@@ -21,6 +22,7 @@ import type * as mediaCleanup from "../mediaCleanup.js";
 import type * as mediaMaintenance from "../mediaMaintenance.js";
 import type * as mediaService from "../mediaService.js";
 import type * as messages from "../messages.js";
+import type * as myTracks from "../myTracks.js";
 import type * as posts from "../posts.js";
 import type * as presence from "../presence.js";
 import type * as profiles from "../profiles.js";
@@ -39,6 +41,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  bands: typeof bands;
   blocks: typeof blocks;
   comments: typeof comments;
   communities: typeof communities;
@@ -51,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   mediaMaintenance: typeof mediaMaintenance;
   mediaService: typeof mediaService;
   messages: typeof messages;
+  myTracks: typeof myTracks;
   posts: typeof posts;
   presence: typeof presence;
   profiles: typeof profiles;

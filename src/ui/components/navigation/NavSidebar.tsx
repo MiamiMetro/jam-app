@@ -7,6 +7,8 @@ import {
   Rss,
   Users as UsersIcon,
   MessageCircle,
+  Guitar,
+  Disc3,
   Sun,
   Moon,
   Activity,
@@ -69,6 +71,18 @@ const navItems: NavItem[] = [
     path: "/communities",
     matchPrefix: "/communit",
     shortcut: `${modKey}4`,
+  },
+  {
+    label: "Bands",
+    icon: <Guitar className="h-5 w-5" />,
+    path: "/bands",
+    shortcut: `${modKey}5`,
+  },
+  {
+    label: "My Music",
+    icon: <Disc3 className="h-5 w-5" />,
+    path: "/my-music",
+    shortcut: `${modKey}6`,
   },
 ];
 

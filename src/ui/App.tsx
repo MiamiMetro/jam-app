@@ -11,6 +11,8 @@ const FeedTab = lazy(() => import("@/components/FeedTab"));
 const JamsTab = lazy(() => import("@/components/JamsTab"));
 const FriendsTab = lazy(() => import("@/components/FriendsTab"));
 const CommunitiesTab = lazy(() => import("@/components/CommunitiesTab"));
+const BandsTab = lazy(() => import("@/components/BandsTab"));
+const MyMusicTab = lazy(() => import("@/components/MyMusicTab"));
 const CommunityPage = lazy(() => import("@/pages/CommunityPage"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
@@ -70,6 +72,8 @@ function App() {
             <Route path="/jams" element={<JamsTab />} />
             <Route path="/friends" element={<FriendsTab />} />
             <Route path="/communities" element={<CommunitiesTab />} />
+            <Route path="/bands" element={<BandsTab />} />
+            <Route path="/my-music" element={<MyMusicTab />} />
             <Route path="/community/:handle" element={<CommunityPage />} />
             <Route path="/profile/:username" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />

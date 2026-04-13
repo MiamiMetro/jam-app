@@ -516,6 +516,20 @@ body::-webkit-scrollbar {
   padding-right: 140px;
 }
 
+/* Windows-only drag strip — shown only inside the Electron Windows shell */
+.electron-windows-only {
+  display: none;
+}
+
+.electron-windows .electron-windows-only {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 140px; /* avoid caption buttons */
+  z-index: 50;
+}
+
 /* Page headers are draggable (for window dragging) */
 .page-header {
   -webkit-app-region: drag;
