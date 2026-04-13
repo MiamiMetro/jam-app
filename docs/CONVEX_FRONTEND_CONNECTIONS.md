@@ -1,124 +1,204 @@
 # Convex Frontend Connections Inventory
 
-Last updated: 2026-02-22
+Last updated: 2026-04-13
 
-This file lists all Convex connections used by the frontend and their runtime type.
+This file lists the current Convex connections used by the frontend and how they are consumed.
 
 ## Connection Types
 
-1. `Live Subscription`:
-   Uses `useQuery(...)`. Reactively reruns when relevant Convex data changes.
-2. `Live Paginated Subscription`:
-   Uses `usePaginatedQuery(...)`. Loaded pages are reactive; `loadMore(...)` extends pages.
-3. `One-Shot Query`:
-   Uses `useConvex().query(...)`. Fetches once (no live subscription).
-4. `Mutation`:
-   Uses `useMutation(...)`. Write operation; not a subscription.
-5. `Transport/Auth Wiring`:
-   App-level Convex client/provider/auth-state integration.
+1. `Live Subscription`
+   - uses `useQuery(...)`
+2. `Live Paginated Subscription`
+   - uses `usePaginatedQuery(...)`
+3. `One-Shot Query`
+   - uses `useConvex().query(...)`
+4. `Mutation`
+   - uses `useMutation(...)`
+5. `Transport/Auth Wiring`
+   - app-level Convex client/provider/auth integration
 
-## A) Live Subscriptions (`useQuery`)
+## Live Subscriptions (`useQuery`)
 
-1. `api.profiles.getMe`
-   - Type: `Live Subscription`
-   - Used in: `src/ui/hooks/useEnsureProfile.ts:35`
-   - Purpose: keep current profile existence/data in sync after auth.
-2. `api.posts.getById`
-   - Type: `Live Subscription`
-   - Used in: `src/ui/hooks/usePosts.ts:162`
-   - Purpose: reactive single post view.
-3. `api.profiles.getByUsername`
-   - Type: `Live Subscription`
-   - Used in: `src/ui/hooks/useUsers.ts:130`
-   - Purpose: reactive profile lookup by username.
-4. `api.messages.getWithUser` (first page)
-   - Type: `Live Subscription`
-   - Used in: `src/ui/hooks/useUsers.ts:218`
-   - Purpose: newest DM page stays live (new messages/read indicators).
+### Profiles and users
 
-## B) Live Paginated Subscriptions (`usePaginatedQuery`)
+- `api.profiles.getMe`
+- `api.profiles.getByUsername`
+- `api.profiles.getProfileCatalog`
+- `api.users.getOnline`
 
-1. `api.posts.getFeedPaginated`
-   - Type: `Live Paginated Subscription`
-   - Used in: `src/ui/hooks/usePosts.ts:119` (`usePosts`)
-   - Used in: `src/ui/hooks/usePosts.ts:146` (`useGlobalPosts`)
-2. `api.comments.getByPostPaginated`
-   - Type: `Live Paginated Subscription`
-   - Used in: `src/ui/hooks/usePosts.ts:173` (`useComments`)
-3. `api.posts.getByUsernamePaginated`
-   - Type: `Live Paginated Subscription`
-   - Used in: `src/ui/hooks/usePosts.ts:319` (`useUserPosts`)
-4. `api.friends.listPaginated`
-   - Type: `Live Paginated Subscription`
-   - Used in: `src/ui/hooks/useFriends.ts:49` (`useFriends`)
-5. `api.friends.getRequestsPaginated`
-   - Type: `Live Paginated Subscription`
-   - Used in: `src/ui/hooks/useFriends.ts:80` (`useFriendRequests`)
-6. `api.friends.getSentRequestsWithDataPaginated`
-   - Type: `Live Paginated Subscription`
-   - Used in: `src/ui/hooks/useFriends.ts:224` (`useSentFriendRequests`)
-7. `api.users.getOnline`
-   - Type: `Live Paginated Subscription`
-   - Used in: `src/ui/hooks/useUsers.ts:118` (`useOnlineUsers`)
-8. `api.users.searchPaginated`
-   - Type: `Live Paginated Subscription`
-   - Used in: `src/ui/hooks/useUsers.ts:139` (`useAllUsers`)
-9. `api.messages.getConversationsPaginated`
-   - Type: `Live Paginated Subscription`
-   - Used in: `src/ui/hooks/useUsers.ts:161` (`useConversations`)
+### Friends
 
-## C) One-Shot Queries (`useConvex().query`)
+- `api.friends.getCount`
+- `api.friends.getSuggested`
 
-1. `api.messages.getWithUser` (older pages)
-   - Type: `One-Shot Query`
-   - Used in: `src/ui/hooks/useUsers.ts:241`
-   - Purpose: fetch older DM pages on demand ("load more older"), intentionally non-reactive.
-   - Note: this is the approved DM exception pattern (live newest page + one-shot older pages).
+### Posts
 
-## D) Mutations (`useMutation`)
+- `api.posts.getById`
 
-1. Profiles:
-   - `api.profiles.createProfile`
-   - Used in: `src/ui/components/auth/UsernameSetupModal.tsx:25`
-2. Friends:
-   - `api.friends.sendRequest` at `src/ui/hooks/useFriends.ts:99`
-   - `api.friends.acceptRequest` at `src/ui/hooks/useFriends.ts:123`
-   - `api.friends.remove` at `src/ui/hooks/useFriends.ts:147`, `src/ui/hooks/useFriends.ts:171`, `src/ui/hooks/useFriends.ts:195`
-3. Posts/Comments:
-   - `api.comments.create` at `src/ui/hooks/usePosts.ts:190`
-   - `api.posts.create` at `src/ui/hooks/usePosts.ts:220`
-   - `api.posts.remove` at `src/ui/hooks/usePosts.ts:245`
-   - `api.posts.toggleLike` at `src/ui/hooks/usePosts.ts:269`
-   - `api.comments.toggleLike` at `src/ui/hooks/usePosts.ts:294`
-4. Messages:
-   - `api.messages.send` at `src/ui/hooks/useUsers.ts:303`
-   - `api.messages.markAsRead` at `src/ui/hooks/useUsers.ts:340`
+### Communities
 
-## E) Transport/Auth Wiring
+- `api.communities.getByHandle`
+- `api.communities.getById`
+- `api.communities.getMemberRole`
+- `api.communities.getCreatedCount`
 
-1. Convex client creation:
-   - `new ConvexReactClient(...)` at `src/ui/main.tsx:14`
-2. App provider:
-   - `<ConvexBetterAuthProvider ...>` at `src/ui/main.tsx:61`
-3. Auth state sync hook:
-   - `useConvexAuth()` call at `src/ui/main.tsx:27`
-   - Hook implementation in `src/ui/hooks/useConvexAuth.ts:21`
+### Rooms
 
-## F) Type Inference Links (for endpoint contracts)
+- `api.rooms.getByHandle`
+- `api.rooms.getMyRoom`
+- `api.rooms.getParticipants`
+- `api.rooms.getFriendsInRooms`
+- `api.roomMessages.getLatest`
 
-1. `api.profiles.getMe` -> `User` base inference:
-   - `src/ui/lib/api/types.ts:9`
-2. `api.posts.getById` / `api.posts.getFeedPaginated`:
-   - `src/ui/lib/api/types.ts:13`, `src/ui/lib/api/types.ts:17`
-3. `api.comments.getByPostPaginated`:
-   - `src/ui/lib/api/types.ts:21`
-4. `api.messages.getWithUser` / `api.messages.getConversationsPaginated`:
-   - `src/ui/lib/api/types.ts:25`, `src/ui/lib/api/types.ts:29`
+### Messages
 
-## G) Quick Summary
+- `api.messages.getParticipants`
+- newest-page `api.messages.getByConversationPaginated`
 
-1. Live subscriptions (`useQuery`): 4
-2. Live paginated subscriptions (`usePaginatedQuery`): 9
-3. One-shot Convex queries (`useConvex().query`): 1
-4. Mutations (`useMutation`): 13 call sites
-5. Transport/auth Convex wiring: active in `main.tsx`
+### Bands and tracks
+
+- `api.bands.getActiveListingCount`
+- `api.myTracks.getMyTrackCount`
+
+## Live Paginated Subscriptions (`usePaginatedQuery`)
+
+### Posts and comments
+
+- `api.posts.getFeedPaginated`
+- `api.posts.getCommunityPostsPaginated`
+- `api.posts.getByUsernamePaginated`
+- `api.posts.getLikes`
+- `api.comments.getByPostPaginated`
+- `api.comments.getRepliesPaginated`
+
+### Friends
+
+- `api.friends.listPaginated`
+- `api.friends.getRequestsPaginated`
+- `api.friends.getSentRequestsWithDataPaginated`
+
+### Users
+
+- `api.users.searchPaginated`
+
+### Messages
+
+- `api.messages.getConversationsPaginated`
+
+### Communities
+
+- `api.communities.listPaginated`
+- `api.communities.getJoined`
+- `api.communities.getMembersPaginated`
+- `api.communities.searchMembersPaginated`
+
+### Rooms
+
+- `api.rooms.listActivePaginated`
+
+### Bands
+
+- `api.bands.listPaginated`
+- `api.bands.getMyListingsPaginated`
+- `api.bands.getByUserPaginated`
+- `api.bands.getApplications`
+- `api.bands.getMyApplicationsPaginated`
+
+### My Music
+
+- `api.myTracks.getMyTracks`
+
+## One-Shot Queries (`useConvex().query`)
+
+### Messages
+
+- older-page `api.messages.getByConversationPaginated`
+- approved exception for older DM history pages only
+
+## Mutations (`useMutation`)
+
+### Profiles
+
+- `api.profiles.createProfile`
+- `api.profiles.updateMe`
+- `api.profiles.softDeleteMe`
+
+### Friends
+
+- `api.friends.sendRequest`
+- `api.friends.acceptRequest`
+- `api.friends.remove`
+
+### Posts and comments
+
+- `api.posts.create`
+- `api.posts.remove`
+- `api.posts.toggleLike`
+- `api.comments.create`
+- `api.comments.reply`
+- `api.comments.remove`
+- `api.comments.toggleLike`
+
+### Messages
+
+- `api.messages.ensureDmWithUser`
+- `api.messages.send`
+- `api.messages.markAsRead`
+- `api.messages.remove`
+
+### Communities
+
+- `api.communities.create`
+- `api.communities.update`
+- `api.communities.join`
+- `api.communities.leave`
+- `api.communities.promoteMod`
+- `api.communities.demoteMod`
+- `api.communities.removeMember`
+
+### Rooms and presence
+
+- `api.rooms.create`
+- `api.rooms.update`
+- `api.rooms.activate`
+- `api.rooms.deactivate`
+- `api.rooms.deleteRoom`
+- `api.rooms.setStreamUrl`
+- `api.rooms.updateRoomStatus`
+- `api.roomMessages.send`
+- `api.presence.heartbeat`
+- `api.presence.disconnect`
+- `api.presence.roomHeartbeat`
+- `api.presence.guestRoomHeartbeat`
+- `api.presence.setMyStatus`
+
+### Bands
+
+- `api.bands.createListing`
+- `api.bands.closeListing`
+- `api.bands.deleteListing`
+- `api.bands.apply`
+
+### My Music
+
+- `api.myTracks.addTrack`
+- `api.myTracks.deleteTrack`
+
+## Composed Frontend Flows
+
+1. `useUnifiedSearch`
+   - composes `api.users.searchPaginated` and `api.communities.listPaginated`
+2. `useMessages`
+   - composes live newest-page reads with one-shot older-page loads
+
+## Transport/Auth Wiring
+
+1. Convex client creation in `src/ui/main.tsx`
+2. Convex provider wiring in `src/ui/main.tsx`
+3. auth sync through `useConvexAuth`
+
+## Summary
+
+1. Native Convex pagination is the standard for list UIs.
+2. The only approved one-shot query path is older DM history loading.
+3. Global search currently composes existing Convex endpoints rather than using a dedicated backend endpoint.
