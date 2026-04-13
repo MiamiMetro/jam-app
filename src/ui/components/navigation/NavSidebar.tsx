@@ -216,10 +216,13 @@ export default function NavSidebar() {
 
   useEffect(() => {
     if (!isGuest) return;
-    setManualPresenceStatus("online");
-    setCurrentPresenceStatus("online");
-    setIsAutoAway(false);
     clearIdleTimer();
+    const timer = window.setTimeout(() => {
+      setManualPresenceStatus("online");
+      setCurrentPresenceStatus("online");
+      setIsAutoAway(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [clearIdleTimer, isGuest, setCurrentPresenceStatus, setManualPresenceStatus]);
 
   useEffect(() => {

@@ -428,6 +428,16 @@ if (!gotTheLock) {
                         accelerator: isMac ? 'Cmd+4' : 'Ctrl+4',
                         click: () => mainWindow?.webContents.send('navigate', '/communities'),
                     },
+                    {
+                        label: 'Bands',
+                        accelerator: isMac ? 'Cmd+5' : 'Ctrl+5',
+                        click: () => mainWindow?.webContents.send('navigate', '/bands'),
+                    },
+                    {
+                        label: 'My Music',
+                        accelerator: isMac ? 'Cmd+6' : 'Ctrl+6',
+                        click: () => mainWindow?.webContents.send('navigate', '/my-music'),
+                    },
                 ],
             },
             // Window

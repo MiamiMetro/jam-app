@@ -5,14 +5,14 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import type { FunctionReturnType } from "convex/server";
 
 // Band listing type inferred from Convex backend
-type ListingQueryReturn = FunctionReturnType<typeof api.bands.getMyListings>;
-export type BandListing = ListingQueryReturn extends (infer T)[] ? T : never;
+type ListingQueryReturn = FunctionReturnType<typeof api.bands.getMyListingsPaginated>;
+export type BandListing = ListingQueryReturn["page"][number];
 
-type ApplicationQueryReturn = FunctionReturnType<typeof api.bands.getMyApplications>;
-export type BandApplication = ApplicationQueryReturn extends (infer T)[] ? T : never;
+type ApplicationQueryReturn = FunctionReturnType<typeof api.bands.getMyApplicationsPaginated>;
+export type BandApplication = ApplicationQueryReturn["page"][number];
 
-type UserBandListingsReturn = FunctionReturnType<typeof api.bands.getByUser>;
-export type UserBandListing = UserBandListingsReturn extends (infer T)[] ? T : never;
+type UserBandListingsReturn = FunctionReturnType<typeof api.bands.getByUserPaginated>;
+export type UserBandListing = UserBandListingsReturn["page"][number];
 
 type MutationOptions = {
   onSuccess?: () => void;
@@ -48,11 +48,18 @@ export const useBandListings = (filters?: {
 };
 
 export const useMyBandListings = () => {
-  const result = useQuery(api.bands.getMyListings, {});
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.bands.getMyListingsPaginated,
+    {},
+    { initialNumItems: 20 }
+  );
 
   return {
-    data: (result ?? []) as BandListing[],
-    isLoading: result === undefined,
+    data: results as BandListing[],
+    isLoading: status === "LoadingFirstPage",
+    hasNextPage: status === "CanLoadMore",
+    isFetchingNextPage: status === "LoadingMore",
+    fetchNextPage: () => loadMore(20),
   };
 };
 
@@ -79,23 +86,34 @@ export const useBandApplications = (listingId: string) => {
 };
 
 export const useMyBandApplications = () => {
-  const result = useQuery(api.bands.getMyApplications, {});
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.bands.getMyApplicationsPaginated,
+    {},
+    { initialNumItems: 20 }
+  );
 
   return {
-    data: (result ?? []) as BandApplication[],
-    isLoading: result === undefined,
+    data: results as BandApplication[],
+    isLoading: status === "LoadingFirstPage",
+    hasNextPage: status === "CanLoadMore",
+    isFetchingNextPage: status === "LoadingMore",
+    fetchNextPage: () => loadMore(20),
   };
 };
 
 export const useUserBandListings = (userId: string | undefined) => {
-  const result = useQuery(
-    api.bands.getByUser,
-    userId ? { userId: userId as Id<"profiles"> } : "skip"
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.bands.getByUserPaginated,
+    userId ? { userId: userId as Id<"profiles"> } : "skip",
+    { initialNumItems: 10 }
   );
 
   return {
-    data: (result ?? []) as BandListing[],
-    isLoading: result === undefined && !!userId,
+    data: results as BandListing[],
+    isLoading: status === "LoadingFirstPage",
+    hasNextPage: status === "CanLoadMore",
+    isFetchingNextPage: status === "LoadingMore",
+    fetchNextPage: () => loadMore(20),
   };
 };
 

@@ -290,6 +290,7 @@ export default defineSchema({
     maxMembers: v.number(),
     seekingRole: v.string(), // Vocalist, Guitarist, Bassist, Drummer, Keyboardist, Producer, Other
     region: v.string(), // Free text input
+    regionNormalized: v.string(),
     description: v.optional(v.string()),
     genre: v.optional(v.string()),
     status: v.union(v.literal("open"), v.literal("closed")),
@@ -297,11 +298,14 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_owner", ["ownerId"])
+    .index("by_owner_and_status", ["ownerId", "status"])
     .index("by_status", ["status"])
-    .index("by_created_at", ["createdAt"])
+    .index("by_status_and_role", ["status", "seekingRole"])
+    .index("by_status_and_region", ["status", "regionNormalized"])
+    .index("by_status_role_and_region", ["status", "seekingRole", "regionNormalized"])
     .searchIndex("search_band_listings", {
       searchField: "bandName",
-      filterFields: ["status"],
+      filterFields: ["status", "seekingRole", "regionNormalized"],
     }),
 
   // Band applications — applications to band listings

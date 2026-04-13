@@ -26,6 +26,10 @@ interface BandApplicationDialogProps {
   listing: BandListing | null;
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export function BandApplicationDialog({ open, onOpenChange, listing }: BandApplicationDialogProps) {
   const applyMutation = useApplyToBand();
 
@@ -45,8 +49,8 @@ export function BandApplicationDialog({ open, onOpenChange, listing }: BandAppli
         message: message.trim() || undefined,
       });
       handleClose(false);
-    } catch (err: any) {
-      setError(err?.message || "Failed to apply.");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Failed to apply."));
     }
   };
 

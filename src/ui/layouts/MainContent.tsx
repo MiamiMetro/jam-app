@@ -5,7 +5,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useUIStore } from "@/stores/uiStore";
-import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
 
 const JamRoom = lazy(() => import("@/pages/JamRoom"));
 
@@ -43,19 +42,12 @@ export default function MainContent() {
         </div>
       }
     >
-      <div className="flex-1 relative flex flex-col min-h-0">
-        {/* Unified Search Bar — fixed at top, hidden on jam routes */}
-        {!isOnJamRoute && (
-          <div className="shrink-0 px-5 py-2.5 border-b border-border/50 flex justify-end caption-safe relative z-40">
-            <UnifiedSearchBar />
-          </div>
-        )}
-
+      <div className="flex-1 relative">
         {/* Regular pages — rendered via React Router Outlet with page transition */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto min-h-0 flex flex-col"
-          style={{ display: isOnJamRoute ? "none" : undefined }}
+          className="absolute inset-0 overflow-y-auto"
+          style={{ display: isOnJamRoute ? "none" : "block" }}
         >
           <ErrorBoundary key={location.pathname}>
             <Outlet />

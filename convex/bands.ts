@@ -31,6 +31,10 @@ export type BandSeekingRole = (typeof BAND_SEEKING_ROLES)[number];
 
 const MAX_ACTIVE_LISTINGS = 3;
 
+function normalizeRegion(region: string) {
+  return region.trim().toLowerCase();
+}
+
 // ============================================
 // Internal Format Helper
 // ============================================
@@ -91,45 +95,70 @@ export const listPaginated = query({
     search: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    let result;
-    if (args.search && args.search.trim().length > 0) {
-      result = await ctx.db
+    const hasSearch = args.search && args.search.trim().length > 0;
+    const normalizedRegion = args.region?.trim()
+      ? normalizeRegion(args.region)
+      : undefined;
+
+    if (hasSearch) {
+      const result = await ctx.db
         .query("band_listings")
         .withSearchIndex("search_band_listings", (q) => {
           let query = q.search("bandName", args.search!.trim());
           query = query.eq("status", "open");
+          if (args.seekingRole) {
+            query = query.eq("seekingRole", args.seekingRole);
+          }
+          if (normalizedRegion) {
+            query = query.eq("regionNormalized", normalizedRegion);
+          }
           return query;
         })
+        .paginate(args.paginationOpts);
+      const page = await Promise.all(
+        result.page.map((listing) => formatListing(ctx, listing))
+      );
+      return { ...result, page };
+    }
+
+    let result;
+    if (args.seekingRole && normalizedRegion) {
+      result = await ctx.db
+        .query("band_listings")
+        .withIndex("by_status_role_and_region", (q) =>
+          q
+            .eq("status", "open")
+            .eq("seekingRole", args.seekingRole!)
+            .eq("regionNormalized", normalizedRegion)
+        )
+        .order("desc")
+        .paginate(args.paginationOpts);
+    } else if (args.seekingRole) {
+      result = await ctx.db
+        .query("band_listings")
+        .withIndex("by_status_and_role", (q) =>
+          q.eq("status", "open").eq("seekingRole", args.seekingRole!)
+        )
+        .order("desc")
+        .paginate(args.paginationOpts);
+    } else if (normalizedRegion) {
+      result = await ctx.db
+        .query("band_listings")
+        .withIndex("by_status_and_region", (q) =>
+          q.eq("status", "open").eq("regionNormalized", normalizedRegion)
+        )
+        .order("desc")
         .paginate(args.paginationOpts);
     } else {
       result = await ctx.db
         .query("band_listings")
-        .withIndex("by_created_at")
+        .withIndex("by_status", (q) => q.eq("status", "open"))
         .order("desc")
         .paginate(args.paginationOpts);
     }
 
-    // Apply filters client-side
-    let filtered = result.page;
-
-    // Only show open listings when not searching (search already filters)
-    if (!args.search || args.search.trim().length === 0) {
-      filtered = filtered.filter((l) => l.status === "open");
-    }
-
-    if (args.seekingRole) {
-      filtered = filtered.filter((l) => l.seekingRole === args.seekingRole);
-    }
-
-    if (args.region && args.region.trim()) {
-      const regionLower = args.region.trim().toLowerCase();
-      filtered = filtered.filter((l) =>
-        l.region.toLowerCase().includes(regionLower)
-      );
-    }
-
     const page = await Promise.all(
-      filtered.map((listing) => formatListing(ctx, listing))
+      result.page.map((listing) => formatListing(ctx, listing))
     );
 
     return { ...result, page };
@@ -137,23 +166,29 @@ export const listPaginated = query({
 });
 
 /**
- * Get current user's listings (all statuses)
+ * Get current user's listings (all statuses, paginated)
  */
-export const getMyListings = query({
-  args: {},
-  handler: async (ctx) => {
+export const getMyListingsPaginated = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
     const currentProfile = await getCurrentProfile(ctx);
-    if (!currentProfile) return [];
+    if (!currentProfile) {
+      return { page: [], isDone: true, continueCursor: "" };
+    }
 
-    const listings = await ctx.db
+    const result = await ctx.db
       .query("band_listings")
       .withIndex("by_owner", (q) => q.eq("ownerId", currentProfile._id))
       .order("desc")
-      .collect();
+      .paginate(args.paginationOpts);
 
-    return await Promise.all(
-      listings.map((listing) => formatListing(ctx, listing))
+    const page = await Promise.all(
+      result.page.map((listing) => formatListing(ctx, listing))
     );
+
+    return { ...result, page };
   },
 });
 
@@ -168,33 +203,37 @@ export const getActiveListingCount = query({
 
     const listings = await ctx.db
       .query("band_listings")
-      .withIndex("by_owner", (q) => q.eq("ownerId", currentProfile._id))
+      .withIndex("by_owner_and_status", (q) =>
+        q.eq("ownerId", currentProfile._id).eq("status", "open")
+      )
       .collect();
 
-    return listings.filter((l) => l.status === "open").length;
+    return listings.length;
   },
 });
 
 /**
- * Get band listings for a specific user (public, open listings only)
+ * Get band listings for a specific user (public, open listings only, paginated)
  */
-export const getByUser = query({
+export const getByUserPaginated = query({
   args: {
     userId: v.id("profiles"),
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    const listings = await ctx.db
+    const result = await ctx.db
       .query("band_listings")
-      .withIndex("by_owner", (q) => q.eq("ownerId", args.userId))
+      .withIndex("by_owner_and_status", (q) =>
+        q.eq("ownerId", args.userId).eq("status", "open")
+      )
       .order("desc")
-      .collect();
+      .paginate(args.paginationOpts);
 
-    // Only return open listings for public view
-    const openListings = listings.filter((l) => l.status === "open");
-
-    return await Promise.all(
-      openListings.map((listing) => formatListing(ctx, listing))
+    const page = await Promise.all(
+      result.page.map((listing) => formatListing(ctx, listing))
     );
+
+    return { ...result, page };
   },
 });
 
@@ -233,23 +272,31 @@ export const getApplications = query({
 });
 
 /**
- * Get applications made by the current user
+ * Get applications made by the current user (paginated)
  */
-export const getMyApplications = query({
-  args: {},
-  handler: async (ctx) => {
+export const getMyApplicationsPaginated = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
     const currentProfile = await getCurrentProfile(ctx);
-    if (!currentProfile) return [];
+    if (!currentProfile) {
+      return { page: [], isDone: true, continueCursor: "" };
+    }
 
-    const apps = await ctx.db
+    const result = await ctx.db
       .query("band_applications")
       .withIndex("by_applicant", (q) =>
         q.eq("applicantId", currentProfile._id)
       )
       .order("desc")
-      .collect();
+      .paginate(args.paginationOpts);
 
-    return await Promise.all(apps.map((app) => formatApplication(ctx, app)));
+    const page = await Promise.all(
+      result.page.map((app) => formatApplication(ctx, app))
+    );
+
+    return { ...result, page };
   },
 });
 
@@ -331,6 +378,7 @@ export const createListing = mutation({
       maxMembers: args.maxMembers,
       seekingRole: args.seekingRole,
       region,
+      regionNormalized: normalizeRegion(region),
       description,
       genre,
       status: "open",

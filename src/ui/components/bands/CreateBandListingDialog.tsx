@@ -39,13 +39,21 @@ interface CreateBandListingDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function clampMembers(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 export function CreateBandListingDialog({ open, onOpenChange }: CreateBandListingDialogProps) {
   const createMutation = useCreateBandListing();
   const activeCount = useActiveListingCount();
 
   const [bandName, setBandName] = useState("");
-  const [currentMembers, setCurrentMembers] = useState<string>("1");
-  const [maxMembers, setMaxMembers] = useState<string>("5");
+  const [currentMembers, setCurrentMembers] = useState(1);
+  const [maxMembers, setMaxMembers] = useState(5);
   const [seekingRole, setSeekingRole] = useState<string>("Guitarist");
   const [region, setRegion] = useState("");
   const [genre, setGenre] = useState<string>("");
@@ -60,24 +68,24 @@ export function CreateBandListingDialog({ open, onOpenChange }: CreateBandListin
     try {
       await createMutation.mutateAsync({
         bandName: bandName.trim(),
-        currentMembers: parseInt(currentMembers) || 1,
-        maxMembers: parseInt(maxMembers) || 5,
+        currentMembers,
+        maxMembers,
         seekingRole,
         region: region.trim(),
         description: description.trim() || undefined,
         genre: genre || undefined,
       });
       handleClose(false);
-    } catch (err: any) {
-      setError(err?.message || "Failed to create listing.");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Failed to create listing."));
     }
   };
 
   const handleClose = (val: boolean) => {
     if (!val) {
       setBandName("");
-      setCurrentMembers("1");
-      setMaxMembers("5");
+      setCurrentMembers(1);
+      setMaxMembers(5);
       setSeekingRole("Guitarist");
       setRegion("");
       setGenre("");
@@ -117,25 +125,59 @@ export function CreateBandListingDialog({ open, onOpenChange }: CreateBandListin
           <div className="flex gap-3">
             <div className="flex-1 space-y-1">
               <label className="text-xs text-muted-foreground">Current Members</label>
-              <Input
-                type="number"
-                min="1"
-                max="50"
-                value={currentMembers}
-                onChange={(e) => setCurrentMembers(e.target.value)}
-                className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
-              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentMembers((value) => clampMembers(value - 1, 1, maxMembers))}
+                  disabled={currentMembers <= 1}
+                  className="h-9 w-9 flex items-center justify-center rounded-md bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  -
+                </button>
+                <span className="w-8 text-center text-sm font-medium tabular-nums">
+                  {currentMembers}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentMembers((value) => clampMembers(value + 1, 1, maxMembers))
+                  }
+                  disabled={currentMembers >= maxMembers}
+                  className="h-9 w-9 flex items-center justify-center rounded-md bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  +
+                </button>
+              </div>
             </div>
             <div className="flex-1 space-y-1">
               <label className="text-xs text-muted-foreground">Total Capacity</label>
-              <Input
-                type="number"
-                min="2"
-                max="50"
-                value={maxMembers}
-                onChange={(e) => setMaxMembers(e.target.value)}
-                className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
-              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMaxMembers((value) => {
+                      const nextValue = clampMembers(value - 1, 2, 50);
+                      setCurrentMembers((currentValue) => Math.min(currentValue, nextValue));
+                      return nextValue;
+                    })
+                  }
+                  disabled={maxMembers <= 2}
+                  className="h-9 w-9 flex items-center justify-center rounded-md bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  -
+                </button>
+                <span className="w-8 text-center text-sm font-medium tabular-nums">
+                  {maxMembers}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMaxMembers((value) => clampMembers(value + 1, 2, 50))}
+                  disabled={maxMembers >= 50}
+                  className="h-9 w-9 flex items-center justify-center rounded-md bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
 

@@ -20,6 +20,10 @@ import { LoadMoreButton } from "@/components/LoadMoreButton";
 
 const MAX_TRACKS = 30;
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 function formatDuration(seconds: number): string {
   if (!seconds || seconds <= 0) return "0:00";
   const mins = Math.floor(seconds / 60);
@@ -211,8 +215,8 @@ function UploadView({
       setDuration(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
       onUploadComplete();
-    } catch (err: any) {
-      const msg = err?.message || "Upload failed. Please try again.";
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error, "Upload failed. Please try again.");
       // Extract user-friendly message
       const match = msg.match(/^[A-Z_]+:\s*(.*)$/);
       setError(match?.[1] ?? msg);

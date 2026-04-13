@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback, AvatarGroup } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,10 @@ type ProfileDraft = {
   instruments: string[];
   genres: string[];
 };
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
 
 function Profile() {
   const { username } = useParams<{ username: string }>();
@@ -94,16 +98,32 @@ function Profile() {
   const [pendingBannerFile, setPendingBannerFile] = useState<File | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
+  const previewAnimationFrameRef = useRef<number | null>(null);
+  const previewTimerRef = useRef<number | null>(null);
+
+  const clearPreviewAnimationTimers = useCallback(() => {
+    if (previewAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(previewAnimationFrameRef.current);
+      previewAnimationFrameRef.current = null;
+    }
+    if (previewTimerRef.current !== null) {
+      window.clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!profileUser) return;
-    setEditDisplayName(profileUser.display_name ?? "");
-    setEditBio(profileUser.bio ?? "");
-    setEditAvatarUrl(profileUser.avatar_url ?? "");
-    setEditBannerUrl(profileUser.banner_url ?? "");
-    setEditInstruments(profileUser.instruments ?? []);
-    setEditGenres(profileUser.genres ?? []);
-  }, [profileUser?.id, profileUser?.display_name, profileUser?.bio, profileUser?.avatar_url, profileUser?.banner_url, profileUser?.instruments, profileUser?.genres]);
+    const timer = window.setTimeout(() => {
+      setEditDisplayName(profileUser.display_name ?? "");
+      setEditBio(profileUser.bio ?? "");
+      setEditAvatarUrl(profileUser.avatar_url ?? "");
+      setEditBannerUrl(profileUser.banner_url ?? "");
+      setEditInstruments(profileUser.instruments ?? []);
+      setEditGenres(profileUser.genres ?? []);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [profileUser]);
 
   const isOwnProfile = currentUser?.username === profileUser?.username;
   const isPreviewing = isOwnProfile && previewDraft !== null;
@@ -111,19 +131,7 @@ function Profile() {
   const isFriend = currentUserFriends.some((friend: User) => friend.id === profileUser?.id);
   const hasSentRequest = profileUser?.id ? hasPendingRequest(profileUser.id) : false;
 
-  useEffect(() => {
-    if (!isPreviewing) {
-      setStopPreviewAnimPhase("idle");
-      return;
-    }
-    setStopPreviewAnimPhase("hidden");
-    const raf = window.requestAnimationFrame(() => setStopPreviewAnimPhase("enter"));
-    const timer = window.setTimeout(() => setStopPreviewAnimPhase("idle"), 220);
-    return () => {
-      window.cancelAnimationFrame(raf);
-      window.clearTimeout(timer);
-    };
-  }, [isPreviewing]);
+  useEffect(() => clearPreviewAnimationTimers, [clearPreviewAnimationTimers]);
 
   const mutualFriends = !isOwnProfile
     ? currentUserFriends.filter((f: User) => profileUserFriends.some((pf: User) => pf.id === f.id))
@@ -145,26 +153,23 @@ function Profile() {
     [catalog.genres]
   );
 
-  const activityPosts = useMemo(() => {
-    if (!isPreviewing || !isOwnProfile || !profileUser?.username) {
-      return userPosts;
-    }
+  const activityPosts =
+    !isPreviewing || !isOwnProfile || !profileUser?.username
+      ? userPosts
+      : userPosts.map((post) => {
+          const isCurrentUserPost =
+            post.author.username.toLowerCase() === profileUser.username.toLowerCase();
 
-    return userPosts.map((post) => {
-      const isCurrentUserPost =
-        post.author.username.toLowerCase() === profileUser.username.toLowerCase();
+          if (!isCurrentUserPost) return post;
 
-      if (!isCurrentUserPost) return post;
-
-      return {
-        ...post,
-        author: {
-          ...post.author,
-          avatar: visibleAvatarUrl || undefined,
-        },
-      };
-    });
-  }, [isPreviewing, isOwnProfile, profileUser?.username, userPosts, visibleAvatarUrl]);
+          return {
+            ...post,
+            author: {
+              ...post.author,
+              avatar: visibleAvatarUrl || undefined,
+            },
+          };
+        });
 
   const handleAddFriend = async () => {
     if (isGuest || !profileUser?.id) return;
@@ -262,6 +267,8 @@ function Profile() {
   const handlePreviewProfile = () => {
     if (!isOwnProfile) return;
     setEditError(null);
+    clearPreviewAnimationTimers();
+    setStopPreviewAnimPhase("hidden");
     setPreviewDraft({
       display_name: editDisplayName.trim(),
       bio: editBio,
@@ -270,11 +277,21 @@ function Profile() {
       instruments: editInstruments,
       genres: editGenres,
     });
+    previewAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      setStopPreviewAnimPhase("enter");
+      previewAnimationFrameRef.current = null;
+    });
+    previewTimerRef.current = window.setTimeout(() => {
+      setStopPreviewAnimPhase("idle");
+      previewTimerRef.current = null;
+    }, 220);
     setIsEditOpen(false);
   };
 
   const handleStopPreview = () => {
+    clearPreviewAnimationTimers();
     setPreviewDraft(null);
+    setStopPreviewAnimPhase("idle");
     setIsEditOpen(true);
   };
 
@@ -304,6 +321,8 @@ function Profile() {
       });
       setUser(updated);
       setPreviewDraft(null);
+      clearPreviewAnimationTimers();
+      setStopPreviewAnimPhase("idle");
       setPendingAvatarFile(null);
       setPendingBannerFile(null);
       setEditDisplayName(updated.display_name ?? "");
@@ -313,8 +332,8 @@ function Profile() {
       setEditInstruments(updated.instruments ?? []);
       setEditGenres(updated.genres ?? []);
       setIsEditOpen(false);
-    } catch (error: any) {
-      setEditError(error?.message || "Failed to save profile.");
+    } catch (error: unknown) {
+      setEditError(getErrorMessage(error, "Failed to save profile."));
     }
   };
 

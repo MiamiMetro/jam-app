@@ -42,7 +42,13 @@ function BandsTab() {
     search: searchQuery || undefined,
   });
 
-  const { data: myListings = [], isLoading: myListingsLoading } = useMyBandListings();
+  const {
+    data: myListings = [],
+    isLoading: myListingsLoading,
+    hasNextPage: hasMoreMyListings,
+    isFetchingNextPage: isLoadingMoreMyListings,
+    fetchNextPage: fetchMoreMyListings,
+  } = useMyBandListings();
 
   const handleSearchChange = (query: string) => {
     const params: Record<string, string> = {};
@@ -164,11 +170,20 @@ function BandsTab() {
               description="Create your first band listing to find musicians!"
             />
           ) : (
-            <div className="px-5 py-3 space-y-3">
-              {myListings.map((listing) => (
-                <MyBandListingCard key={listing.id} listing={listing} />
-              ))}
-            </div>
+            <>
+              <div className="px-5 py-3 space-y-3">
+                {myListings.map((listing) => (
+                  <MyBandListingCard key={listing.id} listing={listing} />
+                ))}
+              </div>
+              <div className="p-4">
+                <LoadMoreButton
+                  hasNextPage={hasMoreMyListings}
+                  isFetchingNextPage={isLoadingMoreMyListings}
+                  fetchNextPage={fetchMoreMyListings}
+                />
+              </div>
+            </>
           )
         ) : (
           /* All Listings View */

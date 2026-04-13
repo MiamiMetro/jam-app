@@ -1,6 +1,7 @@
 // App.tsx — Root routing with layout route pattern + post modal overlay
 import { lazy, useEffect, Suspense } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import type { Location } from "react-router-dom";
 import AppLayout from "@/layouts/AppLayout";
 import { useUIStore } from "@/stores/uiStore";
 import { useDeepLink } from "@/hooks/useDeepLink";
@@ -55,7 +56,9 @@ function NotFound() {
 function App() {
   useDeepLink();
   const location = useLocation();
-  const backgroundLocation = (location.state as any)?.backgroundLocation;
+  const backgroundLocation = (
+    location.state as { backgroundLocation?: Location } | null
+  )?.backgroundLocation;
 
   // Clear jam room handle on app startup
   useEffect(() => {
