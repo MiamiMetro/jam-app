@@ -9,6 +9,9 @@ import ProfileSetupScreen from "../screens/Auth/ProfileSetupScreen";
 import PostDetailScreen from "../screens/Posts/PostDetailScreen";
 import ConversationScreen from "../screens/Messages/ConversationScreen";
 import JamRoomScreen from "../screens/Jams/JamRoomScreen";
+import MyMusicScreen from "../screens/Music/MyMusicScreen";
+import CommunityScreen from "../screens/Community/CommunityScreen";
+import BandsScreen from "../screens/Bands/BandsScreen";
 import { authClient } from "../lib/auth-client";
 import { api } from "../../convex/_generated/api";
 
@@ -19,6 +22,9 @@ export type RootStackParamList = {
   PostDetail: { postId: string };
   Conversation: { conversationId: string; title?: string };
   JamRoom: { handle: string };
+  MyMusic: undefined;
+  Communities: undefined;
+  Bands: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -48,6 +54,9 @@ export default function RootNavigator() {
           <Stack.Screen name="PostDetail" component={PostDetailScreen} />
           <Stack.Screen name="Conversation" component={ConversationScreen} />
           <Stack.Screen name="JamRoom" component={JamRoomScreen} />
+          <Stack.Screen name="MyMusic" component={MyMusicScreen} />
+          <Stack.Screen name="Communities" component={CommunityScreen} />
+          <Stack.Screen name="Bands" component={BandsScreen} />
         </>
       ) : (
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />

@@ -6,12 +6,14 @@ import ProfileScreen from "../screens/Profile/ProfileScreen";
 import HomeScreen from "../screens/Home/HomeScreen";
 import JamScreen from "../screens/Jams/JamScreen";
 import MessagesScreen from "../screens/Messages/MessagesScreen";
+import MoreScreen from "../screens/More/MoreScreen";
 
 type MainTabParamList = {
   Jams: undefined;
   Feed: undefined;
   Messages: undefined;
   Profile: undefined;
+  More: undefined;
 };
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -34,6 +36,10 @@ const icons: Record<keyof MainTabParamList, { focused: IconName; idle: IconName 
   Profile: {
     focused: "person",
     idle: "person-outline",
+  },
+  More: {
+    focused: "ellipsis-horizontal-circle",
+    idle: "ellipsis-horizontal-circle-outline",
   },
 };
 
@@ -64,6 +70,7 @@ const MainTabs = () => {
       <Tab.Screen name="Feed" component={HomeScreen} />
       <Tab.Screen name="Messages" component={MessagesScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="More" component={MoreScreen} />
     </Tab.Navigator>
   );
 };

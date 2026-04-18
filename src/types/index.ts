@@ -53,9 +53,24 @@ export type Conversation = ConversationsQueryReturn["page"][number];
 type CommunityQueryReturn = FunctionReturnType<typeof api.communities.getByHandle>;
 export type CommunityItem = NonNullable<CommunityQueryReturn>;
 
+// Infer community list item type (Convex format - single source of truth)
+type CommunitiesListReturn = FunctionReturnType<typeof api.communities.listPaginated>;
+export type CommunityListItem = CommunitiesListReturn["page"][number];
+
 // Infer profile posts feed item type (Convex format - single source of truth)
 type ProfilePostsReturn = FunctionReturnType<typeof api.posts.getByUsernamePaginated>;
 export type ProfilePostItem = ProfilePostsReturn["page"][number];
+
+// Infer current user's music library track type (Convex format - single source of truth)
+type MyTracksReturn = FunctionReturnType<typeof api.myTracks.getMyTracks>;
+export type MyTrackItem = MyTracksReturn["page"][number];
+
+// Infer band listing and application types (Convex format - single source of truth)
+type BandListingsReturn = FunctionReturnType<typeof api.bands.getMyListingsPaginated>;
+export type BandListingItem = BandListingsReturn["page"][number];
+
+type BandApplicationsReturn = FunctionReturnType<typeof api.bands.getApplications>;
+export type BandApplicationItem = BandApplicationsReturn["page"][number];
 
 
 // Re-export Convex utility types for direct use
@@ -64,6 +79,16 @@ export type { Doc, Id } from "../../convex/_generated/dataModel";
 
 // Helper type that uses Doc and Id to ensure imports are recognized
 // This is a workaround for TypeScript's unused import detection
-type CoreTables = "profiles" | "posts" | "comments" | "messages" | "conversations" | "rooms";
+type CoreTables =
+  | "profiles"
+  | "posts"
+  | "comments"
+  | "messages"
+  | "conversations"
+  | "rooms"
+  | "communities"
+  | "band_listings"
+  | "band_applications"
+  | "my_tracks";
 export type ConvexDoc<T extends CoreTables> = Doc<T>;
 export type ConvexId<T extends CoreTables> = Id<T>;

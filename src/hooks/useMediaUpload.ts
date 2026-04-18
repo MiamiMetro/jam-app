@@ -128,6 +128,8 @@ export function useMediaUpload() {
       }
 
       return {
+        contentType,
+        fileSize,
         key: finalized.key,
         url: finalized.publicUrl,
       };
