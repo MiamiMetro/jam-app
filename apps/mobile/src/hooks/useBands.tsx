@@ -1,7 +1,7 @@
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useState } from "react";
-import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
+import { api } from "@jam-app/convex";
+import type { Id } from "@jam-app/convex";
 import type { BandApplicationItem, BandListingItem } from "@/types";
 
 type MutationOptions = {

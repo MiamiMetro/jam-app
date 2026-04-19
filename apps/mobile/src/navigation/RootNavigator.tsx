@@ -13,7 +13,7 @@ import MyMusicScreen from "../screens/Music/MyMusicScreen";
 import CommunityScreen from "../screens/Community/CommunityScreen";
 import BandsScreen from "../screens/Bands/BandsScreen";
 import { authClient } from "../lib/auth-client";
-import { api } from "../../convex/_generated/api";
+import { api } from "@jam-app/convex";
 
 export type RootStackParamList = {
   Auth: undefined;

@@ -1,8 +1,8 @@
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useState } from "react";
-import { api } from "../../convex/_generated/api";
+import { api } from "@jam-app/convex";
 import type { MyTrackItem } from "@/types";
-import type { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "@jam-app/convex";
 
 type MutationOptions = {
   onError?: (error: Error) => void;

@@ -14,8 +14,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
+import { api } from "@jam-app/convex";
+import type { Id } from "@jam-app/convex";
 
 type TabKey = "chats" | "friends" | "find";
 

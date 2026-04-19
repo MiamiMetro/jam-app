@@ -1,6 +1,6 @@
 import { useEffect  } from "react";
 import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { api } from "@jam-app/convex";
 import { useAuthStore } from "@/stores/authStore";
 import { authClient } from "@/lib/auth-client";
 import { useConvexAuthStore } from "./useConvexAuth";

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useConvex, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { api } from "@jam-app/convex";
 import { useAuthStore } from "@/stores/authStore";
 import { useConvexAuthStore } from "@/hooks/useConvexAuth";
 import { useProfileStore } from "@/hooks/useEnsureProfile";

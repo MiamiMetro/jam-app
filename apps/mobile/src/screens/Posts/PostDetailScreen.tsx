@@ -17,8 +17,8 @@ import CommentItem from "@/components/comments/CommentItem";
 import AudioPostPlayer from "@/components/posts/AudioPostPlayer";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 import { useMyProfile } from "@/hooks/useMyProfile";
-import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
+import { api } from "@jam-app/convex";
+import type { Id } from "@jam-app/convex";
 
 type Props = NativeStackScreenProps<RootStackParamList, "PostDetail">;
 

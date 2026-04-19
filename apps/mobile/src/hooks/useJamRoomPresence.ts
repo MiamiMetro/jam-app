@@ -1,6 +1,6 @@
 import React from "react";
 import { useDisconnectPresence, useRoomHeartbeat } from "@/hooks/useRooms";
-import type { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "@jam-app/convex";
 
 const HEARTBEAT_INTERVAL_MS = 20_000;
 

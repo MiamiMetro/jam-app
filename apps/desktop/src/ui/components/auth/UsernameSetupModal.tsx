@@ -1,7 +1,7 @@
 // UsernameSetupModal.tsx — Branded username setup after signup
 import { useState } from "react";
 import { useMutation } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "@jam-app/convex";
 import { authClient } from "@/lib/auth-client";
 import {
   AlertDialog,

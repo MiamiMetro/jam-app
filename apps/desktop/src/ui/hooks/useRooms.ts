@@ -1,13 +1,13 @@
 import { useQuery, usePaginatedQuery, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
+import { api } from "@jam-app/convex";
+import type { Id } from "@jam-app/convex";
 import { useAuthStore } from "@/stores/authStore";
 import { useConvexAuthStore } from "./useConvexAuth";
 import { useProfileStore } from "./useEnsureProfile";
 
 // Re-export from shared constants (safe for browser import)
-export { ROOM_GENRES } from "../../../convex/shared";
-export type { RoomGenre } from "../../../convex/shared";
+export { ROOM_GENRES } from "@jam-app/convex";
+export type { RoomGenre } from "@jam-app/convex";
 
 // ============================================
 // Query Hooks

@@ -17,9 +17,10 @@
     "dist:mac": "npm run transpile:electron && npm run build && electron-builder --mac --arm64",
     "dist:linux": "npm run transpile:electron && npm run build && electron-builder --linux --x64",
     "dist:win": "npm run transpile:electron && npm run build && electron-builder --win --x64",
-    "convex:pull": "convex codegen"
+    "convex:pull": "npm --prefix ../.. run convex:codegen"
   },
   "dependencies": {
+    "@jam-app/convex": "0.0.0",
     "@base-ui/react": "^1.0.0",
     "@better-auth/expo": "1.5.3",
     "@convex-dev/better-auth": "^0.11.4",

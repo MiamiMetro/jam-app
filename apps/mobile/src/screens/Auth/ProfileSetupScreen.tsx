@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { api } from "@jam-app/convex";
 import { authClient } from "../../lib/auth-client";
 
 export default function ProfileSetupScreen() {

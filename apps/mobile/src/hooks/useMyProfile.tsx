@@ -1,5 +1,5 @@
 import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { api } from "@jam-app/convex";
 
 export function useMyProfile() {
   const profile = useQuery(api.profiles.getMe);

@@ -1,5 +1,5 @@
 import { usePaginatedQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { api } from "@jam-app/convex";
 
 export function useProfilePosts(username: string | undefined) {
   const { results, status, loadMore } = usePaginatedQuery(

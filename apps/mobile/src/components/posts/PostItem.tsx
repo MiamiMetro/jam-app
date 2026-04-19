@@ -6,8 +6,8 @@ import { useMutation } from "convex/react";
 import AudioPostPlayer from "@/components/posts/AudioPostPlayer";
 import type { PostFeedItem } from "@/types";
 import { useMyProfile } from "@/hooks/useMyProfile";
-import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
+import { api } from "@jam-app/convex";
+import type { Id } from "@jam-app/convex";
 
 type Props = {
   post: PostFeedItem;

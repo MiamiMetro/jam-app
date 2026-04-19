@@ -30,7 +30,7 @@ import {
   useGuestRoomHeartbeat,
   useDisconnectPresence,
 } from "@/hooks/useRooms";
-import type { Id } from "../../../convex/_generated/dataModel";
+import type { Id } from "@jam-app/convex";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { usePostAudio } from "@/contexts/PostAudioContext";
 import { Timestamp } from "@/components/Timestamp";

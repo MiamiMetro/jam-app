@@ -19,8 +19,8 @@ import {
 import AudioPostPlayer from "@/components/posts/AudioPostPlayer";
 import { useMyProfile } from "@/hooks/useMyProfile";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
-import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
+import { api } from "@jam-app/convex";
+import type { Id } from "@jam-app/convex";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Conversation">;
 type MessagesReturn = FunctionReturnType<typeof api.messages.getByConversationPaginated>;

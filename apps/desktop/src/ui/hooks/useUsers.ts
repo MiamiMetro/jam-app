@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useConvex, usePaginatedQuery } from "convex/react";
 import { useState, useEffect, useMemo, useRef } from "react";
-import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
+import { api } from "@jam-app/convex";
+import type { Id } from "@jam-app/convex";
 import type { User } from "@/lib/api/types";
 import { useAuthStore } from "@/stores/authStore";
 import { usePresenceStore } from "@/stores/presenceStore";

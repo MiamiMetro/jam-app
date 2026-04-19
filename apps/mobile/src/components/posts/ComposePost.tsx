@@ -14,7 +14,7 @@ import {
 import { useMutation } from "convex/react";
 import type { User } from "@/types";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
-import { api } from "../../../convex/_generated/api";
+import { api } from "@jam-app/convex";
 
 type Props = {
   profile: User | null | undefined;

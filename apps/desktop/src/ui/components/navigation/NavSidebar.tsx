@@ -35,7 +35,7 @@ import {
 import { AvatarBadge, AvatarGroup } from "@/components/ui/avatar";
 import { Logo } from "@/components/Logo";
 import { Spinner } from "@/components/ui/spinner";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "@jam-app/convex";
 import { useAuthStore } from "@/stores/authStore";
 import { useUIStore } from "@/stores/uiStore";
 import { useAuthModalStore } from "@/stores/authModalStore";
