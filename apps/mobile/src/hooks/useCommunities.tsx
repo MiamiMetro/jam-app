@@ -2,7 +2,7 @@ import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
-import type { CommunityListItem } from "@/types";
+import type { CommunityListItem, CommunityMemberItem } from "@/types";
 
 type MutationOptions = {
   onError?: (error: Error) => void;
@@ -94,9 +94,10 @@ export function useCommunityMembers(communityId: string) {
   );
 
   return {
-    data: results,
+    data: results as CommunityMemberItem[],
     fetchNextPage: () => loadMore(30),
     hasNextPage: status === "CanLoadMore",
+    isFetchingNextPage: status === "LoadingMore",
     isLoading: status === "LoadingFirstPage",
   };
 }
@@ -111,9 +112,10 @@ export function useSearchCommunityMembers(communityId: string, username: string)
   );
 
   return {
-    data: results,
+    data: results as CommunityMemberItem[],
     fetchNextPage: () => loadMore(20),
     hasNextPage: status === "CanLoadMore",
+    isFetchingNextPage: status === "LoadingMore",
     isLoading: status === "LoadingFirstPage",
   };
 }

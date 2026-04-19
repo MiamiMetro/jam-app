@@ -15,8 +15,11 @@ import { useMutation } from "convex/react";
 import type { User } from "@/types";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
 import { api } from "@jam-app/convex";
+import type { Id } from "@jam-app/convex";
 
 type Props = {
+  communityId?: string;
+  placeholder?: string;
   profile: User | null | undefined;
 };
 
@@ -30,7 +33,11 @@ type SelectedAudio = {
   uri: string;
 };
 
-export default function ComposePost({ profile }: Props) {
+export default function ComposePost({
+  communityId,
+  placeholder = "What's on your mind? Share a message...",
+  profile,
+}: Props) {
   const createPost = useMutation(api.posts.create);
   const { isUploading, uploadFile } = useMediaUpload();
   const [content, setContent] = useState("");
@@ -70,6 +77,9 @@ export default function ComposePost({ profile }: Props) {
         text: trimmedContent || undefined,
         audio_url: audioUrl,
         audio_title: selectedAudio ? stripExtension(selectedAudio.name) : undefined,
+        community_id: communityId
+          ? (communityId as Id<"communities">)
+          : undefined,
       });
       setContent("");
       setSelectedAudio(null);
@@ -140,7 +150,7 @@ export default function ComposePost({ profile }: Props) {
               setContent(value);
               setError(null);
             }}
-            placeholder="What's on your mind? Share a message..."
+            placeholder={placeholder}
             placeholderTextColor="#7E8796"
             style={styles.input}
             textAlignVertical="top"
@@ -212,6 +222,9 @@ function getCreatePostErrorMessage(error: unknown) {
   }
   if (message.includes("PROFILE_REQUIRED")) {
     return "Create your profile before posting.";
+  }
+  if (message.includes("COMMUNITY_MEMBER_REQUIRED")) {
+    return "Join this community before posting.";
   }
   if (message.includes("rate")) {
     return "Slow down for a moment before posting again.";

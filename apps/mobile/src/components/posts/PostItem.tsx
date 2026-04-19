@@ -16,9 +16,11 @@ type Props = {
 export default function PostItem({ post }: Props) {
   const navigation = useNavigation<any>();
   const removePost = useMutation(api.posts.remove);
+  const toggleLike = useMutation(api.posts.toggleLike);
   const { profile } = useMyProfile();
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
   const authorName = post.author?.username ?? "unknown";
   const isOwnPost = profile?.id === post.author_id;
   const fallbackLetters = useMemo(
@@ -42,8 +44,22 @@ export default function PostItem({ post }: Props) {
     }
   };
 
+  const handleToggleLike = async () => {
+    if (isLiking) return;
+
+    try {
+      setIsLiking(true);
+      await toggleLike({ postId: post.id as Id<"posts"> });
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
   return (
-    <Pressable style={({ pressed }) => [styles.container, pressed ? styles.pressed : null]}>
+    <Pressable
+      onPress={() => navigation.navigate("PostDetail", { postId: post.id })}
+      style={({ pressed }) => [styles.container, pressed ? styles.pressed : null]}
+    >
       <View style={styles.avatar}>
         {post.author?.avatar_url && !avatarFailed ? (
           <Image
@@ -60,7 +76,14 @@ export default function PostItem({ post }: Props) {
         <View style={styles.metaRow}>
           <Text style={styles.author}>{authorName}</Text>
           {isOwnPost ? (
-            <Pressable disabled={isDeleting} onPress={handleDelete} style={styles.deleteButton}>
+            <Pressable
+              disabled={isDeleting}
+              onPress={(event) => {
+                event.stopPropagation();
+                handleDelete();
+              }}
+              style={styles.deleteButton}
+            >
               <Ionicons color={isDeleting ? "#4B5565" : "#8F98A8"} name="trash-outline" size={14} />
             </Pressable>
           ) : null}
@@ -84,10 +107,29 @@ export default function PostItem({ post }: Props) {
         ) : null}
 
         <View style={styles.actionsRow}>
-          <Text style={styles.actionText}>Heart {post.likes_count}</Text>
           <Pressable
-            onPress={() => navigation.navigate("PostDetail", { postId: post.id })}
-            style={styles.commentAction}
+            disabled={isLiking}
+            onPress={(event) => {
+              event.stopPropagation();
+              handleToggleLike();
+            }}
+            style={styles.actionButton}
+          >
+            <Ionicons
+              color={post.is_liked ? "#EF6F6C" : "#8F98A8"}
+              name={post.is_liked ? "heart" : "heart-outline"}
+              size={15}
+            />
+            <Text style={[styles.actionText, post.is_liked ? styles.likedText : null]}>
+              {post.likes_count}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation();
+              navigation.navigate("PostDetail", { postId: post.id });
+            }}
+            style={styles.actionButton}
           >
             <Ionicons color="#8F98A8" name="chatbubble-outline" size={14} />
             <Text style={styles.actionText}>Comments {post.comments_count}</Text>
@@ -210,14 +252,17 @@ const styles = StyleSheet.create({
     gap: 20,
     paddingTop: 11,
   },
+  actionButton: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+  },
   actionText: {
     color: "#8F98A8",
     fontSize: 13,
     fontWeight: "700",
   },
-  commentAction: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 5,
+  likedText: {
+    color: "#EF6F6C",
   },
 });

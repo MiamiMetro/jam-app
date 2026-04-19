@@ -2,7 +2,7 @@ import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
-import type { BandApplicationItem, BandListingItem } from "@/types";
+import type { BandApplicationItem, BandListingItem, MyBandItem } from "@/types";
 
 type MutationOptions = {
   onError?: (error: Error) => void;
@@ -79,6 +79,22 @@ export function useMyBandApplications() {
 
   return {
     data: results as BandApplicationItem[],
+    fetchNextPage: () => loadMore(20),
+    hasNextPage: status === "CanLoadMore",
+    isFetchingNextPage: status === "LoadingMore",
+    isLoading: status === "LoadingFirstPage",
+  };
+}
+
+export function useMyBands() {
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.bands.getMyBandsPaginated,
+    {},
+    { initialNumItems: 20 }
+  );
+
+  return {
+    data: results as MyBandItem[],
     fetchNextPage: () => loadMore(20),
     hasNextPage: status === "CanLoadMore",
     isFetchingNextPage: status === "LoadingMore",

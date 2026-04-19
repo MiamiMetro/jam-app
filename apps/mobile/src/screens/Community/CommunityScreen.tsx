@@ -411,6 +411,7 @@ export default function CommunityScreen() {
             community={item}
             isPending={pendingCommunityId === item.id}
             onMembershipPress={() => handleMembershipPress(item)}
+            onOpen={() => navigation.navigate("CommunityDetail", { handle: item.handle })}
           />
         )}
       />
@@ -422,10 +423,12 @@ function CommunityRow({
   community,
   isPending,
   onMembershipPress,
+  onOpen,
 }: {
   community: CommunityListItem;
   isPending: boolean;
   onMembershipPress: () => void;
+  onOpen: () => void;
 }) {
   const accent = THEME_COLOR_VALUES[community.theme_color] ?? THEME_COLOR_VALUES.amber;
   const membershipLabel =
@@ -437,7 +440,13 @@ function CommunityRow({
   const canLeave = community.member_role && community.member_role !== "owner";
 
   return (
-    <View style={styles.communityRow}>
+    <Pressable
+      onPress={onOpen}
+      style={({ pressed }) => [
+        styles.communityRow,
+        pressed ? styles.communityRowPressed : null,
+      ]}
+    >
       <View style={styles.communityTop}>
         <View style={[styles.communityAvatar, { backgroundColor: `${accent}22` }]}>
           <Text style={[styles.communityAvatarText, { color: accent }]}>
@@ -473,7 +482,10 @@ function CommunityRow({
         </View>
         <Pressable
           disabled={isPending || community.member_role === "owner"}
-          onPress={onMembershipPress}
+          onPress={(event) => {
+            event.stopPropagation();
+            onMembershipPress();
+          }}
           style={[
             styles.membershipButton,
             community.member_role ? styles.membershipButtonJoined : null,
@@ -498,7 +510,7 @@ function CommunityRow({
           )}
         </Pressable>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -821,6 +833,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingHorizontal: 18,
     paddingVertical: 15,
+  },
+  communityRowPressed: {
+    backgroundColor: "rgba(255,255,255,0.03)",
   },
   communityTop: {
     alignItems: "center",

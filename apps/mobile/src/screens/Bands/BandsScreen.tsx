@@ -24,10 +24,11 @@ import {
   useCloseBandListing,
   useCreateBandListing,
   useDeleteBandListing,
+  useMyBands,
   useMyBandListings,
   useRejectBandApplication,
 } from "@/hooks/useBands";
-import type { BandApplicationItem, BandListingItem } from "@/types";
+import type { BandApplicationItem, BandListingItem, MyBandItem } from "@/types";
 
 const SEEKING_ROLES = [
   "Vocalist",
@@ -74,11 +75,13 @@ const INSTRUMENTS = [
   "Other",
 ];
 
+type BandsView = "all" | "myListings" | "joined";
+
 export default function BandsScreen() {
   const navigation = useNavigation<any>();
   const [search, setSearch] = useState("");
   const [selectedRole, setSelectedRole] = useState<string | undefined>();
-  const [showMyListings, setShowMyListings] = useState(false);
+  const [activeView, setActiveView] = useState<BandsView>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [applyListing, setApplyListing] = useState<BandListingItem | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -100,41 +103,73 @@ export default function BandsScreen() {
     isFetchingNextPage: isFetchingNextMyListings,
     isLoading: isMyListingsLoading,
   } = useMyBandListings();
+  const {
+    data: myBands,
+    fetchNextPage: fetchNextMyBands,
+    hasNextPage: hasNextMyBands,
+    isFetchingNextPage: isFetchingNextMyBands,
+    isLoading: isMyBandsLoading,
+  } = useMyBands();
 
-  const visibleListings = showMyListings ? myListings : listings;
-  const visibleLoading = showMyListings ? isMyListingsLoading : isLoading;
-  const visibleLoadingMore = showMyListings
-    ? isFetchingNextMyListings
-    : isFetchingNextPage;
+  const visibleItems: Array<BandListingItem | MyBandItem> =
+    activeView === "joined"
+      ? myBands
+      : activeView === "myListings"
+        ? myListings
+        : listings;
+  const visibleLoading =
+    activeView === "joined"
+      ? isMyBandsLoading
+      : activeView === "myListings"
+        ? isMyListingsLoading
+        : isLoading;
+  const visibleLoadingMore =
+    activeView === "joined"
+      ? isFetchingNextMyBands
+      : activeView === "myListings"
+        ? isFetchingNextMyListings
+        : isFetchingNextPage;
 
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
         contentContainerStyle={[
           styles.content,
-          visibleListings.length === 0 ? styles.emptyContent : null,
+          visibleItems.length === 0 ? styles.emptyContent : null,
         ]}
-        data={visibleListings}
-        keyExtractor={(item) => item.id}
+        data={visibleItems}
+        keyExtractor={(item) =>
+          isMyBandItem(item) ? `${item.membership_role}:${item.listing.id}` : item.id
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
             {visibleLoading ? (
               <>
                 <ActivityIndicator color="#D8A64A" />
                 <Text style={styles.stateText}>
-                  {showMyListings ? "Loading your listings..." : "Loading bands..."}
+                  {activeView === "joined"
+                    ? "Loading your bands..."
+                    : activeView === "myListings"
+                      ? "Loading your listings..."
+                      : "Loading bands..."}
                 </Text>
               </>
             ) : (
               <>
                 <Ionicons color="#8F98A8" name="people-circle-outline" size={34} />
                 <Text style={styles.emptyTitle}>
-                  {showMyListings ? "No listings yet" : "No band listings found"}
+                  {activeView === "joined"
+                    ? "No bands yet"
+                    : activeView === "myListings"
+                      ? "No listings yet"
+                      : "No band listings found"}
                 </Text>
                 <Text style={styles.stateText}>
-                  {showMyListings
-                    ? "Create your first band listing to find musicians."
-                    : "Try another search or create one."}
+                  {activeView === "joined"
+                    ? "Create a listing or join a band to see it here."
+                    : activeView === "myListings"
+                      ? "Create your first band listing to find musicians."
+                      : "Try another search or create one."}
                 </Text>
               </>
             )}
@@ -159,34 +194,53 @@ export default function BandsScreen() {
 
             <View style={styles.tabs}>
               <Pressable
-                onPress={() => setShowMyListings(false)}
-                style={[styles.tabButton, !showMyListings ? styles.tabButtonActive : null]}
+                onPress={() => setActiveView("all")}
+                style={[styles.tabButton, activeView === "all" ? styles.tabButtonActive : null]}
               >
                 <Text
                   style={[
                     styles.tabButtonText,
-                    !showMyListings ? styles.tabButtonTextActive : null,
+                    activeView === "all" ? styles.tabButtonTextActive : null,
                   ]}
                 >
                   All Listings
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => setShowMyListings(true)}
-                style={[styles.tabButton, showMyListings ? styles.tabButtonActive : null]}
+                onPress={() => setActiveView("myListings")}
+                style={[
+                  styles.tabButton,
+                  activeView === "myListings" ? styles.tabButtonActive : null,
+                ]}
               >
                 <Text
                   style={[
                     styles.tabButtonText,
-                    showMyListings ? styles.tabButtonTextActive : null,
+                    activeView === "myListings" ? styles.tabButtonTextActive : null,
                   ]}
                 >
                   My Listings {myListings.length > 0 ? `(${myListings.length})` : ""}
                 </Text>
               </Pressable>
+              <Pressable
+                onPress={() => setActiveView("joined")}
+                style={[
+                  styles.tabButton,
+                  activeView === "joined" ? styles.tabButtonActive : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabButtonText,
+                    activeView === "joined" ? styles.tabButtonTextActive : null,
+                  ]}
+                >
+                  My Bands {myBands.length > 0 ? `(${myBands.length})` : ""}
+                </Text>
+              </Pressable>
             </View>
 
-            {!showMyListings ? (
+            {activeView === "all" ? (
               <View style={styles.searchPanel}>
                 <View style={styles.searchBox}>
                   <Ionicons color="#8F98A8" name="search" size={17} />
@@ -236,35 +290,47 @@ export default function BandsScreen() {
               </View>
             ) : null}
 
-            <Pressable
-              onPress={() => {
-                setError(null);
-                setIsCreateOpen(true);
-              }}
-              style={styles.createShortcut}
-            >
-              <View style={styles.createIcon}>
-                <Ionicons color="#D8A64A" name="add" size={20} />
-              </View>
-              <View style={styles.createText}>
-                <Text style={styles.createTitle}>Create band listing</Text>
-                <Text style={styles.createSubtitle}>Open a call for the musician you need.</Text>
-              </View>
-              <Ionicons color="#8F98A8" name="chevron-forward" size={20} />
-            </Pressable>
+            {activeView !== "joined" ? (
+              <Pressable
+                onPress={() => {
+                  setError(null);
+                  setIsCreateOpen(true);
+                }}
+                style={styles.createShortcut}
+              >
+                <View style={styles.createIcon}>
+                  <Ionicons color="#D8A64A" name="add" size={20} />
+                </View>
+                <View style={styles.createText}>
+                  <Text style={styles.createTitle}>Create band listing</Text>
+                  <Text style={styles.createSubtitle}>Open a call for the musician you need.</Text>
+                </View>
+                <Ionicons color="#8F98A8" name="chevron-forward" size={20} />
+              </Pressable>
+            ) : null}
 
             {error ? <Text style={[styles.error, styles.outerError]}>{error}</Text> : null}
 
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
-                {showMyListings ? "My Listings" : "Discover"}
+                {activeView === "joined"
+                  ? "My Bands"
+                  : activeView === "myListings"
+                    ? "My Listings"
+                    : "Discover"}
               </Text>
-              <Text style={styles.sectionMeta}>{visibleListings.length} shown</Text>
+              <Text style={styles.sectionMeta}>{visibleItems.length} shown</Text>
             </View>
           </>
         }
         onEndReached={() => {
-          if (showMyListings) {
+          if (activeView === "joined") {
+            if (hasNextMyBands && !isFetchingNextMyBands) {
+              fetchNextMyBands();
+            }
+            return;
+          }
+          if (activeView === "myListings") {
             if (hasNextMyListings && !isFetchingNextMyListings) {
               fetchNextMyListings();
             }
@@ -275,13 +341,16 @@ export default function BandsScreen() {
           }
         }}
         onEndReachedThreshold={0.5}
-        renderItem={({ item }) =>
-          showMyListings ? (
+        renderItem={({ item }) => {
+          if (isMyBandItem(item)) {
+            return <MyBandCard band={item} />;
+          }
+          return activeView === "myListings" ? (
             <MyBandListingCard listing={item} onError={setError} />
           ) : (
             <BandListingRow listing={item} onApply={() => setApplyListing(item)} />
-          )
-        }
+          );
+        }}
       />
 
       <CreateBandListingModal
@@ -342,6 +411,81 @@ function BandListingRow({
         <Pressable onPress={onApply} style={styles.primarySmallButton}>
           <Text style={styles.primarySmallButtonText}>Apply</Text>
         </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function isMyBandItem(item: BandListingItem | MyBandItem): item is MyBandItem {
+  return "membership_role" in item;
+}
+
+function formatShortDate(value: string | null) {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function MyBandCard({ band }: { band: MyBandItem }) {
+  const isOwner = band.membership_role === "owner";
+  const activityDate = formatShortDate(band.joined_at);
+  const activityLabel = isOwner ? "created" : "joined";
+  const listing = band.listing;
+
+  return (
+    <View style={styles.listingRow}>
+      <View style={styles.listingTop}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {listing.band_name.slice(0, 2).toUpperCase()}
+          </Text>
+        </View>
+        <View style={styles.listingBody}>
+          <View style={styles.titleRow}>
+            <Text numberOfLines={1} style={styles.listingTitle}>
+              {listing.band_name}
+            </Text>
+            <View
+              style={[
+                styles.membershipBadge,
+                isOwner ? styles.ownerMembershipBadge : styles.memberMembershipBadge,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.membershipBadgeText,
+                  isOwner ? styles.ownerMembershipText : styles.memberMembershipText,
+                ]}
+              >
+                {isOwner ? "Owner" : "Member"}
+              </Text>
+            </View>
+            {band.application ? (
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleBadgeText}>{band.application.instrument}</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.listingMeta}>
+            {listing.current_members}/{listing.max_members} members - {listing.region}
+            {listing.genre ? ` - ${listing.genre}` : ""}
+          </Text>
+          {listing.description ? (
+            <Text numberOfLines={2} style={styles.description}>
+              {listing.description}
+            </Text>
+          ) : null}
+          <Text style={styles.ownerText}>
+            by @{listing.owner?.username || "unknown"}
+            {activityDate ? ` - ${activityLabel} ${activityDate}` : ""}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -1393,6 +1537,21 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 4,
   },
+  memberMembershipBadge: {
+    backgroundColor: "rgba(79,180,119,0.16)",
+  },
+  memberMembershipText: {
+    color: "#8BE0AD",
+  },
+  membershipBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  membershipBadgeText: {
+    fontSize: 10,
+    fontWeight: "900",
+  },
   messageArea: {
     minHeight: 82,
     paddingVertical: 10,
@@ -1464,6 +1623,12 @@ const styles = StyleSheet.create({
   },
   outerError: {
     marginHorizontal: 14,
+  },
+  ownerMembershipBadge: {
+    backgroundColor: "rgba(216,166,74,0.14)",
+  },
+  ownerMembershipText: {
+    color: "#D8A64A",
   },
   ownerText: {
     color: "#8F98A8",
@@ -1662,6 +1827,7 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 6,
     paddingHorizontal: 14,
     paddingTop: 12,

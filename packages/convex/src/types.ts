@@ -42,6 +42,9 @@ export type CommunityItem = NonNullable<CommunityQueryReturn>;
 type CommunitiesListReturn = FunctionReturnType<typeof api.communities.listPaginated>;
 export type CommunityListItem = CommunitiesListReturn["page"][number];
 
+type CommunityMembersReturn = FunctionReturnType<typeof api.communities.getMembersPaginated>;
+export type CommunityMemberItem = NonNullable<CommunityMembersReturn["page"][number]>;
+
 type ProfilePostsReturn = FunctionReturnType<typeof api.posts.getByUsernamePaginated>;
 export type ProfilePostItem = ProfilePostsReturn["page"][number];
 
@@ -53,6 +56,9 @@ export type BandListingItem = BandListingsReturn["page"][number];
 
 type BandApplicationsReturn = FunctionReturnType<typeof api.bands.getApplications>;
 export type BandApplicationItem = BandApplicationsReturn["page"][number];
+
+type MyBandsReturn = FunctionReturnType<typeof api.bands.getMyBandsPaginated>;
+export type MyBandItem = MyBandsReturn["page"][number];
 
 export type { Doc, Id } from "../../../convex/_generated/dataModel";
 

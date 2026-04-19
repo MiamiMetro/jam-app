@@ -11,6 +11,7 @@ import ConversationScreen from "../screens/Messages/ConversationScreen";
 import JamRoomScreen from "../screens/Jams/JamRoomScreen";
 import MyMusicScreen from "../screens/Music/MyMusicScreen";
 import CommunityScreen from "../screens/Community/CommunityScreen";
+import CommunityDetailScreen from "../screens/Community/CommunityDetailScreen";
 import BandsScreen from "../screens/Bands/BandsScreen";
 import { authClient } from "../lib/auth-client";
 import { api } from "@jam-app/convex";
@@ -24,6 +25,7 @@ export type RootStackParamList = {
   JamRoom: { handle: string };
   MyMusic: undefined;
   Communities: undefined;
+  CommunityDetail: { handle: string };
   Bands: undefined;
 };
 
@@ -56,6 +58,7 @@ export default function RootNavigator() {
           <Stack.Screen name="JamRoom" component={JamRoomScreen} />
           <Stack.Screen name="MyMusic" component={MyMusicScreen} />
           <Stack.Screen name="Communities" component={CommunityScreen} />
+          <Stack.Screen name="CommunityDetail" component={CommunityDetailScreen} />
           <Stack.Screen name="Bands" component={BandsScreen} />
         </>
       ) : (

@@ -18,3 +18,7 @@ build/
 .next/
 .turbo/
 .cache/
+
+.claude
+.agents
+skills-lock.json
