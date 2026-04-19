@@ -1,0 +1,46 @@
+{
+    "appId": "com.jam.desktop",
+    "files": [
+        "dist-electron",
+        "dist-react",
+        "!**/node_modules/**"
+    ],
+    "extraResources": [
+        {
+            "from": "resources/client",
+            "to": "client",
+            "filter": ["**/*"]
+        }
+    ],
+    "directories": {
+        "output": "dist"
+    },
+    "icon": "desktopIcon.png",
+    "asar": true,
+    "npmRebuild": false,
+    "mac": {
+        "target": "dmg"
+    },
+    "linux": {
+        "target": "AppImage",
+        "category": "Audio"
+    },
+    "win": {
+        "target": [
+            {
+                "target": "nsis",
+                "arch": [
+                    "x64"
+                ]
+            }
+        ]
+    },
+    "nsis": {
+        "oneClick": false,
+        "allowToChangeInstallationDirectory": true,
+        "createDesktopShortcut": true,
+        "createStartMenuShortcut": true,
+        "deleteAppDataOnUninstall": true,
+        "runAfterFinish": true
+    }
+}
