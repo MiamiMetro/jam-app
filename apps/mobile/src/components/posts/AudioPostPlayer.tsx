@@ -17,6 +17,7 @@ import {
   View,
   ViewStyle,
 } from "react-native";
+import { useMobileTheme } from "@/theme/MobileTheme";
 
 type Props = {
   audioUrl: string;
@@ -33,6 +34,7 @@ export default function AudioPostPlayer({
   style,
   title,
 }: Props) {
+  const { colors } = useMobileTheme();
   const player = useAudioPlayer(null, {
     keepAudioSessionActive: true,
     updateInterval: 250,
@@ -164,7 +166,13 @@ export default function AudioPostPlayer({
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.card, borderColor: colors.border },
+        style,
+      ]}
+    >
       <View style={styles.topRow}>
         <Pressable
           accessibilityLabel={status.playing ? "Pause audio" : "Play audio"}
@@ -172,17 +180,22 @@ export default function AudioPostPlayer({
           onPress={handleTogglePlayback}
           style={({ pressed }) => [
             styles.playButton,
-            unsupportedReason ? styles.playButtonDisabled : null,
-            pressed ? styles.playButtonPressed : null,
+            {
+              backgroundColor: unsupportedReason
+                ? colors.muted
+                : pressed
+                  ? colors.accent
+                  : colors.primary,
+            },
           ]}
         >
           {unsupportedReason ? (
-            <Ionicons color="#8F98A8" name="alert" size={18} />
+            <Ionicons color={colors.mutedForeground} name="alert" size={18} />
           ) : isPreparingPlayback ? (
-            <ActivityIndicator color="#251B0A" size="small" />
+            <ActivityIndicator color={colors.primaryForeground} size="small" />
           ) : (
             <Ionicons
-              color="#251B0A"
+              color={colors.primaryForeground}
               name={status.playing ? "pause" : "play"}
               size={18}
             />
@@ -190,10 +203,10 @@ export default function AudioPostPlayer({
         </Pressable>
 
         <View style={styles.meta}>
-          <Text numberOfLines={1} style={styles.title}>
+          <Text numberOfLines={1} style={[styles.title, { color: colors.foreground }]}>
             {title ?? "Audio post"}
           </Text>
-          <Text style={styles.time}>
+          <Text style={[styles.time, { color: colors.mutedForeground }]}>
             {formatDuration(currentTime)} / {formatDuration(displayDuration)}
           </Text>
         </View>
@@ -203,14 +216,26 @@ export default function AudioPostPlayer({
         disabled={!displayDuration}
         onLayout={handleProgressLayout}
         onPress={handleSeek}
-        style={styles.progressTrack}
+        style={[styles.progressTrack, { backgroundColor: colors.muted }]}
       >
-        <View style={[styles.progressFill, { width: `${clamp(progress, 0, 1) * 100}%` }]} />
+        <View
+          style={[
+            styles.progressFill,
+            {
+              backgroundColor: colors.primary,
+              width: `${clamp(progress, 0, 1) * 100}%`,
+            },
+          ]}
+        />
       </Pressable>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text>
+      ) : null}
       {unsupportedReason ? (
-        <Text style={styles.unsupported}>{unsupportedReason}</Text>
+        <Text style={[styles.unsupported, { color: colors.primary }]}>
+          {unsupportedReason}
+        </Text>
       ) : null}
     </View>
   );
@@ -301,8 +326,6 @@ function getPathname(value: string) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     padding: 12,
@@ -314,52 +337,39 @@ const styles = StyleSheet.create({
   },
   playButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
     height: 38,
     justifyContent: "center",
     width: 38,
-  },
-  playButtonPressed: {
-    backgroundColor: "#C89434",
-  },
-  playButtonDisabled: {
-    backgroundColor: "#353B49",
   },
   meta: {
     flex: 1,
     minWidth: 0,
   },
   title: {
-    color: "#EEF0F5",
     fontSize: 13,
     fontWeight: "800",
   },
   time: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 3,
   },
   progressTrack: {
-    backgroundColor: "rgba(255,255,255,0.09)",
     borderRadius: 6,
     height: 7,
     marginTop: 12,
     overflow: "hidden",
   },
   progressFill: {
-    backgroundColor: "#D8A64A",
     height: "100%",
   },
   error: {
-    color: "#F87171",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 8,
   },
   unsupported: {
-    color: "#D8A64A",
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 17,

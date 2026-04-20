@@ -17,12 +17,14 @@ import CommentItem from "@/components/comments/CommentItem";
 import AudioPostPlayer from "@/components/posts/AudioPostPlayer";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 import { useMyProfile } from "@/hooks/useMyProfile";
+import { useMobileTheme } from "@/theme/MobileTheme";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
 
 type Props = NativeStackScreenProps<RootStackParamList, "PostDetail">;
 
 export default function PostDetailScreen({ navigation, route }: Props) {
+  const { colors } = useMobileTheme();
   const { postId } = route.params;
   const post = useQuery(api.posts.getById, { postId: postId as Id<"posts"> });
   const { profile } = useMyProfile();
@@ -94,10 +96,12 @@ export default function PostDetailScreen({ navigation, route }: Props) {
 
   if (post === undefined) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerState}>
-          <ActivityIndicator color="#D8A64A" />
-          <Text style={styles.stateText}>Loading post...</Text>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={[styles.stateText, { color: colors.mutedForeground }]}>
+            Loading post...
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -105,28 +109,36 @@ export default function PostDetailScreen({ navigation, route }: Props) {
 
   if (!post) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons color="#B0B7C4" name="arrow-back" size={20} />
+            <Ionicons color={colors.secondaryForeground} name="arrow-back" size={20} />
           </Pressable>
-          <Text style={styles.headerTitle}>Post</Text>
+          <Text style={[styles.headerTitle, { color: colors.secondaryForeground }]}>
+            Post
+          </Text>
         </View>
         <View style={styles.centerState}>
-          <Text style={styles.emptyTitle}>Post not found</Text>
-          <Text style={styles.stateText}>It may have been deleted.</Text>
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+            Post not found
+          </Text>
+          <Text style={[styles.stateText, { color: colors.mutedForeground }]}>
+            It may have been deleted.
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons color="#B0B7C4" name="arrow-back" size={20} />
+          <Ionicons color={colors.secondaryForeground} name="arrow-back" size={20} />
         </Pressable>
-        <Text style={styles.headerTitle}>Post by {authorName}</Text>
+        <Text style={[styles.headerTitle, { color: colors.secondaryForeground }]}>
+          Post by {authorName}
+        </Text>
         {isOwnPost ? (
           <Pressable
             disabled={isDeletingPost}
@@ -134,7 +146,7 @@ export default function PostDetailScreen({ navigation, route }: Props) {
             style={styles.deleteButton}
           >
             <Ionicons
-              color={isDeletingPost ? "#4B5565" : "#8F98A8"}
+              color={isDeletingPost ? colors.muted : colors.mutedForeground}
               name="trash-outline"
               size={20}
             />
@@ -143,9 +155,14 @@ export default function PostDetailScreen({ navigation, route }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.postBlock}>
+        <View style={[styles.postBlock, { borderBottomColor: colors.border }]}>
           <View style={styles.postHeader}>
-            <View style={styles.avatar}>
+            <View
+              style={[
+                styles.avatar,
+                { backgroundColor: colors.muted, borderColor: colors.border },
+              ]}
+            >
               {post.author?.avatar_url && !avatarFailed ? (
                 <Image
                   onError={() => setAvatarFailed(true)}
@@ -153,16 +170,24 @@ export default function PostDetailScreen({ navigation, route }: Props) {
                   style={styles.avatarImage}
                 />
               ) : (
-                <Text style={styles.avatarFallback}>{fallbackLetters}</Text>
+                <Text style={[styles.avatarFallback, { color: colors.secondaryForeground }]}>
+                  {fallbackLetters}
+                </Text>
               )}
             </View>
             <View style={styles.postMeta}>
-              <Text style={styles.author}>{authorName}</Text>
-              <Text style={styles.timestamp}>{createdAt}</Text>
+              <Text style={[styles.author, { color: colors.foreground }]}>
+                {authorName}
+              </Text>
+              <Text style={[styles.timestamp, { color: colors.mutedForeground }]}>
+                {createdAt}
+              </Text>
             </View>
           </View>
 
-          {post.text ? <Text style={styles.postText}>{post.text}</Text> : null}
+          {post.text ? (
+            <Text style={[styles.postText, { color: colors.foreground }]}>{post.text}</Text>
+          ) : null}
 
           {post.audio_url ? (
             <AudioPostPlayer
@@ -173,28 +198,38 @@ export default function PostDetailScreen({ navigation, route }: Props) {
             />
           ) : null}
 
-          <View style={styles.postActions}>
+          <View style={[styles.postActions, { borderTopColor: colors.border }]}>
             <Pressable onPress={handleTogglePostLike} style={styles.action}>
               <Ionicons
-                color={post.is_liked ? "#EF4444" : "#8F98A8"}
+                color={post.is_liked ? "#EF4444" : colors.mutedForeground}
                 name={post.is_liked ? "heart" : "heart-outline"}
                 size={20}
               />
-              <Text style={[styles.actionText, post.is_liked ? styles.likedText : null]}>
+              <Text
+                style={[
+                  styles.actionText,
+                  { color: colors.mutedForeground },
+                  post.is_liked ? styles.likedText : null,
+                ]}
+              >
                 {post.likes_count}
               </Text>
             </Pressable>
             <View style={styles.action}>
-              <Ionicons color="#8F98A8" name="chatbubble-outline" size={19} />
-              <Text style={styles.actionText}>{post.comments_count}</Text>
+              <Ionicons color={colors.mutedForeground} name="chatbubble-outline" size={19} />
+              <Text style={[styles.actionText, { color: colors.mutedForeground }]}>
+                {post.comments_count}
+              </Text>
             </View>
           </View>
         </View>
 
         <View style={styles.commentsHeader}>
-          <View style={styles.commentsAccent} />
-          <Text style={styles.commentsTitle}>Comments</Text>
-          <Text style={styles.commentsCount}>({topLevelComments.length})</Text>
+          <View style={[styles.commentsAccent, { backgroundColor: colors.primary }]} />
+          <Text style={[styles.commentsTitle, { color: colors.foreground }]}>Comments</Text>
+          <Text style={[styles.commentsCount, { color: colors.mutedForeground }]}>
+            ({topLevelComments.length})
+          </Text>
         </View>
 
         <View style={styles.composerWrap}>
@@ -207,17 +242,27 @@ export default function PostDetailScreen({ navigation, route }: Props) {
 
         {commentsQuery.status === "LoadingFirstPage" ? (
           <View style={styles.centerStateInline}>
-            <ActivityIndicator color="#D8A64A" />
-            <Text style={styles.stateText}>Loading comments...</Text>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={[styles.stateText, { color: colors.mutedForeground }]}>
+              Loading comments...
+            </Text>
           </View>
         ) : topLevelComments.length === 0 ? (
           <View style={styles.centerStateInline}>
-            <Ionicons color="#4B5565" name="chatbubble-ellipses-outline" size={34} />
-            <Text style={styles.emptyTitle}>No comments yet</Text>
-            <Text style={styles.stateText}>Be the first to comment.</Text>
+            <Ionicons
+              color={colors.mutedForeground}
+              name="chatbubble-ellipses-outline"
+              size={34}
+            />
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+              No comments yet
+            </Text>
+            <Text style={[styles.stateText, { color: colors.mutedForeground }]}>
+              Be the first to comment.
+            </Text>
           </View>
         ) : (
-          <View style={styles.commentsList}>
+          <View style={[styles.commentsList, { borderTopColor: colors.border }]}>
             {topLevelComments.map((comment) => (
               <CommentItem key={comment.id} comment={comment} currentProfile={profile} />
             ))}
@@ -226,7 +271,9 @@ export default function PostDetailScreen({ navigation, route }: Props) {
 
         {commentsQuery.status === "CanLoadMore" ? (
           <Pressable onPress={() => commentsQuery.loadMore(20)} style={styles.loadMoreButton}>
-            <Text style={styles.loadMoreText}>Load more comments</Text>
+            <Text style={[styles.loadMoreText, { color: colors.primary }]}>
+              Load more comments
+            </Text>
           </Pressable>
         ) : null}
       </ScrollView>
@@ -255,12 +302,10 @@ function formatRelativeTime(value: string) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#1A1E29",
     flex: 1,
   },
   header: {
     alignItems: "center",
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -282,7 +327,6 @@ const styles = StyleSheet.create({
     width: 34,
   },
   headerTitle: {
-    color: "#B0B7C4",
     flex: 1,
     fontSize: 14,
     fontWeight: "800",
@@ -291,7 +335,6 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   postBlock: {
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     paddingHorizontal: 18,
     paddingVertical: 18,
@@ -303,8 +346,6 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 24,
     borderWidth: 1,
     height: 48,
@@ -317,7 +358,6 @@ const styles = StyleSheet.create({
     width: 48,
   },
   avatarFallback: {
-    color: "#AEB6C4",
     fontSize: 14,
     fontWeight: "800",
   },
@@ -326,18 +366,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   author: {
-    color: "#EEF0F5",
     fontSize: 17,
     fontWeight: "800",
   },
   timestamp: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "600",
     marginTop: 3,
   },
   postText: {
-    color: "#EEF0F5",
     fontSize: 16,
     lineHeight: 24,
   },
@@ -345,7 +382,6 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   postActions: {
-    borderTopColor: "rgba(255,255,255,0.06)",
     borderTopWidth: 1,
     flexDirection: "row",
     gap: 22,
@@ -358,7 +394,6 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   actionText: {
-    color: "#8F98A8",
     fontSize: 14,
     fontWeight: "800",
   },
@@ -373,18 +408,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   commentsAccent: {
-    backgroundColor: "#D8A64A",
     borderRadius: 2,
     height: 18,
     width: 4,
   },
   commentsTitle: {
-    color: "#EEF0F5",
     fontSize: 15,
     fontWeight: "800",
   },
   commentsCount: {
-    color: "#8F98A8",
     fontSize: 13,
     fontWeight: "700",
   },
@@ -393,7 +425,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   commentsList: {
-    borderTopColor: "rgba(255,255,255,0.06)",
     borderTopWidth: 1,
   },
   centerState: {
@@ -409,14 +440,12 @@ const styles = StyleSheet.create({
     paddingVertical: 46,
   },
   emptyTitle: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "800",
     marginTop: 10,
     textAlign: "center",
   },
   stateText: {
-    color: "#8F98A8",
     marginTop: 8,
     textAlign: "center",
   },
@@ -425,7 +454,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   loadMoreText: {
-    color: "#D8A64A",
     fontSize: 13,
     fontWeight: "800",
   },

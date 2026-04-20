@@ -13,10 +13,12 @@ import {
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../../navigation/AuthStack";
 import { authClient } from "../../lib/auth-client";
+import { useMobileTheme } from "@/theme/MobileTheme";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Register">;
 
 const RegisterScreen = ({ navigation }: Props) => {
+  const { colors } = useMobileTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -50,23 +52,27 @@ const RegisterScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardView}
       >
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.kicker}>Jam</Text>
-            <Text style={styles.title}>Join the session</Text>
-            <Text style={styles.description}>
+            <Text style={[styles.kicker, { color: colors.success }]}>Jam</Text>
+            <Text style={[styles.title, { color: colors.foreground }]}>
+              Join the session
+            </Text>
+            <Text style={[styles.description, { color: colors.mutedForeground }]}>
               Create your account, then choose your stage name.
             </Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.field}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={[styles.label, { color: colors.secondaryForeground }]}>
+                Email
+              </Text>
               <TextInput
                 autoCapitalize="none"
                 autoComplete="email"
@@ -78,14 +84,23 @@ const RegisterScreen = ({ navigation }: Props) => {
                   setError(null);
                 }}
                 placeholder="your@email.com"
-                placeholderTextColor="#6B7280"
-                style={styles.input}
+                placeholderTextColor={colors.mutedForeground}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.border,
+                    color: colors.foreground,
+                  },
+                ]}
                 value={email}
               />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={[styles.label, { color: colors.secondaryForeground }]}>
+                Password
+              </Text>
               <TextInput
                 autoComplete="new-password"
                 editable={!isSubmitting}
@@ -94,15 +109,24 @@ const RegisterScreen = ({ navigation }: Props) => {
                   setError(null);
                 }}
                 placeholder="Password"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={colors.mutedForeground}
                 secureTextEntry
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.border,
+                    color: colors.foreground,
+                  },
+                ]}
                 value={password}
               />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Confirm password</Text>
+              <Text style={[styles.label, { color: colors.secondaryForeground }]}>
+                Confirm password
+              </Text>
               <TextInput
                 autoComplete="new-password"
                 editable={!isSubmitting}
@@ -111,28 +135,51 @@ const RegisterScreen = ({ navigation }: Props) => {
                   setError(null);
                 }}
                 placeholder="Password"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={colors.mutedForeground}
                 secureTextEntry
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.border,
+                    color: colors.foreground,
+                  },
+                ]}
                 value={confirmPassword}
               />
             </View>
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? (
+              <Text
+                style={[
+                  styles.error,
+                  {
+                    backgroundColor: colors.destructiveMuted,
+                    borderColor: colors.destructive,
+                    color: colors.destructive,
+                  },
+                ]}
+              >
+                {error}
+              </Text>
+            ) : null}
 
             <Pressable
               disabled={isSubmitting}
               onPress={handleRegister}
               style={({ pressed }) => [
                 styles.primaryButton,
+                { backgroundColor: colors.primary },
                 pressed && !isSubmitting ? styles.buttonPressed : null,
                 isSubmitting ? styles.buttonDisabled : null,
               ]}
             >
               {isSubmitting ? (
-                <ActivityIndicator color="#030712" />
+                <ActivityIndicator color={colors.primaryForeground} />
               ) : (
-                <Text style={styles.primaryButtonText}>Create account</Text>
+                <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>
+                  Create account
+                </Text>
               )}
             </Pressable>
 
@@ -141,7 +188,7 @@ const RegisterScreen = ({ navigation }: Props) => {
               onPress={() => navigation.navigate("Login")}
               style={styles.secondaryButton}
             >
-              <Text style={styles.secondaryButtonText}>
+              <Text style={[styles.secondaryButtonText, { color: colors.mutedForeground }]}>
                 Already have an account? Login
               </Text>
             </Pressable>
@@ -163,7 +210,6 @@ function getAuthErrorMessage(error: unknown, fallback: string) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#030712",
     flex: 1,
   },
   keyboardView: {
@@ -178,20 +224,17 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   kicker: {
-    color: "#22C55E",
     fontSize: 14,
     fontWeight: "800",
     marginBottom: 12,
     textTransform: "uppercase",
   },
   title: {
-    color: "#F9FAFB",
     fontSize: 34,
     fontWeight: "800",
     marginBottom: 12,
   },
   description: {
-    color: "#9CA3AF",
     fontSize: 16,
     lineHeight: 23,
   },
@@ -202,37 +245,28 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: {
-    color: "#E5E7EB",
     fontSize: 13,
     fontWeight: "700",
   },
   input: {
-    backgroundColor: "#111827",
-    borderColor: "#1F2937",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#F9FAFB",
     fontSize: 16,
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
   error: {
-    backgroundColor: "#7F1D1D",
-    borderColor: "#991B1B",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#FEE2E2",
     padding: 12,
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: "#A7F3D0",
     borderRadius: 8,
     minHeight: 48,
     justifyContent: "center",
   },
   primaryButtonText: {
-    color: "#030712",
     fontSize: 16,
     fontWeight: "800",
   },
@@ -241,7 +275,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   secondaryButtonText: {
-    color: "#9CA3AF",
     fontSize: 14,
     fontWeight: "700",
   },

@@ -2,6 +2,7 @@ import { useMemo, type ReactElement } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
 import type { PostFeedItem } from "@/types";
 import PostItem from "./PostItem";
+import { useMobileTheme } from "@/theme/MobileTheme";
 
 type Props = {
   posts: PostFeedItem[];
@@ -18,6 +19,7 @@ export default function PostList({
   ListHeaderComponent,
   onEndReached,
 }: Props) {
+  const { colors } = useMobileTheme();
   const visiblePosts = useMemo(
     () => posts.filter((post) => !post.deleted_at),
     [posts]
@@ -27,6 +29,7 @@ export default function PostList({
     <FlatList
       contentContainerStyle={[
         styles.content,
+        { backgroundColor: colors.background },
         visiblePosts.length === 0 ? styles.emptyContent : null,
       ]}
       data={visiblePosts}
@@ -35,18 +38,28 @@ export default function PostList({
         <View style={styles.centerState}>
           {isLoading ? (
             <>
-              <ActivityIndicator color="#D8A64A" />
-              <Text style={styles.stateText}>Loading posts...</Text>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={[styles.stateText, { color: colors.mutedForeground }]}>
+                Loading posts...
+              </Text>
             </>
           ) : (
             <>
-              <Text style={styles.emptyTitle}>No posts yet</Text>
-              <Text style={styles.stateText}>Be the first to share something.</Text>
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+                No posts yet
+              </Text>
+              <Text style={[styles.stateText, { color: colors.mutedForeground }]}>
+                Be the first to share something.
+              </Text>
             </>
           )}
         </View>
       }
-      ListFooterComponent={isLoadingMore ? <ActivityIndicator color="#D8A64A" style={styles.footerLoader} /> : null}
+      ListFooterComponent={
+        isLoadingMore ? (
+          <ActivityIndicator color={colors.primary} style={styles.footerLoader} />
+        ) : null
+      }
       ListHeaderComponent={ListHeaderComponent}
       renderItem={({ item }) => <PostItem post={item} />}
       onEndReached={onEndReached}
@@ -63,19 +76,16 @@ const styles = StyleSheet.create({
     paddingVertical: 46,
   },
   emptyTitle: {
-    color: "#EEF0F5",
     fontSize: 17,
     fontWeight: "800",
     marginBottom: 6,
     textAlign: "center",
   },
   stateText: {
-    color: "#8F98A8",
     marginTop: 12,
     textAlign: "center",
   },
   content: {
-    backgroundColor: "#1A1E29",
     paddingBottom: 18,
   },
   emptyContent: {

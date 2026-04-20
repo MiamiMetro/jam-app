@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import type { RoomFeedItem } from "@/types";
+import { useMobileTheme } from "@/theme/MobileTheme";
 
 type Props = {
   onPress?: () => void;
@@ -8,6 +9,7 @@ type Props = {
 };
 
 export default function JamItem({ onPress, room }: Props) {
+  const { colors } = useMobileTheme();
   const hostName = room.host?.username ?? room.handle;
   const hostAvatar = room.host?.avatar_url ?? "";
   const initials = hostName.slice(0, 2).toUpperCase();
@@ -19,39 +21,54 @@ export default function JamItem({ onPress, room }: Props) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        isLive ? styles.cardLive : null,
-        pressed ? styles.cardPressed : null,
+        {
+          backgroundColor: pressed ? colors.cardPressed : colors.card,
+          borderColor: isLive ? colors.primary : colors.border,
+        },
       ]}
     >
       <View style={styles.topLine}>
-        <View style={styles.roomIcon}>
-          <Ionicons color="#D8A64A" name="musical-notes" size={18} />
+        <View style={[styles.roomIcon, { backgroundColor: colors.accentMuted }]}>
+          <Ionicons color={colors.primary} name="musical-notes" size={18} />
         </View>
 
         <View style={styles.titleBlock}>
           <View style={styles.titleRow}>
-            <Text numberOfLines={1} style={styles.title}>
+            <Text numberOfLines={1} style={[styles.title, { color: colors.foreground }]}>
               {room.name}
             </Text>
             {room.is_private ? (
-              <Ionicons color="#8F98A8" name="lock-closed-outline" size={14} />
+              <Ionicons color={colors.mutedForeground} name="lock-closed-outline" size={14} />
             ) : null}
           </View>
-          <Text numberOfLines={1} style={styles.handle}>
+          <Text numberOfLines={1} style={[styles.handle, { color: colors.mutedForeground }]}>
             jam/{room.handle}
           </Text>
         </View>
 
-        <View style={[styles.liveBadge, isLive ? styles.liveBadgeOn : null]}>
+        <View
+          style={[
+            styles.liveBadge,
+            { backgroundColor: isLive ? "rgba(34,197,94,0.12)" : colors.muted },
+          ]}
+        >
           <View style={[styles.liveDot, isLive ? styles.liveDotOn : null]} />
-          <Text style={[styles.liveText, isLive ? styles.liveTextOn : null]}>
+          <Text
+            style={[
+              styles.liveText,
+              { color: isLive ? colors.success : colors.secondaryForeground },
+            ]}
+          >
             {isLive ? "Live" : "Idle"}
           </Text>
         </View>
       </View>
 
       {room.description ? (
-        <Text numberOfLines={2} style={styles.description}>
+        <Text
+          numberOfLines={2}
+          style={[styles.description, { color: colors.secondaryForeground }]}
+        >
           {room.description}
         </Text>
       ) : null}
@@ -63,25 +80,37 @@ export default function JamItem({ onPress, room }: Props) {
         {room.stream_url ? <MetaItem icon="radio-outline" label="Stream ready" /> : null}
       </View>
 
-      <View style={styles.footer}>
-        <View style={styles.hostAvatar}>
+      <View style={[styles.footer, { borderTopColor: colors.border }]}>
+        <View
+          style={[
+            styles.hostAvatar,
+            { backgroundColor: colors.muted, borderColor: colors.border },
+          ]}
+        >
           {hostAvatar ? (
             <Image source={{ uri: hostAvatar }} style={styles.hostAvatarImage} />
           ) : (
-            <Text style={styles.hostAvatarText}>{initials}</Text>
+            <Text style={[styles.hostAvatarText, { color: colors.secondaryForeground }]}>
+              {initials}
+            </Text>
           )}
         </View>
         <View style={styles.hostTextBlock}>
-          <Text numberOfLines={1} style={styles.hostName}>
+          <Text numberOfLines={1} style={[styles.hostName, { color: colors.foreground }]}>
             @{hostName}
           </Text>
-          <Text numberOfLines={1} style={styles.hostLabel}>
+          <Text numberOfLines={1} style={[styles.hostLabel, { color: colors.mutedForeground }]}>
             Host
           </Text>
         </View>
         {room.genre ? (
-          <View style={styles.genrePill}>
-            <Text numberOfLines={1} style={styles.genreText}>
+          <View
+            style={[
+              styles.genrePill,
+              { backgroundColor: colors.accentMuted, borderColor: colors.primary },
+            ]}
+          >
+            <Text numberOfLines={1} style={[styles.genreText, { color: colors.primary }]}>
               {room.genre}
             </Text>
           </View>
@@ -98,10 +127,17 @@ function MetaItem({
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
 }) {
+  const { colors } = useMobileTheme();
+
   return (
-    <View style={styles.metaItem}>
-      <Ionicons color="#8F98A8" name={icon} size={13} />
-      <Text numberOfLines={1} style={styles.metaText}>
+    <View
+      style={[
+        styles.metaItem,
+        { backgroundColor: colors.muted, borderColor: colors.border },
+      ]}
+    >
+      <Ionicons color={colors.mutedForeground} name={icon} size={13} />
+      <Text numberOfLines={1} style={[styles.metaText, { color: colors.secondaryForeground }]}>
         {label}
       </Text>
     </View>
@@ -129,20 +165,12 @@ function formatRelativeTime(value: string) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#222733",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
     marginHorizontal: 14,
     marginBottom: 10,
     padding: 14,
-  },
-  cardLive: {
-    borderColor: "rgba(216,166,74,0.26)",
-  },
-  cardPressed: {
-    backgroundColor: "#262C39",
   },
   topLine: {
     alignItems: "center",
@@ -151,7 +179,6 @@ const styles = StyleSheet.create({
   },
   roomIcon: {
     alignItems: "center",
-    backgroundColor: "rgba(216,166,74,0.12)",
     borderRadius: 8,
     height: 38,
     justifyContent: "center",
@@ -167,28 +194,22 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   title: {
-    color: "#EEF0F5",
     flex: 1,
     fontSize: 16,
     fontWeight: "900",
   },
   handle: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "800",
     marginTop: 3,
   },
   liveBadge: {
     alignItems: "center",
-    backgroundColor: "#303644",
     borderRadius: 8,
     flexDirection: "row",
     gap: 6,
     paddingHorizontal: 8,
     paddingVertical: 5,
-  },
-  liveBadgeOn: {
-    backgroundColor: "rgba(34,197,94,0.12)",
   },
   liveDot: {
     backgroundColor: "#737D8C",
@@ -200,15 +221,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#22C55E",
   },
   liveText: {
-    color: "#AEB6C4",
     fontSize: 11,
     fontWeight: "900",
   },
-  liveTextOn: {
-    color: "#86EFAC",
-  },
   description: {
-    color: "#C7CCD6",
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 20,
@@ -220,8 +236,6 @@ const styles = StyleSheet.create({
   },
   metaItem: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -231,13 +245,11 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   metaText: {
-    color: "#AEB6C4",
     fontSize: 11,
     fontWeight: "800",
   },
   footer: {
     alignItems: "center",
-    borderTopColor: "rgba(255,255,255,0.07)",
     borderTopWidth: 1,
     flexDirection: "row",
     gap: 9,
@@ -245,8 +257,6 @@ const styles = StyleSheet.create({
   },
   hostAvatar: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 16,
     borderWidth: 1,
     height: 32,
@@ -259,7 +269,6 @@ const styles = StyleSheet.create({
     width: 32,
   },
   hostAvatarText: {
-    color: "#C7CCD6",
     fontSize: 11,
     fontWeight: "900",
   },
@@ -268,19 +277,15 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   hostName: {
-    color: "#EEF0F5",
     fontSize: 13,
     fontWeight: "900",
   },
   hostLabel: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "700",
     marginTop: 2,
   },
   genrePill: {
-    backgroundColor: "rgba(216,166,74,0.12)",
-    borderColor: "rgba(216,166,74,0.22)",
     borderRadius: 8,
     borderWidth: 1,
     maxWidth: 120,
@@ -288,7 +293,6 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   genreText: {
-    color: "#D8A64A",
     fontSize: 11,
     fontWeight: "900",
   },

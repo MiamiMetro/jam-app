@@ -7,6 +7,7 @@ import HomeScreen from "../screens/Home/HomeScreen";
 import JamScreen from "../screens/Jams/JamScreen";
 import MessagesScreen from "../screens/Messages/MessagesScreen";
 import MoreScreen from "../screens/More/MoreScreen";
+import { useMobileTheme } from "../theme/MobileTheme";
 
 type MainTabParamList = {
   Jams: undefined;
@@ -44,19 +45,32 @@ const icons: Record<keyof MainTabParamList, { focused: IconName; idle: IconName 
 };
 
 const MainTabs = () => {
+  const { colors } = useMobileTheme();
+
   return (
     <Tab.Navigator
       initialRouteName="Jams"
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: "#D8A64A",
-        tabBarInactiveTintColor: "#8F98A8",
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.mutedForeground,
         tabBarHideOnKeyboard: true,
         tabBarLabelStyle: styles.label,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            backgroundColor: colors.card,
+            borderTopColor: colors.border,
+          },
+        ],
         tabBarItemStyle: styles.tabItem,
         tabBarIcon: ({ focused, color, size }) => (
-          <View style={[styles.iconWrap, focused ? styles.iconWrapActive : null]}>
+          <View
+            style={[
+              styles.iconWrap,
+              focused ? { backgroundColor: colors.accentMuted } : null,
+            ]}
+          >
             <Ionicons
               color={color}
               name={focused ? icons[route.name].focused : icons[route.name].idle}
@@ -79,8 +93,6 @@ export default MainTabs;
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: "#171B25",
-    borderTopColor: "rgba(255,255,255,0.08)",
     borderTopWidth: 1,
     elevation: 0,
     height: 66,
@@ -101,9 +113,6 @@ const styles = StyleSheet.create({
     height: 30,
     justifyContent: "center",
     minWidth: 42,
-  },
-  iconWrapActive: {
-    backgroundColor: "rgba(216,166,74,0.12)",
   },
   label: {
     fontSize: 11,

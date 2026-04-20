@@ -19,6 +19,7 @@ import {
 import AudioPostPlayer from "@/components/posts/AudioPostPlayer";
 import { useMyProfile } from "@/hooks/useMyProfile";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
+import { useMobileTheme } from "@/theme/MobileTheme";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
 
@@ -30,6 +31,7 @@ const PAGE_SIZE = 40;
 const MAX_MESSAGE_LENGTH = 300;
 
 export default function ConversationScreen({ navigation, route }: Props) {
+  const { colors } = useMobileTheme();
   const { conversationId } = route.params;
   const convex = useConvex();
   const { profile } = useMyProfile();
@@ -164,34 +166,48 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const canSend = input.trim().length > 0 && input.length <= MAX_MESSAGE_LENGTH && !isSending;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardAvoid}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <Pressable onPress={() => navigation.goBack()} style={styles.headerButton}>
-            <Ionicons color="#B0B7C4" name="arrow-back" size={20} />
+            <Ionicons color={colors.secondaryForeground} name="arrow-back" size={20} />
           </Pressable>
           <Avatar user={otherParticipant} />
           <View style={styles.headerTitleWrap}>
-            <Text numberOfLines={1} style={styles.headerTitle}>
+            <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.foreground }]}>
               {title}
             </Text>
-            <Text style={styles.headerSubtitle}>Direct message</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>
+              Direct message
+            </Text>
           </View>
         </View>
 
         {error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
+          <View
+            style={[
+              styles.errorBox,
+              {
+                backgroundColor: colors.destructiveMuted,
+                borderBottomColor: colors.destructive,
+              },
+            ]}
+          >
+            <Text style={[styles.errorText, { color: colors.destructive }]}>
+              {error}
+            </Text>
           </View>
         ) : null}
 
         {isInitialLoading ? (
           <View style={styles.centerState}>
-            <ActivityIndicator color="#D8A64A" />
-            <Text style={styles.stateText}>Loading messages...</Text>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={[styles.stateText, { color: colors.mutedForeground }]}>
+              Loading messages...
+            </Text>
           </View>
         ) : (
           <FlatList
@@ -205,9 +221,13 @@ export default function ConversationScreen({ navigation, route }: Props) {
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.emptyConversation}>
-                <Ionicons color="#4B5565" name="chatbubble-outline" size={36} />
-                <Text style={styles.emptyTitle}>No messages yet</Text>
-                <Text style={styles.stateText}>Start the conversation.</Text>
+                <Ionicons color={colors.mutedForeground} name="chatbubble-outline" size={36} />
+                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+                  No messages yet
+                </Text>
+                <Text style={[styles.stateText, { color: colors.mutedForeground }]}>
+                  Start the conversation.
+                </Text>
               </View>
             }
             ListHeaderComponent={
@@ -218,9 +238,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
                   style={styles.loadOlderButton}
                 >
                   {isLoadingOlder ? (
-                    <ActivityIndicator color="#D8A64A" size="small" />
+                    <ActivityIndicator color={colors.primary} size="small" />
                   ) : (
-                    <Text style={styles.loadOlderText}>Load older messages</Text>
+                    <Text style={[styles.loadOlderText, { color: colors.primary }]}>
+                      Load older messages
+                    </Text>
                   )}
                 </Pressable>
               ) : null
@@ -238,20 +260,25 @@ export default function ConversationScreen({ navigation, route }: Props) {
           />
         )}
 
-        <View style={styles.composer}>
-          <View style={styles.inputWrap}>
+        <View style={[styles.composer, { borderTopColor: colors.border }]}>
+          <View
+            style={[
+              styles.inputWrap,
+              { backgroundColor: colors.input, borderColor: colors.border },
+            ]}
+          >
             <TextInput
               editable={!isSending}
               maxLength={MAX_MESSAGE_LENGTH}
               multiline
               onChangeText={setInput}
               placeholder="Start a new message"
-              placeholderTextColor="#7E8796"
-              style={styles.input}
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.input, { color: colors.foreground }]}
               value={input}
             />
             {input.length > MAX_MESSAGE_LENGTH * 0.8 ? (
-              <Text style={styles.counter}>
+              <Text style={[styles.counter, { color: colors.mutedForeground }]}>
                 {input.length}/{MAX_MESSAGE_LENGTH}
               </Text>
             ) : null}
@@ -259,12 +286,15 @@ export default function ConversationScreen({ navigation, route }: Props) {
           <Pressable
             disabled={!canSend}
             onPress={handleSend}
-            style={[styles.sendButton, !canSend ? styles.sendButtonDisabled : null]}
+            style={[
+              styles.sendButton,
+              { backgroundColor: canSend ? colors.primary : colors.muted },
+            ]}
           >
             {isSending ? (
-              <ActivityIndicator color="#251B0A" size="small" />
+              <ActivityIndicator color={colors.primaryForeground} size="small" />
             ) : (
-              <Ionicons color="#251B0A" name="send" size={18} />
+              <Ionicons color={colors.primaryForeground} name="send" size={18} />
             )}
           </Pressable>
         </View>
@@ -286,6 +316,7 @@ function MessageBubble({
   onDelete: () => void;
   otherParticipantLastRead: number | null;
 }) {
+  const { colors } = useMobileTheme();
   const shouldShowTime =
     !nextMessage ||
     nextMessage.sender_id !== message.sender_id ||
@@ -299,7 +330,9 @@ function MessageBubble({
   if (message.deleted_at) {
     return (
       <View style={[styles.messageRow, isOwn ? styles.messageRowOwn : null]}>
-        <Text style={styles.deletedMessage}>Message removed</Text>
+        <Text style={[styles.deletedMessage, { color: colors.mutedForeground }]}>
+          Message removed
+        </Text>
       </View>
     );
   }
@@ -308,12 +341,29 @@ function MessageBubble({
     <View style={[styles.messageRow, isOwn ? styles.messageRowOwn : null]}>
       {isOwn ? (
         <Pressable onPress={onDelete} style={styles.messageDeleteButton}>
-          <Ionicons color="#737D8C" name="trash-outline" size={14} />
+          <Ionicons color={colors.mutedForeground} name="trash-outline" size={14} />
         </Pressable>
       ) : null}
-      <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
+      <View
+        style={[
+          styles.bubble,
+          isOwn
+            ? { backgroundColor: colors.primary }
+            : {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                borderWidth: 1,
+              },
+        ]}
+      >
         {message.text ? (
-          <Text style={[styles.messageText, isOwn ? styles.ownMessageText : null]}>
+          <Text
+            style={[
+              styles.messageText,
+              { color: isOwn ? colors.primaryForeground : colors.foreground },
+              isOwn ? styles.ownMessageText : null,
+            ]}
+          >
             {message.text}
           </Text>
         ) : null}
@@ -326,14 +376,27 @@ function MessageBubble({
         ) : null}
         {shouldShowTime ? (
           <View style={[styles.messageMeta, isOwn ? styles.messageMetaOwn : null]}>
-            <Text style={[styles.messageTime, isOwn ? styles.ownMessageTime : null]}>
+            <Text
+              style={[
+                styles.messageTime,
+                {
+                  color: isOwn
+                    ? `${colors.primaryForeground}99`
+                    : colors.mutedForeground,
+                },
+              ]}
+            >
               {formatRelativeTime(message.created_at)}
             </Text>
             {isOwn ? (
               <View
                 style={[
                   styles.readDot,
-                  isRead ? styles.readDotSeen : null,
+                  {
+                    backgroundColor: isRead
+                      ? colors.success
+                      : `${colors.primaryForeground}59`,
+                  },
                 ]}
               />
             ) : null}
@@ -349,15 +412,23 @@ function Avatar({
 }: {
   user?: { avatar_url?: string; username?: string; display_name?: string } | null;
 }) {
+  const { colors } = useMobileTheme();
   const label = user?.username || user?.display_name || "?";
   const image = user?.avatar_url;
 
   return (
-    <View style={styles.avatar}>
+    <View
+      style={[
+        styles.avatar,
+        { backgroundColor: colors.muted, borderColor: colors.border },
+      ]}
+    >
       {image ? (
         <Image source={{ uri: image }} style={styles.avatarImage} />
       ) : (
-        <Text style={styles.avatarText}>{label.slice(0, 2).toUpperCase()}</Text>
+        <Text style={[styles.avatarText, { color: colors.secondaryForeground }]}>
+          {label.slice(0, 2).toUpperCase()}
+        </Text>
       )}
     </View>
   );
@@ -416,7 +487,6 @@ function getFriendlyMessageError(error: unknown) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#1A1E29",
     flex: 1,
   },
   keyboardAvoid: {
@@ -424,7 +494,6 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -440,8 +509,6 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 20,
     borderWidth: 1,
     height: 40,
@@ -454,7 +521,6 @@ const styles = StyleSheet.create({
     width: 40,
   },
   avatarText: {
-    color: "#C7CCD6",
     fontSize: 12,
     fontWeight: "900",
   },
@@ -463,25 +529,20 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   headerTitle: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
   },
   headerSubtitle: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 2,
   },
   errorBox: {
-    backgroundColor: "rgba(127,29,29,0.5)",
-    borderBottomColor: "rgba(248,113,113,0.25)",
     borderBottomWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
   errorText: {
-    color: "#FECACA",
     fontSize: 12,
     fontWeight: "700",
   },
@@ -492,7 +553,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   stateText: {
-    color: "#8F98A8",
     fontSize: 13,
     lineHeight: 19,
     marginTop: 8,
@@ -512,7 +572,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   emptyTitle: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
     marginTop: 12,
@@ -522,7 +581,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   loadOlderText: {
-    color: "#D8A64A",
     fontSize: 12,
     fontWeight: "900",
   },
@@ -542,21 +600,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
-  ownBubble: {
-    backgroundColor: "#D8A64A",
-  },
-  otherBubble: {
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1,
-  },
   messageText: {
-    color: "#EEF0F5",
     fontSize: 15,
     lineHeight: 21,
   },
   ownMessageText: {
-    color: "#251B0A",
     fontWeight: "700",
   },
   audioMessage: {
@@ -574,21 +622,13 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   messageTime: {
-    color: "#8F98A8",
     fontSize: 10,
     fontWeight: "700",
   },
-  ownMessageTime: {
-    color: "rgba(37,27,10,0.58)",
-  },
   readDot: {
-    backgroundColor: "rgba(37,27,10,0.35)",
     borderRadius: 3,
     height: 6,
     width: 6,
-  },
-  readDotSeen: {
-    backgroundColor: "#16A34A",
   },
   messageDeleteButton: {
     alignItems: "center",
@@ -598,7 +638,6 @@ const styles = StyleSheet.create({
     width: 30,
   },
   deletedMessage: {
-    color: "#737D8C",
     fontSize: 12,
     fontStyle: "italic",
     paddingHorizontal: 8,
@@ -606,7 +645,6 @@ const styles = StyleSheet.create({
   },
   composer: {
     alignItems: "flex-end",
-    borderTopColor: "rgba(255,255,255,0.08)",
     borderTopWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -614,8 +652,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   inputWrap: {
-    backgroundColor: "#222733",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -624,7 +660,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   input: {
-    color: "#EEF0F5",
     fontSize: 15,
     maxHeight: 100,
     minHeight: 26,
@@ -632,20 +667,15 @@ const styles = StyleSheet.create({
   },
   counter: {
     alignSelf: "flex-end",
-    color: "#8F98A8",
     fontSize: 10,
     fontWeight: "700",
     marginTop: 3,
   },
   sendButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
     height: 44,
     justifyContent: "center",
     width: 44,
-  },
-  sendButtonDisabled: {
-    backgroundColor: "#4B4F5D",
   },
 });

@@ -14,6 +14,7 @@ import {
 import { useMutation } from "convex/react";
 import type { User } from "@/types";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
+import { useMobileTheme } from "@/theme/MobileTheme";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
 
@@ -38,6 +39,7 @@ export default function ComposePost({
   placeholder = "What's on your mind? Share a message...",
   profile,
 }: Props) {
+  const { colors } = useMobileTheme();
   const createPost = useMutation(api.posts.create);
   const { isUploading, uploadFile } = useMediaUpload();
   const [content, setContent] = useState("");
@@ -127,9 +129,19 @@ export default function ComposePost({
   };
 
   return (
-    <View style={styles.wrapper}>
+    <View
+      style={[
+        styles.wrapper,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
       <View style={styles.row}>
-        <View style={styles.avatar}>
+        <View
+          style={[
+            styles.avatar,
+            { backgroundColor: colors.muted, borderColor: colors.border },
+          ]}
+        >
           {profile?.avatar_url && !avatarFailed ? (
             <Image
               onError={() => setAvatarFailed(true)}
@@ -137,7 +149,9 @@ export default function ComposePost({
               style={styles.avatarImage}
             />
           ) : (
-            <Text style={styles.avatarFallback}>{fallbackLetters}</Text>
+            <Text style={[styles.avatarFallback, { color: colors.secondaryForeground }]}>
+              {fallbackLetters}
+            </Text>
           )}
         </View>
 
@@ -151,22 +165,37 @@ export default function ComposePost({
               setError(null);
             }}
             placeholder={placeholder}
-            placeholderTextColor="#7E8796"
-            style={styles.input}
+            placeholderTextColor={colors.mutedForeground}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.borderStrong,
+                color: colors.foreground,
+              },
+            ]}
             textAlignVertical="top"
             value={content}
           />
 
           {selectedAudio ? (
-            <View style={styles.audioPreview}>
-              <View style={styles.audioIcon}>
-                <Ionicons color="#D8A64A" name="musical-note" size={16} />
+            <View
+              style={[
+                styles.audioPreview,
+                { backgroundColor: colors.input, borderColor: colors.border },
+              ]}
+            >
+              <View style={[styles.audioIcon, { backgroundColor: colors.accentMuted }]}>
+                <Ionicons color={colors.primary} name="musical-note" size={16} />
               </View>
               <View style={styles.audioMeta}>
-                <Text numberOfLines={1} style={styles.audioName}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.audioName, { color: colors.secondaryForeground }]}
+                >
                   {selectedAudio.name}
                 </Text>
-                <Text style={styles.audioSize}>
+                <Text style={[styles.audioSize, { color: colors.mutedForeground }]}>
                   {formatFileSize(selectedAudio.size)}
                 </Text>
               </View>
@@ -175,20 +204,35 @@ export default function ComposePost({
                 onPress={() => setSelectedAudio(null)}
                 style={styles.removeAudioButton}
               >
-                <Ionicons color="#8F98A8" name="close" size={18} />
+                <Ionicons color={colors.mutedForeground} name="close" size={18} />
               </Pressable>
             </View>
           ) : null}
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? (
+            <Text
+              style={[
+                styles.error,
+                {
+                  backgroundColor: colors.destructiveMuted,
+                  borderColor: colors.destructive,
+                  color: colors.destructive,
+                },
+              ]}
+            >
+              {error}
+            </Text>
+          ) : null}
 
           <View style={styles.footer}>
             <View style={styles.footerActions}>
               <Pressable disabled={isBusy} onPress={handlePickAudio} style={styles.audioButton}>
-                <Ionicons color="#8F98A8" name="cloud-upload-outline" size={16} />
-                <Text style={styles.audioButtonText}>Audio</Text>
+                <Ionicons color={colors.mutedForeground} name="cloud-upload-outline" size={16} />
+                <Text style={[styles.audioButtonText, { color: colors.mutedForeground }]}>
+                  Audio
+                </Text>
               </Pressable>
-              <Text style={styles.counter}>
+              <Text style={[styles.counter, { color: colors.mutedForeground }]}>
                 {content.length}/{MAX_POST_LENGTH}
               </Text>
             </View>
@@ -197,14 +241,21 @@ export default function ComposePost({
               onPress={handleSubmit}
               style={({ pressed }) => [
                 styles.postButton,
-                !canSubmit ? styles.postButtonDisabled : null,
+                { backgroundColor: canSubmit ? colors.primary : colors.muted },
                 pressed && canSubmit ? styles.postButtonPressed : null,
               ]}
             >
               {isSubmitting ? (
-                <ActivityIndicator color="#251B0A" />
+                <ActivityIndicator color={colors.primaryForeground} />
               ) : (
-                <Text style={styles.postButtonText}>{isUploading ? "Uploading..." : "Post"}</Text>
+                <Text
+                  style={[
+                    styles.postButtonText,
+                    { color: canSubmit ? colors.primaryForeground : colors.mutedForeground },
+                  ]}
+                >
+                  {isUploading ? "Uploading..." : "Post"}
+                </Text>
               )}
             </Pressable>
           </View>
@@ -264,8 +315,6 @@ function isSupportedAudioFile(filename: string, mimeType?: string) {
 
 const styles = StyleSheet.create({
   wrapper: {
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: 10,
@@ -283,8 +332,6 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: "center",
-    backgroundColor: "#353B49",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 22,
     borderWidth: 1,
     height: 44,
@@ -297,7 +344,6 @@ const styles = StyleSheet.create({
     width: 44,
   },
   avatarFallback: {
-    color: "#C7CCD6",
     fontSize: 13,
     fontWeight: "800",
   },
@@ -306,11 +352,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   input: {
-    backgroundColor: "#1E2330",
-    borderColor: "rgba(255,255,255,0.1)",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#EEF0F5",
     fontSize: 15,
     lineHeight: 22,
     minHeight: 76,
@@ -318,11 +361,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   error: {
-    backgroundColor: "rgba(127,29,29,0.5)",
-    borderColor: "rgba(248,113,113,0.35)",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#FECACA",
     fontSize: 12,
     lineHeight: 17,
     marginTop: 10,
@@ -331,8 +371,6 @@ const styles = StyleSheet.create({
   },
   audioPreview: {
     alignItems: "center",
-    backgroundColor: "#1E2330",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -343,7 +381,6 @@ const styles = StyleSheet.create({
   },
   audioIcon: {
     alignItems: "center",
-    backgroundColor: "rgba(216,166,74,0.12)",
     borderRadius: 8,
     height: 32,
     justifyContent: "center",
@@ -354,12 +391,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   audioName: {
-    color: "#D5D9E2",
     fontSize: 13,
     fontWeight: "800",
   },
   audioSize: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "600",
     marginTop: 2,
@@ -391,32 +426,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   audioButtonText: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "800",
   },
   counter: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "600",
   },
   postButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
     minHeight: 36,
     justifyContent: "center",
     minWidth: 78,
     paddingHorizontal: 18,
   },
-  postButtonDisabled: {
-    backgroundColor: "#4B4F5D",
-  },
   postButtonPressed: {
     opacity: 0.82,
   },
   postButtonText: {
-    color: "#251B0A",
     fontSize: 14,
     fontWeight: "800",
   },

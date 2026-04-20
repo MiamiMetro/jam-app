@@ -6,6 +6,7 @@ import { useMutation } from "convex/react";
 import AudioPostPlayer from "@/components/posts/AudioPostPlayer";
 import type { PostFeedItem } from "@/types";
 import { useMyProfile } from "@/hooks/useMyProfile";
+import { useMobileTheme } from "@/theme/MobileTheme";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
 
@@ -15,6 +16,7 @@ type Props = {
 
 export default function PostItem({ post }: Props) {
   const navigation = useNavigation<any>();
+  const { colors } = useMobileTheme();
   const removePost = useMutation(api.posts.remove);
   const toggleLike = useMutation(api.posts.toggleLike);
   const { profile } = useMyProfile();
@@ -58,9 +60,21 @@ export default function PostItem({ post }: Props) {
   return (
     <Pressable
       onPress={() => navigation.navigate("PostDetail", { postId: post.id })}
-      style={({ pressed }) => [styles.container, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.container,
+        {
+          backgroundColor: pressed ? colors.cardPressed : colors.background,
+          borderBottomColor: colors.border,
+          borderLeftColor: pressed ? colors.primary : "transparent",
+        },
+      ]}
     >
-      <View style={styles.avatar}>
+      <View
+        style={[
+          styles.avatar,
+          { backgroundColor: colors.muted, borderColor: colors.border },
+        ]}
+      >
         {post.author?.avatar_url && !avatarFailed ? (
           <Image
             onError={() => setAvatarFailed(true)}
@@ -68,13 +82,15 @@ export default function PostItem({ post }: Props) {
             style={styles.avatarImage}
           />
         ) : (
-          <Text style={styles.avatarFallback}>{fallbackLetters}</Text>
+          <Text style={[styles.avatarFallback, { color: colors.secondaryForeground }]}>
+            {fallbackLetters}
+          </Text>
         )}
       </View>
 
       <View style={styles.body}>
         <View style={styles.metaRow}>
-          <Text style={styles.author}>{authorName}</Text>
+          <Text style={[styles.author, { color: colors.foreground }]}>{authorName}</Text>
           {isOwnPost ? (
             <Pressable
               disabled={isDeleting}
@@ -84,18 +100,28 @@ export default function PostItem({ post }: Props) {
               }}
               style={styles.deleteButton}
             >
-              <Ionicons color={isDeleting ? "#4B5565" : "#8F98A8"} name="trash-outline" size={14} />
+              <Ionicons
+                color={isDeleting ? colors.muted : colors.mutedForeground}
+                name="trash-outline"
+                size={14}
+              />
             </Pressable>
           ) : null}
           {post.community_handle ? (
-            <View style={styles.communityBadge}>
-              <Text style={styles.communityText}>#{post.community_handle}</Text>
+            <View style={[styles.communityBadge, { backgroundColor: colors.accentMuted }]}>
+              <Text style={[styles.communityText, { color: colors.primary }]}>
+                #{post.community_handle}
+              </Text>
             </View>
           ) : null}
-          <Text style={styles.timestamp}>- {createdAt}</Text>
+          <Text style={[styles.timestamp, { color: colors.mutedForeground }]}>
+            - {createdAt}
+          </Text>
         </View>
 
-        {post.text ? <Text style={styles.content}>{post.text}</Text> : null}
+        {post.text ? (
+          <Text style={[styles.content, { color: colors.foreground }]}>{post.text}</Text>
+        ) : null}
 
         {post.audio_url ? (
           <AudioPostPlayer
@@ -106,7 +132,7 @@ export default function PostItem({ post }: Props) {
           />
         ) : null}
 
-        <View style={styles.actionsRow}>
+        <View style={[styles.actionsRow, { borderTopColor: colors.border }]}>
           <Pressable
             disabled={isLiking}
             onPress={(event) => {
@@ -116,11 +142,17 @@ export default function PostItem({ post }: Props) {
             style={styles.actionButton}
           >
             <Ionicons
-              color={post.is_liked ? "#EF6F6C" : "#8F98A8"}
+              color={post.is_liked ? "#EF6F6C" : colors.mutedForeground}
               name={post.is_liked ? "heart" : "heart-outline"}
               size={15}
             />
-            <Text style={[styles.actionText, post.is_liked ? styles.likedText : null]}>
+            <Text
+              style={[
+                styles.actionText,
+                { color: colors.mutedForeground },
+                post.is_liked ? styles.likedText : null,
+              ]}
+            >
               {post.likes_count}
             </Text>
           </Pressable>
@@ -131,10 +163,14 @@ export default function PostItem({ post }: Props) {
             }}
             style={styles.actionButton}
           >
-            <Ionicons color="#8F98A8" name="chatbubble-outline" size={14} />
-            <Text style={styles.actionText}>Comments {post.comments_count}</Text>
+            <Ionicons color={colors.mutedForeground} name="chatbubble-outline" size={14} />
+            <Text style={[styles.actionText, { color: colors.mutedForeground }]}>
+              Comments {post.comments_count}
+            </Text>
           </Pressable>
-          <Text style={styles.actionText}>Share</Text>
+          <Text style={[styles.actionText, { color: colors.mutedForeground }]}>
+            Share
+          </Text>
         </View>
       </View>
     </Pressable>
@@ -162,23 +198,15 @@ function formatRelativeTime(value: string) {
 
 const styles = StyleSheet.create({
   container: {
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
-    borderLeftColor: "transparent",
     borderLeftWidth: 2,
     flexDirection: "row",
     gap: 12,
     paddingHorizontal: 18,
     paddingVertical: 16,
   },
-  pressed: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderLeftColor: "rgba(216,166,74,0.45)",
-  },
   avatar: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 22,
     borderWidth: 1,
     height: 44,
@@ -191,7 +219,6 @@ const styles = StyleSheet.create({
     width: 44,
   },
   avatarFallback: {
-    color: "#AEB6C4",
     fontSize: 13,
     fontWeight: "800",
   },
@@ -207,7 +234,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   author: {
-    color: "#EEF0F5",
     flexShrink: 1,
     fontSize: 14,
     fontWeight: "800",
@@ -221,23 +247,19 @@ const styles = StyleSheet.create({
     width: 28,
   },
   communityBadge: {
-    backgroundColor: "rgba(216,166,74,0.12)",
     borderRadius: 6,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
   communityText: {
-    color: "#D8A64A",
     fontSize: 11,
     fontWeight: "800",
   },
   timestamp: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "600",
   },
   content: {
-    color: "#EEF0F5",
     fontSize: 15,
     lineHeight: 22,
     marginBottom: 12,
@@ -246,7 +268,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   actionsRow: {
-    borderTopColor: "rgba(255,255,255,0.06)",
     borderTopWidth: 1,
     flexDirection: "row",
     gap: 20,
@@ -258,7 +279,6 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   actionText: {
-    color: "#8F98A8",
     fontSize: 13,
     fontWeight: "700",
   },

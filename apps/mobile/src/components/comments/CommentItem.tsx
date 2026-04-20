@@ -13,6 +13,7 @@ import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
 import type { Comment, User } from "@/types";
 import CommentComposer from "./CommentComposer";
+import { useMobileTheme } from "@/theme/MobileTheme";
 
 type Props = {
   comment: Comment;
@@ -24,6 +25,7 @@ const INDENT_WIDTH = 16;
 const MAX_VISIBLE_DEPTH = 4;
 
 export default function CommentItem({ comment, currentProfile, depth = 0 }: Props) {
+  const { colors } = useMobileTheme();
   const toggleLike = useMutation(api.comments.toggleLike);
   const deleteComment = useMutation(api.comments.remove);
   const createReply = useMutation(api.comments.reply);
@@ -89,11 +91,23 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
   const leftOffset = Math.min(depth, MAX_VISIBLE_DEPTH) * INDENT_WIDTH;
 
   return (
-    <View style={[styles.wrapper, { marginLeft: leftOffset }]}>
+    <View
+      style={[
+        styles.wrapper,
+        { borderBottomColor: colors.border, marginLeft: leftOffset },
+      ]}
+    >
       <View style={[styles.row, depth > 0 ? styles.replyRow : null]}>
-        {depth > 0 ? <View style={styles.threadLine} /> : null}
+        {depth > 0 ? (
+          <View style={[styles.threadLine, { backgroundColor: colors.borderStrong }]} />
+        ) : null}
 
-        <View style={styles.avatar}>
+        <View
+          style={[
+            styles.avatar,
+            { backgroundColor: colors.muted, borderColor: colors.border },
+          ]}
+        >
           {comment.author?.avatar_url && !avatarFailed && !isDeleted ? (
             <Image
               onError={() => setAvatarFailed(true)}
@@ -101,20 +115,30 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
               style={styles.avatarImage}
             />
           ) : (
-            <Text style={styles.avatarFallback}>{isDeleted ? "--" : fallbackLetters}</Text>
+            <Text style={[styles.avatarFallback, { color: colors.secondaryForeground }]}>
+              {isDeleted ? "--" : fallbackLetters}
+            </Text>
           )}
         </View>
 
         <View style={styles.body}>
           <View style={styles.metaRow}>
-            <Text style={styles.author}>{isDeleted ? "deleted" : authorName}</Text>
-            <Text style={styles.timestamp}>- {createdAt}</Text>
+            <Text style={[styles.author, { color: colors.foreground }]}>
+              {isDeleted ? "deleted" : authorName}
+            </Text>
+            <Text style={[styles.timestamp, { color: colors.mutedForeground }]}>
+              - {createdAt}
+            </Text>
           </View>
 
           {isDeleted ? (
-            <Text style={styles.deletedText}>Comment removed</Text>
+            <Text style={[styles.deletedText, { color: colors.mutedForeground }]}>
+              Comment removed
+            </Text>
           ) : (
-            <Text style={styles.content}>{comment.text}</Text>
+            <Text style={[styles.content, { color: colors.foreground }]}>
+              {comment.text}
+            </Text>
           )}
 
           <View style={styles.actionsRow}>
@@ -124,19 +148,27 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
               style={styles.action}
             >
               <Ionicons
-                color={comment.is_liked ? "#EF4444" : "#8F98A8"}
+                color={comment.is_liked ? "#EF4444" : colors.mutedForeground}
                 name={comment.is_liked ? "heart" : "heart-outline"}
                 size={15}
               />
-              <Text style={[styles.actionText, comment.is_liked ? styles.likedText : null]}>
+              <Text
+                style={[
+                  styles.actionText,
+                  { color: colors.mutedForeground },
+                  comment.is_liked ? styles.likedText : null,
+                ]}
+              >
                 {comment.likes_count}
               </Text>
             </Pressable>
 
             {!isDeleted ? (
               <Pressable onPress={() => setReplying((value) => !value)} style={styles.action}>
-                <Ionicons color="#8F98A8" name="chatbubble-outline" size={14} />
-                <Text style={styles.actionText}>Reply</Text>
+                <Ionicons color={colors.mutedForeground} name="chatbubble-outline" size={14} />
+                <Text style={[styles.actionText, { color: colors.mutedForeground }]}>
+                  Reply
+                </Text>
               </Pressable>
             ) : null}
 
@@ -145,7 +177,7 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
                 onPress={() => setRepliesExpanded((value) => !value)}
                 style={styles.action}
               >
-                <Text style={styles.primaryActionText}>
+                <Text style={[styles.primaryActionText, { color: colors.primary }]}>
                   {repliesExpanded ? "Hide" : `View ${comment.replies_count}`}
                 </Text>
               </Pressable>
@@ -153,7 +185,7 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
 
             {isOwn && !isDeleted ? (
               <Pressable disabled={isMutating} onPress={handleDelete} style={styles.action}>
-                <Ionicons color="#8F98A8" name="trash-outline" size={14} />
+                <Ionicons color={colors.mutedForeground} name="trash-outline" size={14} />
               </Pressable>
             ) : null}
           </View>
@@ -161,9 +193,13 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
           {replying ? (
             <View style={styles.replyComposer}>
               <View style={styles.replyHeader}>
-                <Text style={styles.replyingText}>Replying to @{authorName}</Text>
+                <Text style={[styles.replyingText, { color: colors.mutedForeground }]}>
+                  Replying to @{authorName}
+                </Text>
                 <Pressable onPress={() => setReplying(false)}>
-                  <Text style={styles.cancelText}>Cancel</Text>
+                  <Text style={[styles.cancelText, { color: colors.primary }]}>
+                    Cancel
+                  </Text>
                 </Pressable>
               </View>
               <CommentComposer
@@ -180,8 +216,10 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
             <View style={styles.replies}>
               {repliesQuery.status === "LoadingFirstPage" ? (
                 <View style={styles.loadingReplies}>
-                  <ActivityIndicator color="#D8A64A" />
-                  <Text style={styles.loadingText}>Loading replies...</Text>
+                  <ActivityIndicator color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
+                    Loading replies...
+                  </Text>
                 </View>
               ) : (
                 visibleReplies.map((reply) => (
@@ -199,7 +237,9 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
                   onPress={() => repliesQuery.loadMore(10)}
                   style={styles.loadMoreReplies}
                 >
-                  <Text style={styles.primaryActionText}>Load more replies</Text>
+                  <Text style={[styles.primaryActionText, { color: colors.primary }]}>
+                    Load more replies
+                  </Text>
                 </Pressable>
               ) : null}
             </View>
@@ -231,7 +271,6 @@ function formatRelativeTime(value: string) {
 
 const styles = StyleSheet.create({
   wrapper: {
-    borderBottomColor: "rgba(255,255,255,0.06)",
     borderBottomWidth: 1,
   },
   row: {
@@ -244,14 +283,11 @@ const styles = StyleSheet.create({
     paddingLeft: 0,
   },
   threadLine: {
-    backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 1,
     width: 2,
   },
   avatar: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 17,
     borderWidth: 1,
     height: 34,
@@ -264,7 +300,6 @@ const styles = StyleSheet.create({
     width: 34,
   },
   avatarFallback: {
-    color: "#AEB6C4",
     fontSize: 11,
     fontWeight: "800",
   },
@@ -279,22 +314,18 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   author: {
-    color: "#EEF0F5",
     fontSize: 13,
     fontWeight: "800",
   },
   timestamp: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "600",
   },
   content: {
-    color: "#EEF0F5",
     fontSize: 14,
     lineHeight: 21,
   },
   deletedText: {
-    color: "#8F98A8",
     fontSize: 13,
     fontStyle: "italic",
     lineHeight: 20,
@@ -312,7 +343,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionText: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
   },
@@ -320,7 +350,6 @@ const styles = StyleSheet.create({
     color: "#EF4444",
   },
   primaryActionText: {
-    color: "#D8A64A",
     fontSize: 12,
     fontWeight: "800",
   },
@@ -334,12 +363,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   replyingText: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
   },
   cancelText: {
-    color: "#D8A64A",
     fontSize: 12,
     fontWeight: "800",
   },
@@ -353,7 +380,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   loadingText: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
   },
@@ -361,4 +387,3 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
 });
-

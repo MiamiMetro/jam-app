@@ -3,10 +3,12 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView, StyleSheet } from "react-native";
 import JamList from "@/components/jams/JamList";
 import { useFriendsInRooms, useMyRoom, useRooms } from "@/hooks/useRooms";
+import { useMobileTheme } from "@/theme/MobileTheme";
 import type { RoomFeedItem } from "@/types";
 
 const JamScreen = () => {
   const navigation = useNavigation<any>();
+  const { colors } = useMobileTheme();
   const [search, setSearch] = React.useState("");
   const { rooms, isLoading, isLoadingMore, canLoadMore, loadMore } = useRooms(search);
   const { room: myRoom, isLoading: isMyRoomLoading } = useMyRoom();
@@ -19,7 +21,7 @@ const JamScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <JamList
         friendsInRooms={friendsInRooms}
         isLoading={isLoading}
@@ -45,7 +47,6 @@ export default JamScreen;
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#1A1E29",
     flex: 1,
   },
 });

@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
+import { useMobileTheme } from "@/theme/MobileTheme";
 
 type TabKey = "chats" | "friends" | "find";
 
@@ -34,6 +35,7 @@ const INITIAL_PAGE_SIZE = 25;
 
 export default function MessagesScreen() {
   const navigation = useNavigation<any>();
+  const { colors } = useMobileTheme();
   const [activeTab, setActiveTab] = useState<TabKey>("chats");
   const [friendSearch, setFriendSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
@@ -151,15 +153,19 @@ export default function MessagesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View>
-          <Text style={styles.eyebrow}>Inbox</Text>
-          <Text style={styles.title}>Messages</Text>
+          <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>
+            Inbox
+          </Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>Messages</Text>
         </View>
         {incomingRequests.length > 0 ? (
-          <View style={styles.requestBadge}>
-            <Text style={styles.requestBadgeText}>{incomingRequests.length}</Text>
+          <View style={[styles.requestBadge, { backgroundColor: colors.primary }]}>
+            <Text style={[styles.requestBadgeText, { color: colors.primaryForeground }]}>
+              {incomingRequests.length}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -172,9 +178,24 @@ export default function MessagesScreen() {
               setError(null);
               setActiveTab(tab);
             }}
-            style={[styles.tabButton, activeTab === tab ? styles.tabButtonActive : null]}
+            style={[
+              styles.tabButton,
+              {
+                backgroundColor:
+                  activeTab === tab ? colors.accentMuted : colors.input,
+                borderColor: activeTab === tab ? colors.primary : colors.border,
+              },
+            ]}
           >
-            <Text style={[styles.tabText, activeTab === tab ? styles.tabTextActive : null]}>
+            <Text
+              style={[
+                styles.tabText,
+                {
+                  color:
+                    activeTab === tab ? colors.primary : colors.mutedForeground,
+                },
+              ]}
+            >
               {getTabLabel(tab)}
             </Text>
           </Pressable>
@@ -182,8 +203,18 @@ export default function MessagesScreen() {
       </View>
 
       {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
+        <View
+          style={[
+            styles.errorBox,
+            {
+              backgroundColor: colors.destructiveMuted,
+              borderColor: colors.destructive,
+            },
+          ]}
+        >
+          <Text style={[styles.errorText, { color: colors.destructive }]}>
+            {error}
+          </Text>
         </View>
       ) : null}
 
@@ -245,7 +276,9 @@ export default function MessagesScreen() {
                 placeholder="Search friends..."
                 value={friendSearch}
               />
-              <Text style={styles.sectionLabel}>Friends</Text>
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+                Friends
+              </Text>
             </View>
           }
           ListEmptyComponent={
@@ -297,7 +330,7 @@ export default function MessagesScreen() {
                 onCancel={handleRemoveRelation}
                 sentRequests={sentRequests}
               />
-              <Text style={styles.sectionLabel}>
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
                 {userSearch.trim() ? "Search results" : "People"}
               </Text>
             </View>
@@ -349,24 +382,43 @@ function ConversationRow({
   conversation: ConversationItem;
   onPress: () => void;
 }) {
+  const { colors } = useMobileTheme();
   const title = getConversationTitle(conversation);
   const lastMessage = getLastMessagePreview(conversation);
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        {
+          backgroundColor: pressed ? colors.cardPressed : colors.background,
+          borderBottomColor: colors.border,
+        },
+      ]}
+    >
       <Avatar user={conversation.other_user ?? undefined} />
       <View style={styles.rowBody}>
         <View style={styles.rowTitleLine}>
-          <Text numberOfLines={1} style={styles.rowTitle}>
+          <Text numberOfLines={1} style={[styles.rowTitle, { color: colors.foreground }]}>
             {title}
           </Text>
-          <Text style={styles.rowTime}>{formatRelativeTime(conversation.updated_at)}</Text>
+          <Text style={[styles.rowTime, { color: colors.mutedForeground }]}>
+            {formatRelativeTime(conversation.updated_at)}
+          </Text>
         </View>
-        <Text numberOfLines={1} style={styles.rowSubtext}>
+        <Text numberOfLines={1} style={[styles.rowSubtext, { color: colors.mutedForeground }]}>
           {lastMessage}
         </Text>
       </View>
-      {conversation.hasUnread ? <View style={styles.unreadDot} /> : null}
+      {conversation.hasUnread ? (
+        <View
+          style={[
+            styles.unreadDot,
+            { backgroundColor: colors.primary, shadowColor: colors.primary },
+          ]}
+        />
+      ) : null}
     </Pressable>
   );
 }
@@ -382,22 +434,30 @@ function FriendRow({
   onMessage: () => void;
   onRemove: () => void;
 }) {
+  const { colors } = useMobileTheme();
+
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, { borderBottomColor: colors.border }]}>
       <Avatar user={friend} />
       <View style={styles.rowBody}>
-        <Text numberOfLines={1} style={styles.rowTitle}>
+        <Text numberOfLines={1} style={[styles.rowTitle, { color: colors.foreground }]}>
           {friend.username}
         </Text>
-        <Text numberOfLines={1} style={styles.rowSubtext}>
+        <Text numberOfLines={1} style={[styles.rowSubtext, { color: colors.mutedForeground }]}>
           Friends since {formatShortDate(friend.friends_since)}
         </Text>
       </View>
-      <Pressable disabled={busy} onPress={onMessage} style={styles.smallPrimaryButton}>
-        <Text style={styles.smallPrimaryText}>{busy ? "..." : "DM"}</Text>
+      <Pressable
+        disabled={busy}
+        onPress={onMessage}
+        style={[styles.smallPrimaryButton, { backgroundColor: colors.primary }]}
+      >
+        <Text style={[styles.smallPrimaryText, { color: colors.primaryForeground }]}>
+          {busy ? "..." : "DM"}
+        </Text>
       </Pressable>
       <Pressable disabled={busy} onPress={onRemove} style={styles.iconButton}>
-        <Ionicons color="#8F98A8" name="person-remove-outline" size={17} />
+        <Ionicons color={colors.mutedForeground} name="person-remove-outline" size={17} />
       </Pressable>
     </View>
   );
@@ -424,6 +484,7 @@ function SearchUserRow({
   onRequest: () => void;
   user: SearchUserItem;
 }) {
+  const { colors } = useMobileTheme();
   let actionLabel = "Add";
   let action = onRequest;
   let secondaryAction: (() => void) | null = null;
@@ -443,13 +504,13 @@ function SearchUserRow({
   }
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, { borderBottomColor: colors.border }]}>
       <Avatar user={user} />
       <View style={styles.rowBody}>
-        <Text numberOfLines={1} style={styles.rowTitle}>
+        <Text numberOfLines={1} style={[styles.rowTitle, { color: colors.foreground }]}>
           {user.username}
         </Text>
-        <Text numberOfLines={1} style={styles.rowSubtext}>
+        <Text numberOfLines={1} style={[styles.rowSubtext, { color: colors.mutedForeground }]}>
           {user.display_name || "Jam user"}
         </Text>
       </View>
@@ -458,13 +519,23 @@ function SearchUserRow({
         onPress={action}
         style={[
           styles.smallPrimaryButton,
-          hasSentRequest ? styles.smallMutedButton : null,
+          hasSentRequest
+            ? {
+                backgroundColor: colors.muted,
+                borderColor: colors.border,
+                borderWidth: 1,
+              }
+            : { backgroundColor: colors.primary },
         ]}
       >
         <Text
           style={[
             styles.smallPrimaryText,
-            hasSentRequest ? styles.smallMutedText : null,
+            {
+              color: hasSentRequest
+                ? colors.secondaryForeground
+                : colors.primaryForeground,
+            },
           ]}
         >
           {busy ? "..." : actionLabel}
@@ -472,7 +543,7 @@ function SearchUserRow({
       </Pressable>
       {secondaryAction && secondaryIcon ? (
         <Pressable disabled={busy} onPress={secondaryAction} style={styles.iconButton}>
-          <Ionicons color="#8F98A8" name={secondaryIcon} size={18} />
+          <Ionicons color={colors.mutedForeground} name={secondaryIcon} size={18} />
         </Pressable>
       ) : null}
     </View>
@@ -490,35 +561,43 @@ function RequestsSection({
   onAccept: (userId: string) => void;
   onDecline: (userId: string) => void;
 }) {
+  const { colors } = useMobileTheme();
+
   if (incomingRequests.length === 0) return null;
 
   return (
-    <View style={styles.sectionBlock}>
-      <Text style={styles.sectionLabel}>Friend requests</Text>
+    <View style={[styles.sectionBlock, { borderBottomColor: colors.border }]}>
+      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+        Friend requests
+      </Text>
       {incomingRequests.map((request) => {
         const busy = busyUserId === String(request.id);
         return (
           <View key={String(request.id)} style={styles.requestRow}>
             <Avatar size={38} user={request} />
             <View style={styles.rowBody}>
-              <Text numberOfLines={1} style={styles.rowTitle}>
+              <Text numberOfLines={1} style={[styles.rowTitle, { color: colors.foreground }]}>
                 {request.username}
               </Text>
-              <Text style={styles.rowSubtext}>{formatRelativeTime(request.requested_at)}</Text>
+              <Text style={[styles.rowSubtext, { color: colors.mutedForeground }]}>
+                {formatRelativeTime(request.requested_at)}
+              </Text>
             </View>
             <Pressable
               disabled={busy}
               onPress={() => onAccept(String(request.id))}
-              style={styles.smallPrimaryButton}
+              style={[styles.smallPrimaryButton, { backgroundColor: colors.primary }]}
             >
-              <Text style={styles.smallPrimaryText}>{busy ? "..." : "Accept"}</Text>
+              <Text style={[styles.smallPrimaryText, { color: colors.primaryForeground }]}>
+                {busy ? "..." : "Accept"}
+              </Text>
             </Pressable>
             <Pressable
               disabled={busy}
               onPress={() => onDecline(String(request.id))}
               style={styles.iconButton}
             >
-              <Ionicons color="#8F98A8" name="close" size={18} />
+              <Ionicons color={colors.mutedForeground} name="close" size={18} />
             </Pressable>
           </View>
         );
@@ -536,28 +615,39 @@ function SentRequestsSection({
   onCancel: (userId: string) => void;
   sentRequests: SentRequestItem[];
 }) {
+  const { colors } = useMobileTheme();
+
   if (sentRequests.length === 0) return null;
 
   return (
-    <View style={styles.sectionBlock}>
-      <Text style={styles.sectionLabel}>Sent requests</Text>
+    <View style={[styles.sectionBlock, { borderBottomColor: colors.border }]}>
+      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+        Sent requests
+      </Text>
       {sentRequests.map((request) => {
         const busy = busyUserId === String(request.id);
         return (
           <View key={String(request.id)} style={styles.requestRow}>
             <Avatar size={38} user={request} />
             <View style={styles.rowBody}>
-              <Text numberOfLines={1} style={styles.rowTitle}>
+              <Text numberOfLines={1} style={[styles.rowTitle, { color: colors.foreground }]}>
                 {request.username}
               </Text>
-              <Text style={styles.rowSubtext}>Pending</Text>
+              <Text style={[styles.rowSubtext, { color: colors.mutedForeground }]}>
+                Pending
+              </Text>
             </View>
             <Pressable
               disabled={busy}
               onPress={() => onCancel(String(request.id))}
-              style={styles.smallMutedButton}
+              style={[
+                styles.smallMutedButton,
+                { backgroundColor: colors.muted, borderColor: colors.border },
+              ]}
             >
-              <Text style={styles.smallMutedText}>{busy ? "..." : "Cancel"}</Text>
+              <Text style={[styles.smallMutedText, { color: colors.secondaryForeground }]}>
+                {busy ? "..." : "Cancel"}
+              </Text>
             </Pressable>
           </View>
         );
@@ -573,6 +663,7 @@ function Avatar({
   size?: number;
   user?: { avatar_url?: string; username?: string; display_name?: string } | null;
 }) {
+  const { colors } = useMobileTheme();
   const label = user?.username || user?.display_name || "?";
   const image = user?.avatar_url;
   const radius = size / 2;
@@ -582,6 +673,8 @@ function Avatar({
       style={[
         styles.avatar,
         {
+          backgroundColor: colors.muted,
+          borderColor: colors.border,
           borderRadius: radius,
           height: size,
           width: size,
@@ -598,7 +691,9 @@ function Avatar({
           }}
         />
       ) : (
-        <Text style={styles.avatarText}>{label.slice(0, 2).toUpperCase()}</Text>
+        <Text style={[styles.avatarText, { color: colors.secondaryForeground }]}>
+          {label.slice(0, 2).toUpperCase()}
+        </Text>
       )}
     </View>
   );
@@ -613,14 +708,21 @@ function SearchBox({
   placeholder: string;
   value: string;
 }) {
+  const { colors } = useMobileTheme();
+
   return (
-    <View style={styles.searchBox}>
-      <Ionicons color="#8F98A8" name="search" size={17} />
+    <View
+      style={[
+        styles.searchBox,
+        { backgroundColor: colors.input, borderColor: colors.border },
+      ]}
+    >
+      <Ionicons color={colors.mutedForeground} name="search" size={17} />
       <TextInput
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#7E8796"
-        style={styles.searchInput}
+        placeholderTextColor={colors.mutedForeground}
+        style={[styles.searchInput, { color: colors.foreground }]}
         value={value}
       />
     </View>
@@ -636,28 +738,34 @@ function EmptyState({
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
 }) {
+  const { colors } = useMobileTheme();
+
   return (
     <View style={styles.emptyState}>
-      <Ionicons color="#4B5565" name={icon} size={36} />
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyBody}>{body}</Text>
+      <Ionicons color={colors.mutedForeground} name={icon} size={36} />
+      <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{title}</Text>
+      <Text style={[styles.emptyBody, { color: colors.mutedForeground }]}>{body}</Text>
     </View>
   );
 }
 
 function LoadingState({ label }: { label: string }) {
+  const { colors } = useMobileTheme();
+
   return (
     <View style={styles.emptyState}>
-      <ActivityIndicator color="#D8A64A" />
-      <Text style={styles.emptyBody}>{label}</Text>
+      <ActivityIndicator color={colors.primary} />
+      <Text style={[styles.emptyBody, { color: colors.mutedForeground }]}>{label}</Text>
     </View>
   );
 }
 
 function LoadingMore() {
+  const { colors } = useMobileTheme();
+
   return (
     <View style={styles.loadingMore}>
-      <ActivityIndicator color="#D8A64A" size="small" />
+      <ActivityIndicator color={colors.primary} size="small" />
     </View>
   );
 }
@@ -669,9 +777,11 @@ function LoadMoreButton({
   label: string;
   onPress: () => void;
 }) {
+  const { colors } = useMobileTheme();
+
   return (
     <Pressable onPress={onPress} style={styles.loadMoreButton}>
-      <Text style={styles.loadMoreText}>{label}</Text>
+      <Text style={[styles.loadMoreText, { color: colors.primary }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -733,12 +843,10 @@ function getFriendlyError(error: unknown) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#1A1E29",
     flex: 1,
   },
   header: {
     alignItems: "center",
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -746,28 +854,24 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   eyebrow: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0,
     textTransform: "uppercase",
   },
   title: {
-    color: "#EEF0F5",
     fontSize: 24,
     fontWeight: "900",
     marginTop: 2,
   },
   requestBadge: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
     minWidth: 28,
     paddingHorizontal: 8,
     paddingVertical: 5,
   },
   requestBadgeText: {
-    color: "#251B0A",
     fontSize: 12,
     fontWeight: "900",
   },
@@ -779,28 +883,16 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     alignItems: "center",
-    backgroundColor: "#222733",
-    borderColor: "rgba(255,255,255,0.07)",
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     paddingVertical: 10,
   },
-  tabButtonActive: {
-    backgroundColor: "rgba(216,166,74,0.13)",
-    borderColor: "rgba(216,166,74,0.35)",
-  },
   tabText: {
-    color: "#8F98A8",
     fontSize: 13,
     fontWeight: "800",
   },
-  tabTextActive: {
-    color: "#D8A64A",
-  },
   errorBox: {
-    backgroundColor: "rgba(127,29,29,0.5)",
-    borderColor: "rgba(248,113,113,0.35)",
     borderRadius: 8,
     borderWidth: 1,
     marginHorizontal: 14,
@@ -809,7 +901,6 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   errorText: {
-    color: "#FECACA",
     fontSize: 12,
     fontWeight: "700",
   },
@@ -819,7 +910,6 @@ const styles = StyleSheet.create({
   },
   row: {
     alignItems: "center",
-    borderBottomColor: "rgba(255,255,255,0.07)",
     borderBottomWidth: 1,
     flexDirection: "row",
     gap: 11,
@@ -827,19 +917,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 12,
   },
-  rowPressed: {
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
   avatar: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
     justifyContent: "center",
     overflow: "hidden",
   },
   avatarText: {
-    color: "#C7CCD6",
     fontSize: 13,
     fontWeight: "900",
   },
@@ -853,27 +937,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   rowTitle: {
-    color: "#EEF0F5",
     flex: 1,
     fontSize: 15,
     fontWeight: "800",
   },
   rowTime: {
-    color: "#737D8C",
     fontSize: 11,
     fontWeight: "700",
   },
   rowSubtext: {
-    color: "#8F98A8",
     fontSize: 13,
     fontWeight: "600",
     marginTop: 4,
   },
   unreadDot: {
-    backgroundColor: "#D8A64A",
     borderRadius: 5,
     height: 10,
-    shadowColor: "#D8A64A",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 6,
@@ -881,7 +960,6 @@ const styles = StyleSheet.create({
   },
   smallPrimaryButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
     justifyContent: "center",
     minHeight: 34,
@@ -889,14 +967,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   smallPrimaryText: {
-    color: "#251B0A",
     fontSize: 12,
     fontWeight: "900",
   },
   smallMutedButton: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
@@ -905,7 +980,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   smallMutedText: {
-    color: "#AEB6C4",
     fontSize: 12,
     fontWeight: "900",
   },
@@ -917,12 +991,10 @@ const styles = StyleSheet.create({
     width: 34,
   },
   sectionBlock: {
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     paddingBottom: 8,
   },
   sectionLabel: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0,
@@ -940,8 +1012,6 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     alignItems: "center",
-    backgroundColor: "#222733",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -951,7 +1021,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   searchInput: {
-    color: "#EEF0F5",
     flex: 1,
     fontSize: 14,
     minHeight: 42,
@@ -964,14 +1033,12 @@ const styles = StyleSheet.create({
     paddingVertical: 52,
   },
   emptyTitle: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
     marginTop: 12,
     textAlign: "center",
   },
   emptyBody: {
-    color: "#8F98A8",
     fontSize: 13,
     lineHeight: 19,
     marginTop: 6,
@@ -982,7 +1049,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   loadMoreText: {
-    color: "#D8A64A",
     fontSize: 13,
     fontWeight: "900",
   },

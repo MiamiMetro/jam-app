@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import type { FriendInRoomItem, MyRoom, RoomFeedItem } from "@/types";
 import JamItem from "./JamItem";
+import { useMobileTheme } from "@/theme/MobileTheme";
 
 type Props = {
   friendsInRooms?: FriendInRoomItem[];
@@ -39,11 +40,16 @@ export default function JamList({
   rooms,
   searchValue = "",
 }: Props) {
+  const { colors } = useMobileTheme();
   const hasSearch = searchValue.trim().length > 0;
 
   return (
     <FlatList
-      contentContainerStyle={[styles.content, rooms.length === 0 ? styles.emptyContent : null]}
+      contentContainerStyle={[
+        styles.content,
+        { backgroundColor: colors.background },
+        rooms.length === 0 ? styles.emptyContent : null,
+      ]}
       data={rooms}
       keyExtractor={(item) => item.id}
       keyboardShouldPersistTaps="handled"
@@ -59,30 +65,48 @@ export default function JamList({
         />
       }
       ListFooterComponent={
-        isLoadingMore ? <ActivityIndicator color="#D8A64A" style={styles.footerLoader} /> : null
+        isLoadingMore ? (
+          <ActivityIndicator color={colors.primary} style={styles.footerLoader} />
+        ) : null
       }
       ListHeaderComponent={
         <View>
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={styles.headerCopy}>
-              <Text style={styles.eyebrow}>Live Rooms</Text>
-              <Text style={styles.title}>Jams</Text>
+              <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>
+                Live Rooms
+              </Text>
+              <Text style={[styles.title, { color: colors.foreground }]}>Jams</Text>
             </View>
-            <View style={styles.liveCount}>
-              <Text style={styles.liveCountNumber}>{rooms.length}</Text>
-              <Text style={styles.liveCountLabel}>live</Text>
+            <View
+              style={[
+                styles.liveCount,
+                { backgroundColor: colors.accentMuted, borderColor: colors.primary },
+              ]}
+            >
+              <Text style={[styles.liveCountNumber, { color: colors.primary }]}>
+                {rooms.length}
+              </Text>
+              <Text style={[styles.liveCountLabel, { color: colors.secondaryForeground }]}>
+                live
+              </Text>
             </View>
           </View>
 
-          <View style={styles.searchBox}>
-            <Ionicons color="#8F98A8" name="search" size={17} />
+          <View
+            style={[
+              styles.searchBox,
+              { backgroundColor: colors.input, borderColor: colors.border },
+            ]}
+          >
+            <Ionicons color={colors.mutedForeground} name="search" size={17} />
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
               onChangeText={onSearchChange}
               placeholder="Search jams..."
-              placeholderTextColor="#7E8796"
-              style={styles.searchInput}
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.searchInput, { color: colors.foreground }]}
               value={searchValue}
             />
             {searchValue ? (
@@ -91,7 +115,7 @@ export default function JamList({
                 onPress={() => onSearchChange?.("")}
                 style={styles.clearSearchButton}
               >
-                <Ionicons color="#8F98A8" name="close" size={17} />
+                <Ionicons color={colors.mutedForeground} name="close" size={17} />
               </Pressable>
             ) : null}
           </View>
@@ -107,8 +131,10 @@ export default function JamList({
           />
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>Live Rooms</Text>
-            <Text style={styles.sectionMeta}>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+              Live Rooms
+            </Text>
+            <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>
               {isLoading ? "Loading" : `${rooms.length} shown`}
             </Text>
           </View>
@@ -130,11 +156,20 @@ function MyRoomSummary({
   onOpenRoomHandle?: (handle: string) => void;
   room?: MyRoom | null;
 }) {
+  const { colors } = useMobileTheme();
+
   if (isLoading) {
     return (
-      <View style={styles.myRoomCard}>
-        <ActivityIndicator color="#D8A64A" size="small" />
-        <Text style={styles.myRoomLoading}>Your room is loading...</Text>
+      <View
+        style={[
+          styles.myRoomCard,
+          { backgroundColor: colors.input, borderColor: colors.border },
+        ]}
+      >
+        <ActivityIndicator color={colors.primary} size="small" />
+        <Text style={[styles.myRoomLoading, { color: colors.mutedForeground }]}>
+          Your room is loading...
+        </Text>
       </View>
     );
   }
@@ -149,28 +184,49 @@ function MyRoomSummary({
       onPress={() => onOpenRoomHandle?.(room.handle)}
       style={({ pressed }) => [
         styles.myRoomCard,
-        room.is_active ? styles.myRoomActive : null,
-        pressed ? styles.myRoomPressed : null,
+        {
+          backgroundColor: pressed ? colors.cardPressed : colors.input,
+          borderColor: room.is_active ? colors.primary : colors.border,
+        },
       ]}
     >
       <View style={styles.myRoomTopLine}>
         <View style={styles.myRoomTitleWrap}>
-          <Ionicons color="#8F98A8" name="home-outline" size={15} />
-          <Text style={styles.myRoomLabel}>My Room</Text>
+          <Ionicons color={colors.mutedForeground} name="home-outline" size={15} />
+          <Text style={[styles.myRoomLabel, { color: colors.mutedForeground }]}>
+            My Room
+          </Text>
         </View>
-        <View style={[styles.statusPill, room.is_active ? styles.statusPillActive : null]}>
+        <View
+          style={[
+            styles.statusPill,
+            {
+              backgroundColor: room.is_active
+                ? "rgba(34,197,94,0.12)"
+                : colors.muted,
+            },
+          ]}
+        >
           <View style={[styles.statusDot, room.is_active ? styles.statusDotActive : null]} />
-          <Text style={[styles.statusText, room.is_active ? styles.statusTextActive : null]}>
+          <Text
+            style={[
+              styles.statusText,
+              { color: room.is_active ? colors.success : colors.secondaryForeground },
+            ]}
+          >
             {statusLabel}
           </Text>
         </View>
       </View>
 
-      <Text numberOfLines={1} style={styles.myRoomName}>
+      <Text numberOfLines={1} style={[styles.myRoomName, { color: colors.foreground }]}>
         {room.name}
       </Text>
       {room.description ? (
-        <Text numberOfLines={2} style={styles.myRoomDescription}>
+        <Text
+          numberOfLines={2}
+          style={[styles.myRoomDescription, { color: colors.secondaryForeground }]}
+        >
           {room.description}
         </Text>
       ) : null}
@@ -192,11 +248,15 @@ function FriendsJammingNow({
   friendsInRooms: FriendInRoomItem[];
   onOpenRoomHandle?: (handle: string) => void;
 }) {
+  const { colors } = useMobileTheme();
+
   if (friendsInRooms.length === 0) return null;
 
   return (
     <View style={styles.friendsBlock}>
-      <Text style={styles.friendsTitle}>Friends Jamming Now</Text>
+      <Text style={[styles.friendsTitle, { color: colors.mutedForeground }]}>
+        Friends Jamming Now
+      </Text>
       <ScrollView
         contentContainerStyle={styles.friendsContent}
         horizontal
@@ -208,19 +268,30 @@ function FriendsJammingNow({
             onPress={() => onOpenRoomHandle?.(item.room_handle)}
             style={({ pressed }) => [
               styles.friendChip,
-              pressed ? styles.friendChipPressed : null,
+              {
+                backgroundColor: pressed ? colors.cardPressed : colors.input,
+                borderColor: colors.border,
+              },
             ]}
           >
-            <View style={styles.friendAvatar}>
-              <Text style={styles.friendAvatarText}>
+            <View
+              style={[
+                styles.friendAvatar,
+                { backgroundColor: colors.muted, borderColor: colors.success },
+              ]}
+            >
+              <Text style={[styles.friendAvatarText, { color: colors.secondaryForeground }]}>
                 {item.friend.username.slice(0, 2).toUpperCase()}
               </Text>
             </View>
             <View style={styles.friendChipTextWrap}>
-              <Text numberOfLines={1} style={styles.friendName}>
+              <Text numberOfLines={1} style={[styles.friendName, { color: colors.foreground }]}>
                 {item.friend.username}
               </Text>
-              <Text numberOfLines={1} style={styles.friendRoom}>
+              <Text
+                numberOfLines={1}
+                style={[styles.friendRoom, { color: colors.mutedForeground }]}
+              >
                 {item.room_name}
               </Text>
             </View>
@@ -238,10 +309,20 @@ function DetailPill({
   icon?: keyof typeof Ionicons.glyphMap;
   label: string;
 }) {
+  const { colors } = useMobileTheme();
+
   return (
-    <View style={styles.detailPill}>
-      {icon ? <Ionicons color="#8F98A8" name={icon} size={13} /> : null}
-      <Text numberOfLines={1} style={styles.detailPillText}>
+    <View
+      style={[
+        styles.detailPill,
+        { backgroundColor: colors.muted, borderColor: colors.border },
+      ]}
+    >
+      {icon ? <Ionicons color={colors.mutedForeground} name={icon} size={13} /> : null}
+      <Text
+        numberOfLines={1}
+        style={[styles.detailPillText, { color: colors.secondaryForeground }]}
+      >
         {label}
       </Text>
     </View>
@@ -257,15 +338,21 @@ function EmptyState({
   message: string;
   title: string;
 }) {
+  const { colors } = useMobileTheme();
+
   return (
     <View style={styles.emptyState}>
       {isLoading ? (
-        <ActivityIndicator color="#D8A64A" />
+        <ActivityIndicator color={colors.primary} />
       ) : (
-        <Ionicons color="#4B5565" name="musical-notes-outline" size={38} />
+        <Ionicons color={colors.mutedForeground} name="musical-notes-outline" size={38} />
       )}
-      <Text style={styles.emptyTitle}>{isLoading ? "Loading jams..." : title}</Text>
-      <Text style={styles.emptyMessage}>{isLoading ? "Finding live rooms." : message}</Text>
+      <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+        {isLoading ? "Loading jams..." : title}
+      </Text>
+      <Text style={[styles.emptyMessage, { color: colors.mutedForeground }]}>
+        {isLoading ? "Finding live rooms." : message}
+      </Text>
     </View>
   );
 }

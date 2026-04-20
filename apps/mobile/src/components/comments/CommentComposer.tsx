@@ -7,6 +7,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useMobileTheme } from "@/theme/MobileTheme";
 
 type Props = {
   buttonLabel?: string;
@@ -25,6 +26,7 @@ export default function CommentComposer({
   onSubmit,
   placeholder,
 }: Props) {
+  const { colors } = useMobileTheme();
   const [text, setText] = useState(initialValue);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +47,12 @@ export default function CommentComposer({
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
       <TextInput
         editable={!isSubmitting}
         maxLength={MAX_COMMENT_LENGTH}
@@ -55,16 +62,36 @@ export default function CommentComposer({
           setError(null);
         }}
         placeholder={placeholder}
-        placeholderTextColor="#7E8796"
-        style={styles.input}
+        placeholderTextColor={colors.mutedForeground}
+        style={[
+          styles.input,
+          {
+            backgroundColor: colors.input,
+            borderColor: colors.borderStrong,
+            color: colors.foreground,
+          },
+        ]}
         textAlignVertical="top"
         value={text}
       />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text
+          style={[
+            styles.error,
+            {
+              backgroundColor: colors.destructiveMuted,
+              borderColor: colors.destructive,
+              color: colors.destructive,
+            },
+          ]}
+        >
+          {error}
+        </Text>
+      ) : null}
 
       <View style={styles.footer}>
-        <Text style={styles.counter}>
+        <Text style={[styles.counter, { color: colors.mutedForeground }]}>
           {text.length}/{MAX_COMMENT_LENGTH}
         </Text>
         <Pressable
@@ -72,14 +99,21 @@ export default function CommentComposer({
           onPress={handleSubmit}
           style={({ pressed }) => [
             styles.button,
-            !canSubmit ? styles.buttonDisabled : null,
+            { backgroundColor: canSubmit ? colors.primary : colors.muted },
             pressed && canSubmit ? styles.buttonPressed : null,
           ]}
         >
           {isSubmitting ? (
-            <ActivityIndicator color="#251B0A" />
+            <ActivityIndicator color={colors.primaryForeground} />
           ) : (
-            <Text style={styles.buttonText}>{buttonLabel}</Text>
+            <Text
+              style={[
+                styles.buttonText,
+                { color: canSubmit ? colors.primaryForeground : colors.mutedForeground },
+              ]}
+            >
+              {buttonLabel}
+            </Text>
           )}
         </Pressable>
       </View>
@@ -89,18 +123,13 @@ export default function CommentComposer({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     padding: 12,
   },
   input: {
-    backgroundColor: "#1E2330",
-    borderColor: "rgba(255,255,255,0.1)",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#EEF0F5",
     fontSize: 14,
     lineHeight: 21,
     minHeight: 62,
@@ -108,11 +137,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   error: {
-    backgroundColor: "rgba(127,29,29,0.5)",
-    borderColor: "rgba(248,113,113,0.35)",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#FECACA",
     fontSize: 12,
     lineHeight: 17,
     marginTop: 10,
@@ -126,29 +152,22 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   counter: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "600",
   },
   button: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
     minHeight: 34,
     justifyContent: "center",
     minWidth: 92,
     paddingHorizontal: 16,
   },
-  buttonDisabled: {
-    backgroundColor: "#4B4F5D",
-  },
   buttonPressed: {
     opacity: 0.82,
   },
   buttonText: {
-    color: "#251B0A",
     fontSize: 13,
     fontWeight: "800",
   },
 });
-
