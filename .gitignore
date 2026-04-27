@@ -22,3 +22,4 @@ build/
 .claude
 .agents
 skills-lock.json
+*.ini

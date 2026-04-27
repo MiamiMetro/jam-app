@@ -19,6 +19,6 @@
     "convex:codegen": "convex codegen"
   },
   "dependencies": {
-    "convex": "^1.35.1"
+    "convex": "^1.36.1"
   }
 }
