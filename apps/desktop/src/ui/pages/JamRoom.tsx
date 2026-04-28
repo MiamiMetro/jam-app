@@ -29,8 +29,11 @@ import {
   useRoomHeartbeat,
   useGuestRoomHeartbeat,
   useDisconnectPresence,
+  useCreatePerformerJoinToken,
+  useRefreshJamSession,
 } from "@/hooks/useRooms";
 import type { Id } from "@jam-app/convex";
+import type { JamClientState } from "../electron";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { usePostAudio } from "@/contexts/PostAudioContext";
 import { Timestamp } from "@/components/Timestamp";
@@ -39,6 +42,24 @@ import { EmptyState } from "@/components/EmptyState";
 
 interface JamRoomProps {
   roomHandle?: string;
+}
+
+function nativeJamErrorMessage(error: unknown) {
+  const message =
+    error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  if (message.includes("JAM_SERVER_NOT_CONFIGURED")) {
+    return "Jam server is not configured.";
+  }
+  if (message.includes("JAM_SERVER_SECRET_MISSING")) {
+    return "Jam server secret is missing.";
+  }
+  if (message.includes("ROOM_INACTIVE")) {
+    return "This room is not active.";
+  }
+  if (message.includes("PRIVATE_ROOM")) {
+    return "This room is private.";
+  }
+  return message || "Failed to launch client";
 }
 
 function JamRoom({ roomHandle }: JamRoomProps = {}) {
@@ -53,10 +74,14 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const roomHeartbeat = useRoomHeartbeat();
   const guestRoomHeartbeat = useGuestRoomHeartbeat();
   const disconnectPresence = useDisconnectPresence();
+  const createPerformerJoinToken = useCreatePerformerJoinToken();
+  const refreshJamSession = useRefreshJamSession();
   const [message, setMessage] = useState("");
   const [clientError, setClientError] = useState<string | null>(null);
   const [isPerforming, setIsPerforming] = useState(false);
+  const [clientState, setClientState] = useState<JamClientState>("idle");
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const jamSessionIdRef = useRef<Id<"jam_sessions"> | null>(null);
 
   // HLS stream player (shared via context so StatusBar can control it too)
   const hlsPlayer = usePlayer();
@@ -186,21 +211,80 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         setClientError("Electron API not available");
         return;
       }
-      const result = await window.electron.spawnClient([
-        "--room=" + (room?.id || ""),
-        "--token=stub",
-      ]);
+      if (!room?.id) {
+        setClientError("Room is not ready");
+        return;
+      }
+      setClientState("launching");
+      const launchContext = await createPerformerJoinToken({
+        roomId: room.id as Id<"rooms">,
+      });
+      jamSessionIdRef.current = launchContext.sessionId;
+      const result = await window.electron.launchJamClient({
+        serverHost: launchContext.serverHost,
+        serverPort: launchContext.serverPort,
+        roomId: launchContext.roomId,
+        roomHandle: launchContext.roomHandle,
+        profileId: launchContext.profileId,
+        displayName: launchContext.displayName,
+        joinToken: launchContext.joinToken,
+        codec: launchContext.codec,
+        frames: launchContext.frames,
+      });
       if (result.success) {
         setIsPerforming(true);
+        setClientState(result.state ?? "running");
       } else {
+        setClientState(result.state ?? "failed");
         setClientError(result.error || "Failed to launch client");
       }
     } catch (error) {
+      setClientState("failed");
       setClientError(
-        error instanceof Error ? error.message : "Unknown error occurred"
+        nativeJamErrorMessage(error)
       );
     }
-  }, [room?.id]);
+  }, [room?.id, createPerformerJoinToken]);
+
+  useEffect(() => {
+    if (!window.electron || (clientState !== "launching" && clientState !== "running")) {
+      return;
+    }
+
+    const poll = async () => {
+      const status = await window.electron?.getJamClientStatus();
+      if (!status) return;
+      setClientState(status.state);
+      setIsPerforming(status.state === "running" || status.state === "launching");
+      if (status.state === "failed") {
+        setClientError(status.error || "Native jam client failed");
+      }
+      if (status.state === "exited") {
+        jamSessionIdRef.current = null;
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      poll().catch(() => {});
+    }, 2_000);
+    poll().catch(() => {});
+    return () => window.clearInterval(timer);
+  }, [clientState]);
+
+  useEffect(() => {
+    if (clientState !== "running" || !jamSessionIdRef.current) return;
+
+    const refresh = () => {
+      const sessionId = jamSessionIdRef.current;
+      if (!sessionId) return;
+      refreshJamSession({ sessionId }).catch((error) => {
+        setClientError(nativeJamErrorMessage(error));
+      });
+    };
+
+    const timer = window.setInterval(refresh, 60_000);
+    return () => window.clearInterval(timer);
+  }, [clientState, refreshJamSession]);
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString([], {
@@ -294,10 +378,15 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
                 variant={clientError ? "destructive" : "default"}
                 size="sm"
                 onClick={handleJoinClient}
+                disabled={clientState === "launching" || clientState === "running"}
                 className={`${!clientError ? "glow-primary" : ""}`}
               >
                 <Music className="h-3.5 w-3.5 mr-1.5" />
-                Start Jamming
+                {clientState === "launching"
+                  ? "Launching..."
+                  : clientState === "running"
+                    ? "Jamming"
+                    : "Start Jamming"}
               </Button>
               {isHost && (
                 <Button

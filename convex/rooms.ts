@@ -29,6 +29,8 @@ const presence = new Presence(components.presence);
 
 const MOCK_STREAM_URL =
   "https://virtual-channel.unified-streaming.com/demo_channel-stable.isml/.m3u8";
+const JOIN_TOKEN_TTL_MS = 2 * 60 * 1000;
+const JAM_SESSION_TTL_MS = 5 * 60 * 1000;
 
 import { ROOM_GENRES } from "./shared";
 export { ROOM_GENRES, type RoomGenre } from "./shared";
@@ -36,6 +38,70 @@ export { ROOM_GENRES, type RoomGenre } from "./shared";
 /** Presence room ID for a jam room */
 function roomPresenceId(roomId: string) {
   return `room:${roomId}`;
+}
+
+function toHex(bytes: ArrayBuffer): string {
+  return Array.from(new Uint8Array(bytes))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function hmacSha256Hex(secret: string, payload: string): Promise<string> {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    new TextEncoder().encode(payload)
+  );
+  return toHex(signature);
+}
+
+function randomNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function requireRoomAccess(
+  ctx: QueryCtx | MutationCtx,
+  profile: Doc<"profiles">,
+  room: Doc<"rooms">
+) {
+  if (!room.isActive) throw new Error("ROOM_INACTIVE");
+  if (!room.isPrivate || room.hostId === profile._id) return;
+  const friends = await areFriends(ctx, profile._id, room.hostId);
+  if (!friends) throw new Error("PRIVATE_ROOM");
+}
+
+async function selectOfficialJamServer(ctx: MutationCtx) {
+  const server = await ctx.db
+    .query("jam_servers")
+    .withIndex("by_kind_status_priority", (q) =>
+      q.eq("kind", "official").eq("status", "enabled")
+    )
+    .order("asc")
+    .first();
+
+  if (!server) throw new Error("JAM_SERVER_NOT_CONFIGURED");
+  if (!server.joinSecret.trim()) throw new Error("JAM_SERVER_SECRET_MISSING");
+  return server;
+}
+
+async function getActiveJamSession(ctx: MutationCtx, roomId: Id<"rooms">) {
+  return await ctx.db
+    .query("jam_sessions")
+    .withIndex("by_room_status", (q) =>
+      q.eq("roomId", roomId).eq("status", "active")
+    )
+    .first();
 }
 
 // ============================================
@@ -474,6 +540,163 @@ export const deleteRoom = mutation({
     await releaseUniqueLock(ctx, "room_handle", room.handle);
     await ctx.db.delete(args.roomId);
     return { success: true };
+  },
+});
+
+/** Mint a short-lived performer token and assign/reuse the room's active jam server session. */
+export const createPerformerJoinToken = mutation({
+  args: { roomId: v.id("rooms") },
+  handler: async (ctx, args) => {
+    const profile = await requireAuth(ctx);
+    const room = await ctx.db.get(args.roomId);
+    if (!room) throw new Error("ROOM_NOT_FOUND");
+    await requireRoomAccess(ctx, profile, room);
+
+    const now = Date.now();
+    let session = await getActiveJamSession(ctx, args.roomId);
+
+    if (session && session.expiresAt <= now) {
+      await ctx.db.patch(session._id, { status: "expired" });
+      session = null;
+    }
+
+    let server: Doc<"jam_servers"> | null = null;
+    if (session) {
+      server = await ctx.db.get(session.jamServerId);
+      if (!server || server.status !== "enabled") {
+        await ctx.db.patch(session._id, { status: "expired" });
+        session = null;
+        server = null;
+      }
+    }
+
+    if (!server) {
+      server = await selectOfficialJamServer(ctx);
+    } else if (!server.joinSecret.trim()) {
+      throw new Error("JAM_SERVER_SECRET_MISSING");
+    }
+
+    const sessionExpiresAt = now + JAM_SESSION_TTL_MS;
+    const lastRefreshAt = session?.lastRefreshAt ?? now;
+    let sessionId: Id<"jam_sessions">;
+
+    if (session) {
+      sessionId = session._id;
+      await ctx.db.patch(session._id, {
+        lastJoinAt: now,
+        expiresAt: sessionExpiresAt,
+      });
+    } else {
+      sessionId = await ctx.db.insert("jam_sessions", {
+        roomId: args.roomId,
+        jamServerId: server._id,
+        serverId: server.serverId,
+        status: "active",
+        startedAt: now,
+        lastJoinAt: now,
+        lastRefreshAt,
+        expiresAt: sessionExpiresAt,
+      });
+    }
+
+    await ctx.db.patch(args.roomId, { status: "live", lastActiveAt: now });
+
+    const tokenExpiresAt = now + JOIN_TOKEN_TTL_MS;
+    const role = "performer";
+    const nonce = randomNonce();
+    const payload = [
+      "v1",
+      tokenExpiresAt,
+      server.serverId,
+      String(room._id),
+      String(profile._id),
+      role,
+      nonce,
+    ].join("|");
+    const signature = await hmacSha256Hex(server.joinSecret, payload);
+    const joinToken = [
+      "v1",
+      tokenExpiresAt,
+      server.serverId,
+      String(room._id),
+      String(profile._id),
+      role,
+      nonce,
+      signature,
+    ].join(".");
+
+    return {
+      serverHost: server.host,
+      serverPort: server.port,
+      serverId: server.serverId,
+      roomId: String(room._id),
+      roomHandle: room.handle,
+      profileId: String(profile._id),
+      displayName: profile.displayName || profile.username,
+      joinToken,
+      codec: "opus" as const,
+      frames: 120,
+      sessionId,
+      expiresAtMs: tokenExpiresAt,
+    };
+  },
+});
+
+/** Keep the temporary jam session alive while the local native process is still running. */
+export const refreshJamSession = mutation({
+  args: { sessionId: v.id("jam_sessions") },
+  handler: async (ctx, args) => {
+    const profile = await requireAuth(ctx);
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.status !== "active") return { refreshed: false };
+
+    const room = await ctx.db.get(session.roomId);
+    if (!room) {
+      await ctx.db.patch(args.sessionId, { status: "expired" });
+      return { refreshed: false };
+    }
+    await requireRoomAccess(ctx, profile, room);
+
+    const now = Date.now();
+    if (session.expiresAt <= now) {
+      await ctx.db.patch(args.sessionId, { status: "expired" });
+      return { refreshed: false };
+    }
+
+    await ctx.db.patch(args.sessionId, {
+      lastRefreshAt: now,
+      expiresAt: now + JAM_SESSION_TTL_MS,
+    });
+    await ctx.db.patch(session.roomId, { status: "live", lastActiveAt: now });
+    return { refreshed: true };
+  },
+});
+
+/** Manual cleanup bridge until SFU-authoritative session presence exists. */
+export const expireStaleJamSessions = mutation({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const staleSessions = await ctx.db
+      .query("jam_sessions")
+      .withIndex("by_expires_at", (q) => q.lte("expiresAt", now))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .take(Math.min(args.limit ?? 50, 100));
+
+    let expired = 0;
+    for (const session of staleSessions) {
+      await ctx.db.patch(session._id, { status: "expired" });
+      expired += 1;
+
+      const newerActive = await getActiveJamSession(ctx, session.roomId);
+      if (!newerActive || newerActive.expiresAt <= now) {
+        await ctx.db.patch(session.roomId, {
+          status: "idle",
+          lastActiveAt: now,
+        });
+      }
+    }
+    return { expired };
   },
 });
 

@@ -140,3 +140,11 @@ export function useSetStreamUrl() {
 export function useUpdateRoomStatus() {
   return useMutation(api.rooms.updateRoomStatus);
 }
+
+export function useCreatePerformerJoinToken() {
+  return useMutation(api.rooms.createPerformerJoinToken);
+}
+
+export function useRefreshJamSession() {
+  return useMutation(api.rooms.refreshJamSession);
+}

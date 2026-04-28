@@ -33,6 +33,69 @@ function getSavedTheme(): 'dark' | 'light' {
 
 // Track the spawned client process
 let clientProcess: ChildProcess | null = null;
+type JamClientState = 'idle' | 'launching' | 'running' | 'failed' | 'exited';
+type JamClientLaunchContext = {
+    serverHost: string;
+    serverPort: number;
+    roomId: string;
+    roomHandle: string;
+    profileId: string;
+    displayName: string;
+    joinToken: string;
+    codec: 'opus' | 'pcm';
+    frames: number;
+};
+let jamClientState: JamClientState = 'idle';
+let jamClientExitCode: number | null = null;
+let jamClientError: string | undefined;
+
+function getClientExecutablePath() {
+    const platform = process.platform;
+    const clientExecutable = platform === 'win32' ? 'client.exe' : 'client';
+
+    if (isDev()) {
+        return path.join(process.cwd(), 'resources', 'client', clientExecutable);
+    }
+
+    let clientPath = path.join(process.resourcesPath, 'client', clientExecutable);
+    if (!existsSync(clientPath)) {
+        const altPath = path.join(process.resourcesPath, 'resources', 'client', clientExecutable);
+        if (existsSync(altPath)) {
+            clientPath = altPath;
+        }
+    }
+    return clientPath;
+}
+
+function isLaunchContext(value: unknown): value is JamClientLaunchContext {
+    if (!value || typeof value !== 'object') return false;
+    const context = value as Record<string, unknown>;
+    return (
+        typeof context.serverHost === 'string' &&
+        typeof context.serverPort === 'number' &&
+        typeof context.roomId === 'string' &&
+        typeof context.roomHandle === 'string' &&
+        typeof context.profileId === 'string' &&
+        typeof context.displayName === 'string' &&
+        typeof context.joinToken === 'string' &&
+        (context.codec === 'opus' || context.codec === 'pcm') &&
+        typeof context.frames === 'number'
+    );
+}
+
+function buildJamClientArgs(context: JamClientLaunchContext) {
+    return [
+        '--server', context.serverHost,
+        '--port', String(context.serverPort),
+        '--room', context.roomId,
+        '--room-handle', context.roomHandle,
+        '--user-id', context.profileId,
+        '--display-name', context.displayName,
+        '--join-token', context.joinToken,
+        '--codec', context.codec,
+        '--frames', String(context.frames),
+    ];
+}
 
 const PRESENCE_DISCONNECT_REQUEST_TIMEOUT_MS = 700;
 const PRESENCE_BACKGROUND_QUIT_DELAY_MS = 500;
@@ -131,77 +194,73 @@ if (!gotTheLock) {
         }
     });
 
-    // IPC handler for spawning client executable
-    ipcMain.handle('spawn-client', async (_event, args: string[] = []) => {
+    // IPC handler for launching the native jam client with product-issued context.
+    ipcMain.handle('launch-jam-client', async (_event, context: unknown) => {
         try {
-            // Check if client is already running
+            if (!isLaunchContext(context)) {
+                jamClientState = 'failed';
+                jamClientError = 'Invalid native jam launch context';
+                return { success: false, error: jamClientError, state: jamClientState };
+            }
+
             if (clientProcess) {
-                // Check if the process is still alive
                 try {
-                    // On Windows, killed processes throw an error when checking exitCode
                     if (clientProcess.exitCode === null && clientProcess.pid) {
-                        // Process is still running
-                        return { success: false, error: 'Client is already running' };
+                        return { success: false, error: 'Client is already running', state: jamClientState };
                     }
                 } catch {
-                    // Process might have been killed, continue to spawn new one
                     clientProcess = null;
                 }
             }
 
-            // Determine the executable name based on platform
-            const platform = process.platform;
-            const clientExecutable = platform === 'win32' ? 'client.exe' : 'client';
-
-            let clientPath: string;
-            
-            if (isDev()) {
-                // In development, look for client executable in resources/client relative to project root
-                clientPath = path.join(process.cwd(), 'resources', 'client', clientExecutable);
-            } else {
-                // In production, extraResources are placed in process.resourcesPath
-                // Try the expected path first
-                clientPath = path.join(process.resourcesPath, 'client', clientExecutable);
-                
-                // If not found, try alternative path (in case electron-builder nests it)
-                if (!existsSync(clientPath)) {
-                    const altPath = path.join(process.resourcesPath, 'resources', 'client', clientExecutable);
-                    if (existsSync(altPath)) {
-                        clientPath = altPath;
-                    }
-                }
-            }
-
-            // Check if file exists
+            const clientPath = getClientExecutablePath();
             if (!existsSync(clientPath)) {
-                return { success: false, error: `Client executable not found at ${clientPath}` };
+                jamClientState = 'failed';
+                jamClientError = `Client executable not found at ${clientPath}`;
+                return { success: false, error: jamClientError, state: jamClientState };
             }
 
-            // Spawn the client executable with provided arguments
-            clientProcess = spawn(clientPath, args, {
+            jamClientState = 'launching';
+            jamClientExitCode = null;
+            jamClientError = undefined;
+            clientProcess = spawn(clientPath, buildJamClientArgs(context), {
                 detached: true,
                 stdio: 'ignore',
             });
+            jamClientState = 'running';
 
-            // Handle process exit to clear the reference
-            clientProcess.on('exit', () => {
+            clientProcess.on('exit', (code) => {
+                jamClientState = 'exited';
+                jamClientExitCode = code;
                 clientProcess = null;
             });
 
-            clientProcess.on('error', () => {
+            clientProcess.on('error', (error) => {
+                jamClientState = 'failed';
+                jamClientError = error.message;
                 clientProcess = null;
             });
 
             clientProcess.unref();
 
-            return { success: true };
+            return { success: true, state: jamClientState };
         } catch (error) {
             clientProcess = null;
+            jamClientState = 'failed';
+            jamClientError = error instanceof Error ? error.message : 'Unknown error';
             return { 
                 success: false, 
-                error: error instanceof Error ? error.message : 'Unknown error' 
+                error: jamClientError,
+                state: jamClientState,
             };
         }
+    });
+
+    ipcMain.handle('get-jam-client-status', async () => {
+        if (clientProcess && clientProcess.exitCode === null) {
+            return { state: jamClientState, exitCode: null, error: jamClientError };
+        }
+        return { state: clientProcess ? jamClientState : jamClientState, exitCode: jamClientExitCode, error: jamClientError };
     });
 
     // Save theme preference so next launch uses correct background color

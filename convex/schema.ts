@@ -218,6 +218,36 @@ export default defineSchema({
     .index("by_active", ["isActive"]),
 
   // Room chat messages — live chat, latest 30 only
+  // Backend-only jam server registry. Secrets must never be returned by public queries.
+  jam_servers: defineTable({
+    kind: v.union(v.literal("official"), v.literal("community")),
+    communityId: v.optional(v.id("communities")),
+    status: v.union(v.literal("enabled"), v.literal("disabled")),
+    serverId: v.string(),
+    name: v.string(),
+    host: v.string(),
+    port: v.number(),
+    joinSecret: v.string(),
+    priority: v.number(),
+    region: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_kind_status_priority", ["kind", "status", "priority"]),
+
+  // Temporary product bridge: room-to-server assignment while a performer session is active.
+  jam_sessions: defineTable({
+    roomId: v.id("rooms"),
+    jamServerId: v.id("jam_servers"),
+    serverId: v.string(),
+    status: v.union(v.literal("active"), v.literal("expired")),
+    startedAt: v.number(),
+    lastJoinAt: v.number(),
+    lastRefreshAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_room_status", ["roomId", "status"])
+    .index("by_expires_at", ["expiresAt"]),
+
   room_messages: defineTable({
     roomId: v.id("rooms"),
     senderId: v.id("profiles"),
