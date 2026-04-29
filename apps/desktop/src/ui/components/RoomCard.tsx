@@ -39,7 +39,10 @@ export function RoomCard({ room, onClick, variant = "grid" }: RoomCardProps) {
       >
         <div className="relative flex items-center gap-3 flex-1 min-w-0">
           <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <span className="text-sm font-semibold truncate flex-shrink min-w-0">{room.name}</span>
+          <div className="min-w-0 flex-shrink">
+            <span className="text-sm font-semibold truncate block">{room.name}</span>
+            <span className="text-[11px] text-muted-foreground truncate block">{room.handle}</span>
+          </div>
           {room.is_private && <Lock className="h-3 w-3 text-muted-foreground shrink-0" />}
           {room.genre && (
             <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium shrink-0">
@@ -81,9 +84,14 @@ export function RoomCard({ room, onClick, variant = "grid" }: RoomCardProps) {
       <div className="relative">
         <div className="flex items-center gap-2 mb-2">
           <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <h3 className="text-sm font-semibold truncate">
-            {room.name}
-          </h3>
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold truncate">
+              {room.name}
+            </h3>
+            <p className="text-[11px] text-muted-foreground truncate">
+              {room.handle}
+            </p>
+          </div>
           {room.is_private && (
             <Lock className="h-3 w-3 text-muted-foreground" />
           )}

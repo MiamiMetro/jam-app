@@ -149,7 +149,9 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
                     <Hash className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="text-base font-semibold">My Room</h3>
+                    <h3 className="text-base font-semibold truncate">
+                      {myRoom.name}
+                    </h3>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${myRoom.is_active
                       ? "bg-green-500/20 text-green-400"
                       : "bg-muted-foreground/20 text-muted-foreground"
@@ -161,7 +163,8 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
                     )}
                   </div>
                   <div className="mb-3">
-                    <h4 className="text-sm font-medium mb-1">{myRoom.name}</h4>
+                    <p className="text-xs text-muted-foreground mb-1">My Room</p>
+                    <h4 className="text-sm font-medium mb-1 text-muted-foreground">{myRoom.handle}</h4>
                     {myRoom.description && (
                       <p className="text-xs text-muted-foreground line-clamp-2">
                         {myRoom.description}

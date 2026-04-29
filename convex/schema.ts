@@ -211,11 +211,14 @@ export default defineSchema({
     streamUrl: v.optional(v.string()),
     status: v.union(v.literal("idle"), v.literal("live")),
     communityId: v.optional(v.id("communities")),
+    scopeKey: v.optional(v.string()),
     lastActiveAt: v.number(),
   })
     .index("by_host", ["hostId"])
+    .index("by_host_scope", ["hostId", "scopeKey"])
     .index("by_handle", ["handle"])
-    .index("by_active", ["isActive"]),
+    .index("by_active", ["isActive"])
+    .index("by_community_active", ["communityId", "isActive"]),
 
   // Room chat messages — live chat, latest 30 only
   // Backend-only jam server registry. Secrets must never be returned by public queries.
@@ -232,7 +235,9 @@ export default defineSchema({
     region: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_kind_status_priority", ["kind", "status", "priority"]),
+  })
+    .index("by_kind_status_priority", ["kind", "status", "priority"])
+    .index("by_community_status", ["communityId", "status"]),
 
   // Temporary product bridge: room-to-server assignment while a performer session is active.
   jam_sessions: defineTable({

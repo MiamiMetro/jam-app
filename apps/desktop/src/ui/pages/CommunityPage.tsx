@@ -1,7 +1,7 @@
 // CommunityPage.tsx — Community detail page, standardized header like Profile
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Hash as HashIcon, Users, Settings2, Shield, UserMinus, ChevronUp, ChevronDown } from "lucide-react";
+import { ArrowLeft, Hash as HashIcon, Users, Settings2, Shield, UserMinus, ChevronUp, ChevronDown, Music, Plus, LayoutGrid, List, Lock } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/authStore";
@@ -15,6 +15,7 @@ import {
   useRemoveMember,
   useCommunityMembers,
   useSearchCommunityMembers,
+  useCommunityJamAvailability,
 } from "@/hooks/useCommunities";
 import { useCommunityPosts, useCreatePost, useToggleLike, useDeletePost } from "@/hooks/usePosts";
 import { PostCard } from "@/components/PostCard";
@@ -27,8 +28,19 @@ import { formatTimeAgo } from "@/lib/postUtils";
 import { getCommunityColors } from "@/lib/communityColors";
 import { EditCommunityDialog } from "@/components/community/EditCommunityDialog";
 import type { FrontendPost } from "@/hooks/usePosts";
+import { RoomFormDialog, type RoomFormData } from "@/components/RoomFormDialog";
+import { RoomCard } from "@/components/RoomCard";
+import type { Id } from "@jam-app/convex";
+import {
+  useCommunityRooms,
+  useMyCommunityRoom,
+  useCreateRoom,
+  useUpdateRoom,
+  useActivateRoom,
+  useDeactivateRoom,
+} from "@/hooks/useRooms";
 
-type Tab = "feed" | "moderation";
+type Tab = "feed" | "jam" | "moderation";
 
 function CommunityPage() {
   const { handle } = useParams<{ handle: string }>();
@@ -45,10 +57,15 @@ function CommunityPage() {
 
   const joinMutation = useJoinCommunity();
   const leaveMutation = useLeaveCommunity();
+  const jamAvailability = useCommunityJamAvailability(community?.id ?? "");
 
   const [activeTab, setActiveTab] = useState<Tab>("feed");
   const [editOpen, setEditOpen] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
+  const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
+  const [isEditRoomOpen, setIsEditRoomOpen] = useState(false);
+  const [roomViewMode, setRoomViewMode] = useState<"grid" | "list">("grid");
+  const [isTogglingRoom, setIsTogglingRoom] = useState(false);
 
   const {
     data: posts = [],
@@ -73,8 +90,23 @@ function CommunityPage() {
   const promoteMutation = usePromoteMod();
   const demoteMutation = useDemoteMod();
   const removeMutation = useRemoveMember();
+  const { data: communityRooms = [], isLoading: communityRoomsLoading } =
+    useCommunityRooms(community?.id ?? undefined);
+  const { data: myCommunityRoom, isLoading: myCommunityRoomLoading } =
+    useMyCommunityRoom(community?.id ?? undefined);
+  const createRoom = useCreateRoom();
+  const updateRoom = useUpdateRoom();
+  const activateRoom = useActivateRoom();
+  const deactivateRoom = useDeactivateRoom();
 
   const displayedMembers = memberSearch.length >= 2 ? searchedMembers : allMembers;
+  const showJamTab = jamAvailability.data.enabled || communityRooms.length > 0;
+
+  useEffect(() => {
+    if (activeTab === "jam" && !showJamTab) {
+      setActiveTab("feed");
+    }
+  }, [activeTab, showJamTab]);
 
   const handleJoin = async () => {
     if (!community) return;
@@ -95,6 +127,72 @@ function CommunityPage() {
     if (!community) return;
     await createPostMutation.mutateAsync({ content, audioFile, communityId: community.id });
   };
+
+  const handleCreateRoom = async (data: RoomFormData) => {
+    if (!community || isGuest || !user || !isMember) return;
+    if (!data.name.trim()) return;
+
+    try {
+      await createRoom({
+        handle: data.handle.trim(),
+        name: data.name.trim(),
+        description: data.description.trim() || undefined,
+        genre: data.genre.trim() || undefined,
+        maxPerformers: data.maxPerformers,
+        isPrivate: data.isPrivate,
+        communityId: community.id as Id<"communities">,
+      });
+      setIsCreateRoomOpen(false);
+    } catch (error) {
+      console.error("Failed to create community room:", error);
+    }
+  };
+
+  const handleUpdateRoom = async (data: RoomFormData) => {
+    if (!community || isGuest || !user || !myCommunityRoom) return;
+    if (!data.name.trim()) return;
+
+    try {
+      await updateRoom({
+        roomId: myCommunityRoom.id as Id<"rooms">,
+        name: data.name.trim(),
+        description: data.description.trim() || undefined,
+        genre: data.genre.trim() || undefined,
+        maxPerformers: data.maxPerformers,
+        isPrivate: data.isPrivate,
+      });
+      setIsEditRoomOpen(false);
+    } catch (error) {
+      console.error("Failed to update community room:", error);
+    }
+  };
+
+  const handleToggleRoomStatus = async () => {
+    if (isGuest || !user || !myCommunityRoom) return;
+    setIsTogglingRoom(true);
+    try {
+      if (myCommunityRoom.is_active) {
+        await deactivateRoom({ roomId: myCommunityRoom.id as Id<"rooms"> });
+      } else {
+        await activateRoom({ roomId: myCommunityRoom.id as Id<"rooms"> });
+      }
+    } catch (error) {
+      console.error("Failed to toggle community room:", error);
+    } finally {
+      setIsTogglingRoom(false);
+    }
+  };
+
+  const editRoomInitialData: RoomFormData | undefined = myCommunityRoom
+    ? {
+        handle: myCommunityRoom.handle,
+        name: myCommunityRoom.name,
+        description: myCommunityRoom.description || "",
+        genre: myCommunityRoom.genre || "",
+        maxPerformers: myCommunityRoom.max_performers,
+        isPrivate: myCommunityRoom.is_private,
+      }
+    : undefined;
 
   const colors = getCommunityColors(community?.theme_color);
 
@@ -208,6 +306,18 @@ function CommunityPage() {
             >
               Feed
             </button>
+            {showJamTab && (
+              <button
+                onClick={() => setActiveTab("jam")}
+                className={`text-sm py-2.5 border-b-2 transition-colors cursor-pointer ${
+                  activeTab === "jam"
+                    ? "text-foreground border-b-primary font-medium"
+                    : "text-muted-foreground border-b-transparent hover:text-foreground"
+                }`}
+              >
+                Jam
+              </button>
+            )}
             {canModerate && (
               <button
                 onClick={() => setActiveTab("moderation")}
@@ -274,6 +384,154 @@ function CommunityPage() {
                   </>
                 )}
               </>
+            ) : activeTab === "jam" ? (
+              <div className="px-5 py-4 space-y-4">
+                {!isMember ? (
+                  <div className="glass-solid rounded-lg p-4 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-sm font-semibold">
+                        <Lock className="h-4 w-4 text-primary" />
+                        Join to jam with this community
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Community rooms are visible, but only members can create rooms or start jamming.
+                      </p>
+                    </div>
+                    {!isGuest && (
+                      <Button size="sm" className="glow-primary shrink-0" onClick={handleJoin} disabled={joinMutation.isPending}>
+                        Join
+                      </Button>
+                    )}
+                  </div>
+                ) : !jamAvailability.data.enabled ? (
+                  <div className="glass-solid rounded-lg p-4 flex items-center gap-3">
+                    <Lock className="h-4 w-4 text-primary shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold">Community jam is disabled</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        The community owner needs to configure a jam server before rooms can be created or started.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+
+                {isMember && myCommunityRoom && (
+                  <div className={`p-4 rounded-lg glass-strong relative overflow-hidden ${myCommunityRoom.is_active ? "ring-1 ring-primary/30" : "ring-1 ring-border"}`}>
+                    {myCommunityRoom.is_active && (
+                      <div className="absolute inset-0 bg-gradient-primary-tr pointer-events-none" />
+                    )}
+                    <div className="flex items-start justify-between gap-4 relative">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <HashIcon className="h-4 w-4 text-muted-foreground" />
+                          <h3 className="text-base font-semibold truncate">
+                            {myCommunityRoom.name}
+                          </h3>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${myCommunityRoom.is_active ? "bg-green-500/20 text-green-400" : "bg-muted-foreground/20 text-muted-foreground"}`}>
+                            {myCommunityRoom.is_active ? "Active" : "Disabled"}
+                          </span>
+                          {myCommunityRoom.is_private && <Lock className="h-3 w-3 text-muted-foreground" />}
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-1">My Community Room</p>
+                        <h4 className="text-sm font-medium mb-1 text-muted-foreground">{myCommunityRoom.handle}</h4>
+                        {myCommunityRoom.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{myCommunityRoom.description}</p>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => myCommunityRoom.is_active && navigate(`/jam/${myCommunityRoom.handle}`)}
+                            disabled={!myCommunityRoom.is_active}
+                            className={myCommunityRoom.is_active ? "glow-primary" : ""}
+                          >
+                            {myCommunityRoom.is_active ? "Enter Room" : "Room Disabled"}
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setIsEditRoomOpen(true)}>
+                            <Settings2 className="h-3 w-3 mr-1" />
+                            Settings
+                          </Button>
+                          <Button
+                            variant={myCommunityRoom.is_active ? "outline" : "default"}
+                            size="sm"
+                            onClick={handleToggleRoomStatus}
+                            disabled={isTogglingRoom}
+                          >
+                            {myCommunityRoom.is_active ? "Disable" : "Activate"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <RoomFormDialog
+                  open={isCreateRoomOpen}
+                  onOpenChange={setIsCreateRoomOpen}
+                  onSubmit={handleCreateRoom}
+                  mode="create"
+                />
+                <RoomFormDialog
+                  open={isEditRoomOpen}
+                  onOpenChange={setIsEditRoomOpen}
+                  onSubmit={handleUpdateRoom}
+                  mode="edit"
+                  initialData={editRoomInitialData}
+                />
+
+                <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm pb-3 -mx-5 px-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1" />
+                    <div className="flex items-center gap-0.5 p-0.5 rounded-md glass-solid shrink-0">
+                      <button
+                        onClick={() => setRoomViewMode("grid")}
+                        className={`p-1.5 rounded transition-colors cursor-pointer ${roomViewMode === "grid" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        <LayoutGrid className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setRoomViewMode("list")}
+                        className={`p-1.5 rounded transition-colors cursor-pointer ${roomViewMode === "list" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        <List className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {isMember && !isGuest && jamAvailability.data.enabled && !myCommunityRoom && !myCommunityRoomLoading && (
+                      <Button variant="default" size="sm" className="shrink-0" onClick={() => setIsCreateRoomOpen(true)}>
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Create Room
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+                    Community Rooms
+                  </h3>
+                  {communityRoomsLoading ? (
+                    <LoadingState message="Loading community rooms..." />
+                  ) : communityRooms.length === 0 ? (
+                    <EmptyState
+                      icon={Music}
+                      title="No community jams"
+                      description={isMember ? "Create a room to start jamming here." : "Join the community to start jamming."}
+                    />
+                  ) : roomViewMode === "grid" ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-stagger">
+                      {communityRooms.map((room) => (
+                        <RoomCard key={room.id} room={room} onClick={(roomHandle) => navigate(`/jam/${roomHandle}`)} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {communityRooms.map((room) => (
+                        <RoomCard key={room.id} room={room} onClick={(roomHandle) => navigate(`/jam/${roomHandle}`)} variant="list" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : (
               <div className="p-4 space-y-3">
                 <SearchInput placeholder="Search members..." value={memberSearch} onSearch={setMemberSearch} />

@@ -53,6 +53,15 @@ function nativeJamErrorMessage(error: unknown) {
   if (message.includes("JAM_SERVER_SECRET_MISSING")) {
     return "Jam server secret is missing.";
   }
+  if (message.includes("COMMUNITY_JAM_SERVER_NOT_CONFIGURED")) {
+    return "Community jam server is not configured.";
+  }
+  if (message.includes("COMMUNITY_JAM_SERVER_SECRET_MISSING")) {
+    return "Community jam server secret is missing.";
+  }
+  if (message.includes("COMMUNITY_MEMBERSHIP_REQUIRED")) {
+    return "Join this community before jamming.";
+  }
   if (message.includes("ROOM_INACTIVE")) {
     return "This room is not active.";
   }

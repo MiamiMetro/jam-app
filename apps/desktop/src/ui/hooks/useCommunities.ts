@@ -119,6 +119,30 @@ export const useCommunityCreatedCount = () => {
   return result ?? 0;
 };
 
+export const useCommunityJamServerSettings = (communityId: string, enabled = true) => {
+  const result = useQuery(
+    api.communities.getJamServerSettings,
+    enabled && communityId ? { communityId: communityId as Id<"communities"> } : "skip"
+  );
+
+  return {
+    data: result ?? null,
+    isLoading: result === undefined && enabled && !!communityId,
+  };
+};
+
+export const useCommunityJamAvailability = (communityId: string) => {
+  const result = useQuery(
+    api.communities.getJamAvailability,
+    communityId ? { communityId: communityId as Id<"communities"> } : "skip"
+  );
+
+  return {
+    data: result ?? { enabled: false },
+    isLoading: result === undefined && !!communityId,
+  };
+};
+
 // ============================================
 // Mutations
 // ============================================
@@ -214,6 +238,48 @@ export const useUpdateCommunity = () => {
         tags: variables.tags,
         avatar_url: avatarUrl,
         banner_url: bannerUrl,
+      });
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return {
+    mutate: (variables: Parameters<typeof run>[0], options?: MutationOptions) => {
+      run(variables)
+        .then(() => options?.onSuccess?.())
+        .catch((error) => options?.onError?.(error as Error));
+    },
+    mutateAsync: run,
+    isPending,
+  };
+};
+
+export const useUpdateCommunityJamServerSettings = () => {
+  const updateMutation = useMutation(api.communities.updateJamServerSettings);
+  const [isPending, setIsPending] = useState(false);
+
+  const run = async (variables: {
+    communityId: string;
+    enabled: boolean;
+    name: string;
+    host: string;
+    port: number;
+    serverId: string;
+    joinSecret?: string;
+    region?: string;
+  }) => {
+    setIsPending(true);
+    try {
+      return await updateMutation({
+        communityId: variables.communityId as Id<"communities">,
+        enabled: variables.enabled,
+        name: variables.name,
+        host: variables.host,
+        port: variables.port,
+        serverId: variables.serverId,
+        joinSecret: variables.joinSecret,
+        region: variables.region,
       });
     } finally {
       setIsPending(false);

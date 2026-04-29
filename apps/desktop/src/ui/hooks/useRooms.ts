@@ -37,10 +37,48 @@ export function useMyRoom() {
   };
 }
 
+export function useMyCommunityRoom(communityId: string | undefined) {
+  const { isGuest } = useAuthStore();
+  const { isAuthSet } = useConvexAuthStore();
+  const { isProfileReady } = useProfileStore();
+  const canQuery = !!communityId && !isGuest && isAuthSet && isProfileReady;
+
+  const data = useQuery(
+    api.rooms.getMyCommunityRoom,
+    canQuery ? { communityId: communityId as Id<"communities"> } : "skip"
+  );
+  return {
+    data: data ?? null,
+    isLoading: data === undefined && canQuery,
+  };
+}
+
 export function useActiveRooms(genre?: string, search?: string) {
   const result = usePaginatedQuery(
     api.rooms.listActivePaginated,
     { genre, search },
+    { initialNumItems: 20 }
+  );
+
+  return {
+    data: result.results,
+    isLoading: result.status === "LoadingFirstPage",
+    hasNextPage: result.status === "CanLoadMore",
+    isFetchingNextPage: result.status === "LoadingMore",
+    fetchNextPage: () => result.loadMore(20),
+  };
+}
+
+export function useCommunityRooms(
+  communityId: string | undefined,
+  genre?: string,
+  search?: string
+) {
+  const result = usePaginatedQuery(
+    api.rooms.listCommunityRoomsPaginated,
+    communityId
+      ? { communityId: communityId as Id<"communities">, genre, search }
+      : "skip",
     { initialNumItems: 20 }
   );
 

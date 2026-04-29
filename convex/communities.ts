@@ -1,8 +1,10 @@
 import { query, mutation } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
+import { Presence } from "@convex-dev/presence";
 import type { Id, Doc } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
+import { components } from "./_generated/api";
 import {
   extractManagedMediaObjectKeyFromUrl,
   resolvePublicMediaUrl,
@@ -24,6 +26,8 @@ import { checkRateLimit } from "./rateLimiter";
 // ============================================
 // Community Constants
 // ============================================
+
+const presence = new Presence(components.presence);
 
 export const COMMUNITY_THEME_COLORS = [
   "amber",
@@ -65,6 +69,108 @@ export type CommunityTag = (typeof COMMUNITY_TAGS)[number];
 
 const MAX_OWNED_COMMUNITIES = 3;
 const MAX_COMMUNITY_TAGS = 5;
+const ACTIVE_JAM_EDIT_BLOCK_WINDOW_MS = 90 * 1000;
+
+function roomPresenceId(roomId: string) {
+  return `room:${roomId}`;
+}
+
+function sanitizeServerField(value: string, field: string) {
+  const sanitized = sanitizeText(value) ?? "";
+  if (!sanitized.trim()) throw new Error(`${field}_REQUIRED`);
+  return sanitized.trim();
+}
+
+function validateJamServerHost(value: string) {
+  const host = sanitizeServerField(value, "SERVER_HOST");
+  if (
+    host.includes("://") ||
+    host.includes("/") ||
+    host.includes("?") ||
+    host.includes("#") ||
+    host.includes(":")
+  ) {
+    throw new Error("INVALID_SERVER_HOST: Enter a hostname or IP without protocol, path, or port");
+  }
+  if (!/^[a-zA-Z0-9.-]+$/.test(host)) {
+    throw new Error("INVALID_SERVER_HOST: Enter a valid hostname or IP");
+  }
+  return host;
+}
+
+async function getCommunityServer(ctx: QueryCtx | MutationCtx, communityId: Id<"communities">) {
+  const enabled = await ctx.db
+    .query("jam_servers")
+    .withIndex("by_community_status", (q) =>
+      q.eq("communityId", communityId).eq("status", "enabled")
+    )
+    .filter((q) => q.eq(q.field("kind"), "community"))
+    .first();
+  if (enabled) return enabled;
+
+  return await ctx.db
+    .query("jam_servers")
+    .withIndex("by_community_status", (q) =>
+      q.eq("communityId", communityId).eq("status", "disabled")
+    )
+    .filter((q) => q.eq(q.field("kind"), "community"))
+    .first();
+}
+
+async function hasActiveJamSessionsForServer(
+  ctx: QueryCtx | MutationCtx,
+  jamServerId: Id<"jam_servers">
+) {
+  const now = Date.now();
+  const activeAfter = now - ACTIVE_JAM_EDIT_BLOCK_WINDOW_MS;
+  const activeSessions = await ctx.db
+    .query("jam_sessions")
+    .filter((q) =>
+      q.and(
+        q.eq(q.field("jamServerId"), jamServerId),
+        q.eq(q.field("status"), "active"),
+        q.gt(q.field("expiresAt"), now),
+        q.gt(q.field("lastRefreshAt"), activeAfter)
+      )
+    )
+    .take(1);
+  return activeSessions.length > 0;
+}
+
+async function hasActiveCommunityRoomPresence(
+  ctx: QueryCtx | MutationCtx,
+  communityId: Id<"communities">
+) {
+  const rooms = await ctx.db
+    .query("rooms")
+    .withIndex("by_community_active", (q) =>
+      q.eq("communityId", communityId).eq("isActive", true)
+    )
+    .take(50);
+
+  for (const room of rooms) {
+    const onlineUsers = await presence.listRoom(
+      ctx,
+      roomPresenceId(String(room._id)),
+      true
+    );
+    if (onlineUsers.length > 0) return true;
+  }
+
+  return false;
+}
+
+async function isCommunityJamEditBlocked(
+  ctx: QueryCtx | MutationCtx,
+  communityId: Id<"communities">,
+  jamServerId: Id<"jam_servers">
+) {
+  return (
+    await hasActiveJamSessionsForServer(ctx, jamServerId)
+  ) || (
+    await hasActiveCommunityRoomPresence(ctx, communityId)
+  );
+}
 
 // ============================================
 // Internal Format Helper
@@ -248,6 +354,72 @@ export const getMembersPaginated = query({
     ).filter(Boolean);
 
     return { ...result, page };
+  },
+});
+
+/**
+ * Get safe community jam server settings for the owner UI.
+ * The join secret is write-only and is never returned.
+ */
+export const getJamServerSettings = query({
+  args: { communityId: v.id("communities") },
+  handler: async (ctx, args) => {
+    const profile = await getCurrentProfile(ctx);
+    if (!profile) return null;
+
+    const community = await ctx.db.get(args.communityId);
+    if (!community) return null;
+    if (community.ownerId !== profile._id) return null;
+
+    const server = await getCommunityServer(ctx, args.communityId);
+    if (!server) {
+      return {
+        enabled: false,
+        name: "",
+        host: "",
+        port: 9999,
+        serverId: "",
+        region: "",
+        hasSecret: false,
+        activeEditBlocked: false,
+      };
+    }
+
+    return {
+      enabled: server.status === "enabled",
+      name: server.name,
+      host: server.host,
+      port: server.port,
+      serverId: server.serverId,
+      region: server.region ?? "",
+      hasSecret: server.joinSecret.trim().length > 0,
+      activeEditBlocked: await isCommunityJamEditBlocked(
+        ctx,
+        args.communityId,
+        server._id
+      ),
+    };
+  },
+});
+
+/** Public-safe community jam availability. Does not expose server details or secrets. */
+export const getJamAvailability = query({
+  args: { communityId: v.id("communities") },
+  handler: async (ctx, args) => {
+    const community = await ctx.db.get(args.communityId);
+    if (!community) return { enabled: false };
+
+    const server = await ctx.db
+      .query("jam_servers")
+      .withIndex("by_community_status", (q) =>
+        q.eq("communityId", args.communityId).eq("status", "enabled")
+      )
+      .filter((q) => q.eq(q.field("kind"), "community"))
+      .first();
+
+    return {
+      enabled: !!server && server.joinSecret.trim().length > 0,
+    };
   },
 });
 
@@ -568,6 +740,82 @@ export const update = mutation({
     if (!updated) throw new Error("Community not found after update");
 
     return await formatCommunity(ctx, updated, profile._id);
+  },
+});
+
+/**
+ * Update community jam server settings (owner only).
+ * The join secret is write-only; omit it to keep the existing secret.
+ */
+export const updateJamServerSettings = mutation({
+  args: {
+    communityId: v.id("communities"),
+    enabled: v.boolean(),
+    name: v.string(),
+    host: v.string(),
+    port: v.number(),
+    serverId: v.string(),
+    joinSecret: v.optional(v.string()),
+    region: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const profile = await requireAuth(ctx);
+    await checkRateLimit(ctx, "updateCommunity", profile._id);
+
+    const community = await ctx.db.get(args.communityId);
+    if (!community) throw new Error("COMMUNITY_NOT_FOUND");
+    if (community.ownerId !== profile._id) {
+      throw new Error("UNAUTHORIZED: Only the owner can edit jam server settings");
+    }
+
+    const existing = await getCommunityServer(ctx, args.communityId);
+    if (existing && await isCommunityJamEditBlocked(ctx, args.communityId, existing._id)) {
+      throw new Error("COMMUNITY_JAM_SERVER_ACTIVE_EDIT_BLOCKED");
+    }
+
+    const name = sanitizeServerField(args.name, "SERVER_NAME");
+    const host = validateJamServerHost(args.host);
+    const serverId = sanitizeServerField(args.serverId, "SERVER_ID");
+    const region = sanitizeText(args.region)?.trim() || undefined;
+    if (args.port < 1 || args.port > 65535) {
+      throw new Error("INVALID_PORT: Port must be between 1 and 65535");
+    }
+
+    const now = Date.now();
+    const status = args.enabled ? "enabled" as const : "disabled" as const;
+    const nextSecret = args.joinSecret?.trim();
+
+    if (!existing) {
+      if (!nextSecret) throw new Error("COMMUNITY_JAM_SERVER_SECRET_REQUIRED");
+      await ctx.db.insert("jam_servers", {
+        kind: "community",
+        communityId: args.communityId,
+        status,
+        serverId,
+        name,
+        host,
+        port: args.port,
+        joinSecret: nextSecret,
+        priority: 0,
+        region,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else {
+      const patch: Partial<Doc<"jam_servers">> = {
+        status,
+        serverId,
+        name,
+        host,
+        port: args.port,
+        region,
+        updatedAt: now,
+      };
+      if (nextSecret) patch.joinSecret = nextSecret;
+      await ctx.db.patch(existing._id, patch);
+    }
+
+    return { success: true };
   },
 });
 

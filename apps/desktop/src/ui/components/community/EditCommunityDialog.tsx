@@ -4,7 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useUpdateCommunity, type Community } from "@/hooks/useCommunities";
+import {
+  useCommunityJamServerSettings,
+  useUpdateCommunity,
+  useUpdateCommunityJamServerSettings,
+  type Community,
+} from "@/hooks/useCommunities";
 import { COMMUNITY_THEME_COLOR_KEYS, COMMUNITY_TAGS, getCommunityColors } from "@/lib/communityColors";
 
 interface EditCommunityDialogProps {
@@ -15,6 +20,8 @@ interface EditCommunityDialogProps {
 
 export function EditCommunityDialog({ open, onOpenChange, community }: EditCommunityDialogProps) {
   const updateMutation = useUpdateCommunity();
+  const jamSettings = useCommunityJamServerSettings(community.id, open);
+  const updateJamSettings = useUpdateCommunityJamServerSettings();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -25,6 +32,14 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [pendingBannerFile, setPendingBannerFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [jamEnabled, setJamEnabled] = useState(false);
+  const [jamName, setJamName] = useState("");
+  const [jamHost, setJamHost] = useState("");
+  const [jamPort, setJamPort] = useState(9999);
+  const [jamServerId, setJamServerId] = useState("");
+  const [jamRegion, setJamRegion] = useState("");
+  const [jamSecret, setJamSecret] = useState("");
+  const [jamError, setJamError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -41,6 +56,19 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
     setPendingBannerFile(null);
     setError(null);
   }, [community?.id, open]);
+
+  useEffect(() => {
+    const settings = jamSettings.data;
+    if (!settings) return;
+    setJamEnabled(settings.enabled);
+    setJamName(settings.name);
+    setJamHost(settings.host);
+    setJamPort(settings.port);
+    setJamServerId(settings.serverId);
+    setJamRegion(settings.region);
+    setJamSecret("");
+    setJamError(null);
+  }, [jamSettings.data, open]);
 
   const handlePickImage = (kind: "avatar" | "banner", file: File) => {
     const objectUrl = URL.createObjectURL(file);
@@ -81,6 +109,42 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
       onOpenChange(false);
     } catch (err: any) {
       setError(err?.message || "Failed to update community.");
+    }
+  };
+
+  const jamErrorMessage = (err: any) => {
+    const message = err?.message || "";
+    if (message.includes("COMMUNITY_JAM_SERVER_ACTIVE_EDIT_BLOCKED")) {
+      return "Stop active jam sessions before changing server settings.";
+    }
+    if (message.includes("COMMUNITY_JAM_SERVER_SECRET_REQUIRED")) {
+      return "Set a join secret before saving jam settings.";
+    }
+    if (message.includes("INVALID_PORT")) {
+      return "Port must be between 1 and 65535.";
+    }
+    if (message.includes("INVALID_SERVER_HOST")) {
+      return "Enter a hostname or IP without protocol, path, or port.";
+    }
+    return message || "Failed to update jam settings.";
+  };
+
+  const handleSaveJamSettings = async () => {
+    setJamError(null);
+    try {
+      await updateJamSettings.mutateAsync({
+        communityId: community.id,
+        enabled: jamEnabled,
+        name: jamName.trim(),
+        host: jamHost.trim(),
+        port: jamPort,
+        serverId: jamServerId.trim(),
+        joinSecret: jamSecret.trim() || undefined,
+        region: jamRegion.trim() || undefined,
+      });
+      setJamSecret("");
+    } catch (err: any) {
+      setJamError(jamErrorMessage(err));
     }
   };
 
@@ -238,6 +302,124 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Jam server settings */}
+          <div className="space-y-3 rounded-lg border border-border/60 p-3 glass-solid">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Jam Server</p>
+                <p className="text-xs text-muted-foreground">
+                  Community-hosted performer rooms use this SFU.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setJamEnabled((value) => !value)}
+                disabled={jamSettings.data?.activeEditBlocked}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  jamEnabled
+                    ? "bg-primary/20 text-primary"
+                    : "bg-muted text-muted-foreground"
+                } disabled:opacity-50`}
+              >
+                {jamEnabled ? "Enabled" : "Disabled"}
+              </button>
+            </div>
+
+            {jamSettings.data?.activeEditBlocked && (
+              <p className="text-xs text-amber-400">
+                Stop active jam sessions before changing server settings.
+              </p>
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Name</label>
+                <Input
+                  value={jamName}
+                  onChange={(e) => setJamName(e.target.value)}
+                  disabled={jamSettings.data?.activeEditBlocked}
+                  placeholder="Community SFU"
+                  className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Server ID</label>
+                <Input
+                  value={jamServerId}
+                  onChange={(e) => setJamServerId(e.target.value)}
+                  disabled={jamSettings.data?.activeEditBlocked}
+                  placeholder="my-community"
+                  className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Host</label>
+                <Input
+                  value={jamHost}
+                  onChange={(e) => setJamHost(e.target.value)}
+                  disabled={jamSettings.data?.activeEditBlocked}
+                  placeholder="127.0.0.1"
+                  className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">UDP Port</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={jamPort}
+                  onChange={(e) => setJamPort(Number(e.target.value))}
+                  disabled={jamSettings.data?.activeEditBlocked}
+                  className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Region</label>
+                <Input
+                  value={jamRegion}
+                  onChange={(e) => setJamRegion(e.target.value)}
+                  disabled={jamSettings.data?.activeEditBlocked}
+                  placeholder="optional"
+                  className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">
+                  Join Secret {jamSettings.data?.hasSecret ? "(set)" : ""}
+                </label>
+                <Input
+                  type="password"
+                  value={jamSecret}
+                  onChange={(e) => setJamSecret(e.target.value)}
+                  disabled={jamSettings.data?.activeEditBlocked}
+                  placeholder={jamSettings.data?.hasSecret ? "Leave blank to keep" : "Required"}
+                  className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
+                />
+              </div>
+            </div>
+
+            {jamError && <p className="text-sm text-destructive">{jamError}</p>}
+
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={
+                  updateJamSettings.isPending ||
+                  jamSettings.data?.activeEditBlocked ||
+                  !jamName.trim() ||
+                  !jamHost.trim() ||
+                  !jamServerId.trim()
+                }
+                onClick={handleSaveJamSettings}
+              >
+                {updateJamSettings.isPending ? "Saving..." : "Save Jam Settings"}
+              </Button>
             </div>
           </div>
 

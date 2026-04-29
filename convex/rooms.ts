@@ -40,6 +40,10 @@ function roomPresenceId(roomId: string) {
   return `room:${roomId}`;
 }
 
+function roomScopeKey(communityId?: Id<"communities">) {
+  return communityId ? `community:${communityId}` : "global";
+}
+
 function toHex(bytes: ArrayBuffer): string {
   return Array.from(new Uint8Array(bytes))
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -81,6 +85,40 @@ async function requireRoomAccess(
   if (!friends) throw new Error("PRIVATE_ROOM");
 }
 
+async function getCommunityMembership(
+  ctx: QueryCtx | MutationCtx,
+  communityId: Id<"communities">,
+  profileId: Id<"profiles">
+) {
+  return await ctx.db
+    .query("community_members")
+    .withIndex("by_community_and_profile", (q) =>
+      q.eq("communityId", communityId).eq("profileId", profileId)
+    )
+    .first();
+}
+
+async function requireCommunityMembership(
+  ctx: QueryCtx | MutationCtx,
+  communityId: Id<"communities">,
+  profileId: Id<"profiles">
+) {
+  const membership = await getCommunityMembership(ctx, communityId, profileId);
+  if (!membership) throw new Error("COMMUNITY_MEMBERSHIP_REQUIRED");
+  return membership;
+}
+
+async function requirePerformerRoomAccess(
+  ctx: QueryCtx | MutationCtx,
+  profile: Doc<"profiles">,
+  room: Doc<"rooms">
+) {
+  await requireRoomAccess(ctx, profile, room);
+  if (room.communityId) {
+    await requireCommunityMembership(ctx, room.communityId, profile._id);
+  }
+}
+
 async function selectOfficialJamServer(ctx: MutationCtx) {
   const server = await ctx.db
     .query("jam_servers")
@@ -92,6 +130,23 @@ async function selectOfficialJamServer(ctx: MutationCtx) {
 
   if (!server) throw new Error("JAM_SERVER_NOT_CONFIGURED");
   if (!server.joinSecret.trim()) throw new Error("JAM_SERVER_SECRET_MISSING");
+  return server;
+}
+
+async function selectCommunityJamServer(
+  ctx: MutationCtx,
+  communityId: Id<"communities">
+) {
+  const server = await ctx.db
+    .query("jam_servers")
+    .withIndex("by_community_status", (q) =>
+      q.eq("communityId", communityId).eq("status", "enabled")
+    )
+    .filter((q) => q.eq(q.field("kind"), "community"))
+    .first();
+
+  if (!server) throw new Error("COMMUNITY_JAM_SERVER_NOT_CONFIGURED");
+  if (!server.joinSecret.trim()) throw new Error("COMMUNITY_JAM_SERVER_SECRET_MISSING");
   return server;
 }
 
@@ -166,7 +221,36 @@ export const getMyRoom = query({
 
     const room = await ctx.db
       .query("rooms")
-      .withIndex("by_host", (q) => q.eq("hostId", currentProfile._id))
+      .withIndex("by_host_scope", (q) =>
+        q.eq("hostId", currentProfile._id).eq("scopeKey", "global")
+      )
+      .first();
+
+    const fallbackRoom =
+      room ??
+      (await ctx.db
+        .query("rooms")
+        .withIndex("by_host", (q) => q.eq("hostId", currentProfile._id))
+        .filter((q) => q.eq(q.field("communityId"), undefined))
+        .first());
+
+    if (!fallbackRoom) return null;
+    return await formatRoom(ctx, fallbackRoom);
+  },
+});
+
+/** Get the current user's room in a community */
+export const getMyCommunityRoom = query({
+  args: { communityId: v.id("communities") },
+  handler: async (ctx, args) => {
+    const currentProfile = await getCurrentProfile(ctx);
+    if (!currentProfile) return null;
+
+    const room = await ctx.db
+      .query("rooms")
+      .withIndex("by_host_scope", (q) =>
+        q.eq("hostId", currentProfile._id).eq("scopeKey", roomScopeKey(args.communityId))
+      )
       .first();
 
     if (!room) return null;
@@ -185,6 +269,45 @@ export const listActivePaginated = query({
     const result = await ctx.db
       .query("rooms")
       .withIndex("by_active", (q) => q.eq("isActive", true))
+      .order("desc")
+      .paginate(args.paginationOpts);
+
+    let filtered = result.page.filter((r) => !r.communityId);
+
+    if (args.genre && args.genre.trim().length > 0) {
+      const genre = args.genre.trim();
+      filtered = filtered.filter((r) => r.genre === genre);
+    }
+
+    if (args.search && args.search.trim().length > 0) {
+      const searchLower = args.search.trim().toLowerCase();
+      filtered = filtered.filter(
+        (r) =>
+          r.name.toLowerCase().includes(searchLower) ||
+          (r.description ?? "").toLowerCase().includes(searchLower) ||
+          r.handle.toLowerCase().includes(searchLower)
+      );
+    }
+
+    const page = await Promise.all(filtered.map((room) => formatRoom(ctx, room)));
+    return { ...result, page };
+  },
+});
+
+/** List active rooms scoped to a community */
+export const listCommunityRoomsPaginated = query({
+  args: {
+    communityId: v.id("communities"),
+    paginationOpts: paginationOptsValidator,
+    genre: v.optional(v.string()),
+    search: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query("rooms")
+      .withIndex("by_community_active", (q) =>
+        q.eq("communityId", args.communityId).eq("isActive", true)
+      )
       .order("desc")
       .paginate(args.paginationOpts);
 
@@ -315,6 +438,7 @@ export const getFriendsInRooms = query({
       const actualRoomId = roomPresence.roomId.replace("room:", "") as Id<"rooms">;
       const room = await ctx.db.get(actualRoomId);
       if (!room || !room.isActive) continue;
+      if (room.communityId) continue;
 
       const friendProfile = await ctx.db.get(friendship.friendId);
       if (!friendProfile) continue;
@@ -351,12 +475,34 @@ export const create = mutation({
     const profile = await requireAuth(ctx);
     await checkRateLimit(ctx, "roomCreate", profile._id);
 
+    if (args.communityId) {
+      await requireCommunityMembership(ctx, args.communityId, profile._id);
+      await selectCommunityJamServer(ctx, args.communityId);
+    }
+    const scopeKey = roomScopeKey(args.communityId);
     const existingRoom = await ctx.db
       .query("rooms")
-      .withIndex("by_host", (q) => q.eq("hostId", profile._id))
+      .withIndex("by_host_scope", (q) =>
+        q.eq("hostId", profile._id).eq("scopeKey", scopeKey)
+      )
       .first();
     if (existingRoom) {
-      throw new Error("ROOM_LIMIT_REACHED: You can only host one room at a time");
+      throw new Error(
+        args.communityId
+          ? "ROOM_LIMIT_REACHED: You can only host one room in this community"
+          : "ROOM_LIMIT_REACHED: You can only host one global room"
+      );
+    }
+
+    if (!args.communityId) {
+      const legacyGlobalRoom = await ctx.db
+        .query("rooms")
+        .withIndex("by_host", (q) => q.eq("hostId", profile._id))
+        .filter((q) => q.eq(q.field("communityId"), undefined))
+        .first();
+      if (legacyGlobalRoom) {
+        throw new Error("ROOM_LIMIT_REACHED: You can only host one global room");
+      }
     }
 
     const normalizedHandle = validateRoomHandle(args.handle);
@@ -405,6 +551,7 @@ export const create = mutation({
       streamUrl: MOCK_STREAM_URL,
       status: "idle",
       communityId: args.communityId,
+      scopeKey,
       lastActiveAt: Date.now(),
     });
 
@@ -550,7 +697,7 @@ export const createPerformerJoinToken = mutation({
     const profile = await requireAuth(ctx);
     const room = await ctx.db.get(args.roomId);
     if (!room) throw new Error("ROOM_NOT_FOUND");
-    await requireRoomAccess(ctx, profile, room);
+    await requirePerformerRoomAccess(ctx, profile, room);
 
     const now = Date.now();
     let session = await getActiveJamSession(ctx, args.roomId);
@@ -571,7 +718,9 @@ export const createPerformerJoinToken = mutation({
     }
 
     if (!server) {
-      server = await selectOfficialJamServer(ctx);
+      server = room.communityId
+        ? await selectCommunityJamServer(ctx, room.communityId)
+        : await selectOfficialJamServer(ctx);
     } else if (!server.joinSecret.trim()) {
       throw new Error("JAM_SERVER_SECRET_MISSING");
     }
@@ -655,7 +804,7 @@ export const refreshJamSession = mutation({
       await ctx.db.patch(args.sessionId, { status: "expired" });
       return { refreshed: false };
     }
-    await requireRoomAccess(ctx, profile, room);
+    await requirePerformerRoomAccess(ctx, profile, room);
 
     const now = Date.now();
     if (session.expiresAt <= now) {
