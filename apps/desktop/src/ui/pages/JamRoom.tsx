@@ -39,6 +39,7 @@ import { usePostAudio } from "@/contexts/PostAudioContext";
 import { Timestamp } from "@/components/Timestamp";
 import { LoadingState } from "@/components/LoadingState";
 import { EmptyState } from "@/components/EmptyState";
+import { censorText } from "@/lib/bannedWords";
 
 interface JamRoomProps {
   roomHandle?: string;
@@ -85,6 +86,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const disconnectPresence = useDisconnectPresence();
   const createPerformerJoinToken = useCreatePerformerJoinToken();
   const refreshJamSession = useRefreshJamSession();
+  const censorshipEnabled = useUIStore((s) => s.censorshipEnabled);
   const [message, setMessage] = useState("");
   const [clientError, setClientError] = useState<string | null>(null);
   const [isPerforming, setIsPerforming] = useState(false);
@@ -710,7 +712,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
                       <p
                         className={`text-sm whitespace-pre-wrap break-words ${showHeader ? "pl-8" : ""}`}
                       >
-                        {msg.text}
+                        {censorText(msg.text, censorshipEnabled)}
                       </p>
                     </div>
                   );

@@ -1,5 +1,7 @@
 import { Fragment } from "react";
 import { Link } from "./Link";
+import { censorText } from "@/lib/bannedWords";
+import { useUIStore } from "@/stores/uiStore";
 
 interface AutoLinkedTextProps {
   text: string;
@@ -11,6 +13,7 @@ interface AutoLinkedTextProps {
  * Component that automatically detects URLs in text and converts them to clickable links.
  * Internal links (starting with /) navigate within the app.
  * External links (http/https) open in the default browser.
+ * When censorship is enabled, banned words are replaced with "***".
  *
  * @example
  * ```tsx
@@ -21,9 +24,12 @@ interface AutoLinkedTextProps {
  * ```
  */
 export function AutoLinkedText({ text, className, linkClassName = "text-blue-500 hover:underline" }: AutoLinkedTextProps) {
+  const censorshipEnabled = useUIStore((s) => s.censorshipEnabled);
+  const processedText = censorText(text, censorshipEnabled);
+
   // Regex to match URLs and internal paths
   const urlRegex = /(https?:\/\/[^\s]+)|(\/[^\s]*)/g;
-  const parts = text.split(urlRegex).filter(Boolean);
+  const parts = processedText.split(urlRegex).filter(Boolean);
 
   return (
     <span className={className}>

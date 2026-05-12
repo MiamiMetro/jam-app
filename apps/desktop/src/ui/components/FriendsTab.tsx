@@ -28,6 +28,8 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import UserSearchPanel from "@/components/social/UserSearchPanel";
 import FriendRequestsPanel from "@/components/social/FriendRequestsPanel";
 import type { User } from "@/lib/api/types";
+import { censorText } from "@/lib/bannedWords";
+import { useUIStore } from "@/stores/uiStore";
 
 type LeftView = "conversations" | "search" | "requests";
 
@@ -46,6 +48,7 @@ function getPresenceBadgeClass(status: PresenceStatus) {
 function FriendsTab() {
   const { isGuest, user } = useAuthStore();
   const { openLogin } = useAuthModalStore();
+  const censorshipEnabled = useUIStore((s) => s.censorshipEnabled);
   const [leftView, setLeftView] = useState<LeftView>("conversations");
   const [friendSearch, setFriendSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
@@ -312,7 +315,7 @@ function FriendsTab() {
                                 ? "text-foreground font-medium"
                                 : "text-muted-foreground"
                             }`}>
-                              {conversation.lastMessage.content}
+                              {censorText(conversation.lastMessage.content, censorshipEnabled)}
                             </p>
                           ) : (
                             <p className="text-xs text-muted-foreground/60 mt-0.5">

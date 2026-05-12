@@ -10,6 +10,8 @@ interface UIState {
   toggleRightPanel: () => void;
   currentJamRoomHandle: string | null;
   setCurrentJamRoomHandle: (handle: string | null) => void;
+  censorshipEnabled: boolean;
+  setCensorshipEnabled: (enabled: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -49,6 +51,11 @@ export const useUIStore = create<UIState>((set) => ({
       localStorage.removeItem('currentJamRoomHandle');
     }
     set({ currentJamRoomHandle: handle });
+  },
+  censorshipEnabled: localStorage.getItem('censorshipEnabled') === 'true',
+  setCensorshipEnabled: (enabled) => {
+    localStorage.setItem('censorshipEnabled', String(enabled));
+    set({ censorshipEnabled: enabled });
   },
 }));
 

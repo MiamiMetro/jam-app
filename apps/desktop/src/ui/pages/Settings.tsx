@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ShieldAlert, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMe, useSoftDeleteProfile, useUpdateProfile } from "@/hooks/useUsers";
 import { useAuthStore } from "@/stores/authStore";
 import { useConvexAuthStore } from "@/hooks/useConvexAuth";
 import { useProfileStore } from "@/hooks/useEnsureProfile";
+import { useUIStore } from "@/stores/uiStore";
 import { authClient } from "@/lib/auth-client";
+import { Switch } from "@/components/ui/switch";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -16,6 +18,8 @@ export default function Settings() {
   const { setUser, setPendingProfile, setIsGuest } = useAuthStore();
   const updateProfile = useUpdateProfile();
   const softDeleteProfile = useSoftDeleteProfile();
+  const censorshipEnabled = useUIStore((s) => s.censorshipEnabled);
+  const setCensorshipEnabled = useUIStore((s) => s.setCensorshipEnabled);
 
   const [username, setUsername] = useState("");
   const [dmPrivacy, setDmPrivacy] = useState<"friends" | "everyone">("friends");
@@ -215,6 +219,31 @@ export default function Settings() {
                   <span className="text-xs text-destructive">{dmPrivacyError}</span>
                 )}
               </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-border glass-solid p-4 space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Content</h2>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {censorshipEnabled ? (
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                )}
+                <div>
+                  <p className="text-sm font-medium">Sansür (Censorship)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Yasaklı kelimeleri otomatik olarak *** şeklinde maskeler.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={censorshipEnabled}
+                onCheckedChange={(checked: boolean) =>
+                  setCensorshipEnabled(checked)
+                }
+              />
             </div>
           </section>
 
