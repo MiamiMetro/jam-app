@@ -12,8 +12,36 @@ import {
 import { checkRateLimit } from "./rateLimiter";
 import { Presence } from "@convex-dev/presence";
 import { components } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
 
 const presence = new Presence(components.presence);
+
+function roomListenAccess(room: Doc<"rooms">) {
+  return room.listenAccess ?? (room.isPrivate ? "friends" : "anyone");
+}
+
+async function canListenToRoom(
+  ctx: QueryCtx | MutationCtx,
+  profile: Doc<"profiles"> | null,
+  room: Doc<"rooms">
+) {
+  if (room.hostId === profile?._id) return true;
+  const listenAccess = roomListenAccess(room);
+  if (listenAccess === "anyone") return true;
+  if (!profile) return false;
+  if (listenAccess === "friends") {
+    return await areFriends(ctx, profile._id, room.hostId);
+  }
+  return Boolean(
+    await ctx.db
+      .query("room_access_grants")
+      .withIndex("by_room_profile_type", (q) =>
+        q.eq("roomId", room._id).eq("profileId", profile._id).eq("type", "listen")
+      )
+      .first()
+  );
+}
 
 /** Get latest 30 messages for a room — only if room is active (and accessible) */
 export const getLatest = query({
@@ -22,15 +50,8 @@ export const getLatest = query({
     const room = await ctx.db.get(args.roomId);
     if (!room || !room.isActive) return [];
 
-    // Private room: only friends of host (or host) can see messages
-    if (room.isPrivate) {
-      const profile = await getCurrentProfile(ctx);
-      if (!profile) return [];
-      if (profile._id !== room.hostId) {
-        const friends = await areFriends(ctx, profile._id, room.hostId);
-        if (!friends) return [];
-      }
-    }
+    const profile = await getCurrentProfile(ctx);
+    if (!(await canListenToRoom(ctx, profile, room))) return [];
 
     const messages = await ctx.db
       .query("room_messages")
@@ -74,12 +95,8 @@ export const send = mutation({
     if (!room) throw new Error("ROOM_NOT_FOUND");
     if (!room.isActive) throw new Error("ROOM_NOT_ACTIVE");
 
-    // Private room: only friends of host can chat
-    if (room.isPrivate && room.hostId !== profile._id) {
-      const friends = await areFriends(ctx, profile._id, room.hostId);
-      if (!friends) {
-        throw new Error("PRIVATE_ROOM: This room is friends only");
-      }
+    if (!(await canListenToRoom(ctx, profile, room))) {
+      throw new Error("ROOM_ACCESS_REQUIRED: You need access to this room");
     }
 
     // Must have presence in the room (heartbeating)

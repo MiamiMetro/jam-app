@@ -51,6 +51,32 @@ const LISTENER_SRT_PASSPHRASE = envOrDefault(
 import { ROOM_GENRES } from "./shared";
 export { ROOM_GENRES, type RoomGenre } from "./shared";
 
+const roomVisibilityValidator = v.union(
+  v.literal("public"),
+  v.literal("unlisted"),
+  v.literal("private")
+);
+const roomListenAccessValidator = v.union(
+  v.literal("anyone"),
+  v.literal("friends"),
+  v.literal("approved")
+);
+const roomJamAccessValidator = v.union(
+  v.literal("anyone"),
+  v.literal("friends"),
+  v.literal("approved"),
+  v.literal("host")
+);
+const roomAccessRequestTypeValidator = v.union(
+  v.literal("listen"),
+  v.literal("jam")
+);
+const roomAccessDecisionValidator = v.union(
+  v.literal("approved"),
+  v.literal("rejected")
+);
+type RoomAccessType = "listen" | "jam";
+
 /** Presence room ID for a jam room */
 function roomPresenceId(roomId: string) {
   return `room:${roomId}`;
@@ -115,26 +141,108 @@ function requireRoomHost(profile: Doc<"profiles">, room: Doc<"rooms">) {
   if (room.hostId !== profile._id) throw new Error("NOT_HOST");
 }
 
+function roomVisibility(room: Doc<"rooms">) {
+  return room.visibility ?? (room.isPrivate ? "private" : "public");
+}
+
+function roomListenAccess(room: Doc<"rooms">) {
+  return room.listenAccess ?? (room.isPrivate ? "friends" : "anyone");
+}
+
+function roomJamAccess(room: Doc<"rooms">) {
+  return room.jamAccess ?? (room.isPrivate ? "friends" : "anyone");
+}
+
+async function hasRoomGrant(
+  ctx: QueryCtx | MutationCtx,
+  roomId: Id<"rooms">,
+  profileId: Id<"profiles">,
+  type: RoomAccessType
+) {
+  const directGrant = await ctx.db
+    .query("room_access_grants")
+    .withIndex("by_room_profile_type", (q) =>
+      q.eq("roomId", roomId).eq("profileId", profileId).eq("type", type)
+    )
+    .first();
+  if (directGrant) return true;
+  if (type === "listen") return false;
+  return Boolean(
+    await ctx.db
+      .query("room_access_grants")
+      .withIndex("by_room_profile_type", (q) =>
+        q.eq("roomId", roomId).eq("profileId", profileId).eq("type", "listen")
+      )
+      .first()
+  );
+}
+
+async function canListenToRoom(
+  ctx: QueryCtx | MutationCtx,
+  profile: Doc<"profiles"> | null,
+  room: Doc<"rooms">
+) {
+  if (room.hostId === profile?._id) return true;
+  const listenAccess = roomListenAccess(room);
+  if (listenAccess === "anyone") return true;
+  if (!profile) return false;
+  if (listenAccess === "friends") {
+    return await areFriends(ctx, profile._id, room.hostId);
+  }
+  return await hasRoomGrant(ctx, room._id, profile._id, "listen");
+}
+
+async function canJamInRoom(
+  ctx: QueryCtx | MutationCtx,
+  profile: Doc<"profiles">,
+  room: Doc<"rooms">
+) {
+  if (room.hostId === profile._id) return true;
+  const jamAccess = roomJamAccess(room);
+  if (jamAccess === "host") return false;
+  if (jamAccess === "anyone") return true;
+  if (jamAccess === "friends") {
+    return await areFriends(ctx, profile._id, room.hostId);
+  }
+  return await hasRoomGrant(ctx, room._id, profile._id, "jam");
+}
+
+async function getRequestStatus(
+  ctx: QueryCtx | MutationCtx,
+  roomId: Id<"rooms">,
+  profileId: Id<"profiles"> | undefined,
+  type: RoomAccessType
+) {
+  if (!profileId) return null;
+  const request = await ctx.db
+    .query("room_access_requests")
+    .withIndex("by_room_requester_type", (q) =>
+      q.eq("roomId", roomId).eq("requesterId", profileId).eq("type", type)
+    )
+    .first();
+  return request?.status ?? null;
+}
+
 async function requireRoomAccess(
   ctx: QueryCtx | MutationCtx,
   profile: Doc<"profiles">,
   room: Doc<"rooms">
 ) {
   if (!room.isActive) throw new Error("ROOM_INACTIVE");
-  if (!room.isPrivate || room.hostId === profile._id) return;
-  const friends = await areFriends(ctx, profile._id, room.hostId);
-  if (!friends) throw new Error("PRIVATE_ROOM");
+  if (!(await canListenToRoom(ctx, profile, room))) {
+    throw new Error("ROOM_ACCESS_REQUIRED");
+  }
 }
 
 async function canViewRoom(
   ctx: QueryCtx | MutationCtx,
   room: Doc<"rooms">
 ) {
-  if (!room.isPrivate) return true;
+  if (roomVisibility(room) !== "private") return true;
   const profile = await getCurrentProfile(ctx);
   if (!profile) return false;
   if (room.hostId === profile._id) return true;
-  return await areFriends(ctx, profile._id, room.hostId);
+  return await canListenToRoom(ctx, profile, room);
 }
 
 async function filterVisibleRooms(
@@ -177,6 +285,9 @@ async function requirePerformerRoomAccess(
   room: Doc<"rooms">
 ) {
   await requireRoomAccess(ctx, profile, room);
+  if (!(await canJamInRoom(ctx, profile, room))) {
+    throw new Error("JAM_ACCESS_REQUIRED");
+  }
   if (room.communityId) {
     await requireCommunityMembership(ctx, room.communityId, profile._id);
   }
@@ -228,6 +339,11 @@ async function getActiveJamSession(ctx: MutationCtx, roomId: Id<"rooms">) {
 
 async function formatRoom(ctx: QueryCtx | MutationCtx, room: Doc<"rooms">) {
   const host = await ctx.db.get(room.hostId);
+  const currentProfile = await getCurrentProfile(ctx);
+  const canListen = await canListenToRoom(ctx, currentProfile, room);
+  const canJam = currentProfile
+    ? await canJamInRoom(ctx, currentProfile, room)
+    : roomJamAccess(room) === "anyone";
 
   // Get live participant count from presence
   const onlineUsers = await presence.listRoom(
@@ -246,6 +362,25 @@ async function formatRoom(ctx: QueryCtx | MutationCtx, room: Doc<"rooms">) {
     genre: room.genre ?? null,
     max_performers: room.maxPerformers,
     is_private: room.isPrivate,
+    visibility: roomVisibility(room),
+    listen_access: roomListenAccess(room),
+    jam_access: roomJamAccess(room),
+    viewer_access: {
+      can_listen: canListen,
+      can_jam: canJam,
+      listen_request_status: await getRequestStatus(
+        ctx,
+        room._id,
+        currentProfile?._id,
+        "listen"
+      ),
+      jam_request_status: await getRequestStatus(
+        ctx,
+        room._id,
+        currentProfile?._id,
+        "jam"
+      ),
+    },
     is_active: room.isActive,
     stream_url: room.streamUrl ?? null,
     status: room.status,
@@ -353,7 +488,7 @@ export const listActivePaginated = query({
 
     let filtered = await filterVisibleRooms(
       ctx,
-      result.page.filter((r) => !r.communityId)
+      result.page.filter((r) => !r.communityId && roomVisibility(r) === "public")
     );
 
     if (args.genre && args.genre.trim().length > 0) {
@@ -392,7 +527,7 @@ export const listActiveCommunityPaginated = query({
 
     let filtered = await filterVisibleRooms(
       ctx,
-      result.page.filter((r) => r.communityId)
+      result.page.filter((r) => r.communityId && roomVisibility(r) === "public")
     );
 
     if (args.genre && args.genre.trim().length > 0) {
@@ -432,7 +567,10 @@ export const listCommunityRoomsPaginated = query({
       .order("desc")
       .paginate(args.paginationOpts);
 
-    let filtered = await filterVisibleRooms(ctx, result.page);
+    let filtered = await filterVisibleRooms(
+      ctx,
+      result.page.filter((r) => roomVisibility(r) === "public")
+    );
 
     if (args.genre && args.genre.trim().length > 0) {
       const genre = args.genre.trim();
@@ -463,14 +601,9 @@ export const getParticipants = query({
     const room = await ctx.db.get(args.roomId);
     if (!room || !room.isActive) return { participants: [], total_count: 0 };
 
-    // Private room: only friends of host (or host) can see participants
-    if (room.isPrivate) {
-      const profile = await getCurrentProfile(ctx);
-      if (!profile) return { participants: [], total_count: 0 };
-      if (profile._id !== room.hostId) {
-        const friends = await areFriends(ctx, profile._id, room.hostId);
-        if (!friends) return { participants: [], total_count: 0 };
-      }
+    const profile = await getCurrentProfile(ctx);
+    if (!(await canListenToRoom(ctx, profile, room))) {
+      return { participants: [], total_count: 0 };
     }
 
     const onlineUsers = await presence.listRoom(
@@ -577,6 +710,61 @@ export const getFriendsInRooms = query({
   },
 });
 
+export const getModeration = query({
+  args: { roomId: v.id("rooms") },
+  handler: async (ctx, args) => {
+    const profile = await getCurrentProfile(ctx);
+    if (!profile) return { pending: [], approved: [] };
+    const room = await ctx.db.get(args.roomId);
+    if (!room || room.hostId !== profile._id) {
+      return { pending: [], approved: [] };
+    }
+
+    const requests = await ctx.db
+      .query("room_access_requests")
+      .withIndex("by_room_status", (q) =>
+        q.eq("roomId", args.roomId).eq("status", "pending")
+      )
+      .collect();
+    const grants = await ctx.db
+      .query("room_access_grants")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .collect();
+
+    const pending = await Promise.all(
+      requests.map(async (request) => {
+        const requester = await ctx.db.get(request.requesterId);
+        return {
+          id: request._id,
+          type: request.type,
+          status: request.status,
+          requester: requester ? formatPublicProfileIdentity(requester) : null,
+          requested_at: new Date(request._creationTime).toISOString(),
+        };
+      })
+    );
+
+    const approved = await Promise.all(
+      grants.map(async (grant) => {
+        const grantedProfile = await ctx.db.get(grant.profileId);
+        return {
+          id: grant._id,
+          type: grant.type,
+          profile: grantedProfile
+            ? formatPublicProfileIdentity(grantedProfile)
+            : null,
+          granted_at: new Date(grant.grantedAt).toISOString(),
+        };
+      })
+    );
+
+    return {
+      pending: pending.filter((item) => item.requester !== null),
+      approved: approved.filter((item) => item.profile !== null),
+    };
+  },
+});
+
 // ============================================
 // Mutations
 // ============================================
@@ -590,6 +778,9 @@ export const create = mutation({
     genre: v.optional(v.string()),
     maxPerformers: v.optional(v.number()),
     isPrivate: v.optional(v.boolean()),
+    visibility: v.optional(roomVisibilityValidator),
+    listenAccess: v.optional(roomListenAccessValidator),
+    jamAccess: v.optional(roomJamAccessValidator),
     communityId: v.optional(v.id("communities")),
   },
   handler: async (ctx, args) => {
@@ -660,6 +851,13 @@ export const create = mutation({
       throw new Error("HANDLE_TAKEN: This handle is already in use");
     }
 
+    const visibility =
+      args.visibility ?? (args.isPrivate ? "private" : "public");
+    const listenAccess =
+      args.listenAccess ?? (args.isPrivate ? "friends" : "anyone");
+    const jamAccess =
+      args.jamAccess ?? (args.isPrivate ? "friends" : "anyone");
+
     const roomId = await ctx.db.insert("rooms", {
       hostId: profile._id,
       handle: normalizedHandle,
@@ -667,7 +865,10 @@ export const create = mutation({
       description,
       genre: args.genre,
       maxPerformers,
-      isPrivate: args.isPrivate ?? false,
+      isPrivate: visibility === "private",
+      visibility,
+      listenAccess,
+      jamAccess,
       isActive: true,
       status: "idle",
       listenerStatus: "off",
@@ -689,6 +890,9 @@ export const update = mutation({
     genre: v.optional(v.string()),
     maxPerformers: v.optional(v.number()),
     isPrivate: v.optional(v.boolean()),
+    visibility: v.optional(roomVisibilityValidator),
+    listenAccess: v.optional(roomListenAccessValidator),
+    jamAccess: v.optional(roomJamAccessValidator),
     communityId: v.optional(v.id("communities")),
   },
   handler: async (ctx, args) => {
@@ -736,7 +940,17 @@ export const update = mutation({
       patch.maxPerformers = args.maxPerformers;
     }
 
-    if (args.isPrivate !== undefined) patch.isPrivate = args.isPrivate;
+    if (args.visibility !== undefined) {
+      patch.visibility = args.visibility;
+      patch.isPrivate = args.visibility === "private";
+    } else if (args.isPrivate !== undefined) {
+      patch.isPrivate = args.isPrivate;
+      patch.visibility = args.isPrivate ? "private" : "public";
+      if (args.listenAccess === undefined) patch.listenAccess = args.isPrivate ? "friends" : "anyone";
+      if (args.jamAccess === undefined) patch.jamAccess = args.isPrivate ? "friends" : "anyone";
+    }
+    if (args.listenAccess !== undefined) patch.listenAccess = args.listenAccess;
+    if (args.jamAccess !== undefined) patch.jamAccess = args.jamAccess;
     if (args.communityId !== undefined) patch.communityId = args.communityId;
 
     await ctx.db.patch(args.roomId, patch);
@@ -744,6 +958,114 @@ export const update = mutation({
     const updated = await ctx.db.get(args.roomId);
     if (!updated) throw new Error("Room not found after update");
     return await formatRoom(ctx, updated);
+  },
+});
+
+export const requestAccess = mutation({
+  args: {
+    roomId: v.id("rooms"),
+    type: roomAccessRequestTypeValidator,
+  },
+  handler: async (ctx, args) => {
+    const profile = await requireAuth(ctx);
+    await checkRateLimit(ctx, "roomUpdate", profile._id);
+    const room = await ctx.db.get(args.roomId);
+    if (!room) throw new Error("ROOM_NOT_FOUND");
+    if (room.hostId === profile._id) throw new Error("HOST_ALREADY_ALLOWED");
+
+    const alreadyAllowed =
+      args.type === "listen"
+        ? await canListenToRoom(ctx, profile, room)
+        : await canJamInRoom(ctx, profile, room);
+    if (alreadyAllowed) return { status: "approved" as const };
+
+    const existing = await ctx.db
+      .query("room_access_requests")
+      .withIndex("by_room_requester_type", (q) =>
+        q.eq("roomId", args.roomId).eq("requesterId", profile._id).eq("type", args.type)
+      )
+      .first();
+    const now = Date.now();
+    if (existing) {
+      if (existing.status !== "pending") {
+        await ctx.db.patch(existing._id, {
+          status: "pending",
+          updatedAt: now,
+        });
+      }
+      return { status: "pending" as const };
+    }
+
+    await ctx.db.insert("room_access_requests", {
+      roomId: args.roomId,
+      requesterId: profile._id,
+      type: args.type,
+      status: "pending",
+      updatedAt: now,
+    });
+    return { status: "pending" as const };
+  },
+});
+
+export const decideAccessRequest = mutation({
+  args: {
+    requestId: v.id("room_access_requests"),
+    decision: roomAccessDecisionValidator,
+  },
+  handler: async (ctx, args) => {
+    const profile = await requireAuth(ctx);
+    await checkRateLimit(ctx, "roomUpdate", profile._id);
+    const request = await ctx.db.get(args.requestId);
+    if (!request) throw new Error("REQUEST_NOT_FOUND");
+    const room = await ctx.db.get(request.roomId);
+    if (!room) throw new Error("ROOM_NOT_FOUND");
+    requireRoomHost(profile, room);
+
+    const now = Date.now();
+    await ctx.db.patch(request._id, {
+      status: args.decision,
+      decidedBy: profile._id,
+      decidedAt: now,
+      updatedAt: now,
+    });
+
+    if (args.decision === "approved") {
+      const existingGrant = await ctx.db
+        .query("room_access_grants")
+        .withIndex("by_room_profile_type", (q) =>
+          q
+            .eq("roomId", request.roomId)
+            .eq("profileId", request.requesterId)
+            .eq("type", request.type)
+        )
+        .first();
+      if (!existingGrant) {
+        await ctx.db.insert("room_access_grants", {
+          roomId: request.roomId,
+          profileId: request.requesterId,
+          type: request.type,
+          grantedBy: profile._id,
+          grantedAt: now,
+        });
+      }
+    }
+
+    return { success: true };
+  },
+});
+
+export const revokeAccessGrant = mutation({
+  args: { grantId: v.id("room_access_grants") },
+  handler: async (ctx, args) => {
+    const profile = await requireAuth(ctx);
+    await checkRateLimit(ctx, "roomUpdate", profile._id);
+    const grant = await ctx.db.get(args.grantId);
+    if (!grant) return { success: true };
+    const room = await ctx.db.get(grant.roomId);
+    if (!room) throw new Error("ROOM_NOT_FOUND");
+    requireRoomHost(profile, room);
+    await ctx.db.delete(grant._id);
+    return { success: true };
   },
 });
 

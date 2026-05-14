@@ -20,7 +20,7 @@ export default function JamItem({ onPress, room }: Props) {
     isLive ? "Live" : "Open",
     room.description,
     `${room.participant_count} listeners`,
-    `${room.max_performers} performers`,
+    `${room.max_performers} max performers`,
     room.stream_url ? "Stream ready" : null,
     `Host ${hostName}`,
     room.genre,
@@ -95,7 +95,7 @@ export default function JamItem({ onPress, room }: Props) {
 
       <View style={styles.metaGrid}>
         <MetaItem icon="people-outline" label={`${room.participant_count} listeners`} />
-        <MetaItem icon="person-add-outline" label={`${room.max_performers} performers`} />
+        <MetaItem icon="person-add-outline" label={`${room.max_performers} max performers`} />
         <MetaItem icon="time-outline" label={formatRelativeTime(room.last_active_at)} />
         {room.stream_url ? <MetaItem icon="radio-outline" label="Stream ready" /> : null}
       </View>

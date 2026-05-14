@@ -140,6 +140,9 @@ function CommunityPage() {
         genre: data.genre.trim() || undefined,
         maxPerformers: data.maxPerformers,
         isPrivate: data.isPrivate,
+        visibility: data.visibility,
+        listenAccess: data.listenAccess,
+        jamAccess: data.jamAccess,
         communityId: community.id as Id<"communities">,
       });
       setIsCreateRoomOpen(false);
@@ -160,6 +163,9 @@ function CommunityPage() {
         genre: data.genre.trim() || undefined,
         maxPerformers: data.maxPerformers,
         isPrivate: data.isPrivate,
+        visibility: data.visibility,
+        listenAccess: data.listenAccess,
+        jamAccess: data.jamAccess,
       });
       setIsEditRoomOpen(false);
     } catch (error) {
@@ -191,6 +197,9 @@ function CommunityPage() {
         genre: myCommunityRoom.genre || "",
         maxPerformers: myCommunityRoom.max_performers,
         isPrivate: myCommunityRoom.is_private,
+        visibility: myCommunityRoom.visibility,
+        listenAccess: myCommunityRoom.listen_access,
+        jamAccess: myCommunityRoom.jam_access,
       }
     : undefined;
 

@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Check,
   Flag,
+  Lock,
   Volume2,
   VolumeX,
   Radio,
@@ -27,6 +28,7 @@ import { useUIStore } from "@/stores/uiStore";
 import {
   useRoom,
   useRoomParticipants,
+  useRoomModeration,
   useRoomMessages,
   useSendRoomMessage,
   useRoomHeartbeat,
@@ -38,6 +40,9 @@ import {
   useStopListenerMode,
   useRefreshListenerMode,
   useUpdateRoom,
+  useRequestRoomAccess,
+  useDecideRoomAccessRequest,
+  useRevokeRoomAccessGrant,
 } from "@/hooks/useRooms";
 import type { Id } from "@jam-app/convex";
 import type { JamBroadcastState, JamClientState } from "../electron";
@@ -90,6 +95,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const { user, isGuest } = useAuthStore();
   const { data: room, isLoading } = useRoom(handleToUse || undefined);
   const { data: participants } = useRoomParticipants(room?.id);
+  const { data: moderation } = useRoomModeration(room?.id, Boolean(room && !isGuest && user && room.host_id === user.id));
   const { data: messages } = useRoomMessages(room?.id);
   const sendRoomMessage = useSendRoomMessage();
   const roomHeartbeat = useRoomHeartbeat();
@@ -101,6 +107,9 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const stopListenerMode = useStopListenerMode();
   const refreshListenerMode = useRefreshListenerMode();
   const updateRoom = useUpdateRoom();
+  const requestRoomAccess = useRequestRoomAccess();
+  const decideAccessRequest = useDecideRoomAccessRequest();
+  const revokeAccessGrant = useRevokeRoomAccessGrant();
   const reportContent = useReportContent();
   const censorshipEnabled = useUIStore((s) => s.censorshipEnabled);
   const [message, setMessage] = useState("");
@@ -111,6 +120,8 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const [broadcastState, setBroadcastState] = useState<JamBroadcastState>("idle");
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [isRoomSettingsOpen, setIsRoomSettingsOpen] = useState(false);
+  const [roomPanel, setRoomPanel] = useState<"listeners" | "requests" | "approved">("listeners");
+  const [requestingAccess, setRequestingAccess] = useState<"listen" | "jam" | null>(null);
   const [publishSessionId, setPublishSessionId] = useState<Id<"listener_publish_sessions"> | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const jamSessionIdRef = useRef<Id<"jam_sessions"> | null>(null);
@@ -280,6 +291,9 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         genre: data.genre.trim() || undefined,
         maxPerformers: data.maxPerformers,
         isPrivate: data.isPrivate,
+        visibility: data.visibility,
+        listenAccess: data.listenAccess,
+        jamAccess: data.jamAccess,
       });
       setIsRoomSettingsOpen(false);
     } catch (error) {
@@ -287,7 +301,32 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     }
   }, [room?.id, updateRoom]);
 
+  const handleRequestAccess = useCallback(async (type: "listen" | "jam") => {
+    if (!room?.id) return;
+    setRequestingAccess(type);
+    try {
+      await requestRoomAccess({ roomId: room.id as Id<"rooms">, type });
+    } finally {
+      setRequestingAccess(null);
+    }
+  }, [requestRoomAccess, room?.id]);
+
+  const handleDecideAccessRequest = useCallback(async (
+    requestId: Id<"room_access_requests">,
+    decision: "approved" | "rejected"
+  ) => {
+    await decideAccessRequest({ requestId, decision });
+  }, [decideAccessRequest]);
+
+  const handleRevokeAccessGrant = useCallback(async (grantId: Id<"room_access_grants">) => {
+    await revokeAccessGrant({ grantId });
+  }, [revokeAccessGrant]);
+
   const handleJoinClient = useCallback(async () => {
+    if (!room?.viewer_access?.can_jam) {
+      setClientError("Ask the host for permission to jam.");
+      return;
+    }
     try {
       setClientError(null);
       if (!window.electron) {
@@ -328,7 +367,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         nativeJamErrorMessage(error)
       );
     }
-  }, [room?.id, isHost, createPerformerJoinToken]);
+  }, [room?.id, room?.viewer_access?.can_jam, isHost, createPerformerJoinToken]);
 
   const handleStartBroadcast = useCallback(async () => {
     try {
@@ -567,6 +606,9 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     genre: room.genre || "",
     maxPerformers: room.max_performers,
     isPrivate: room.is_private,
+    visibility: room.visibility,
+    listenAccess: room.listen_access,
+    jamAccess: room.jam_access,
   };
 
   return (
@@ -633,11 +675,17 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
                 variant={clientError ? "destructive" : "default"}
                 size="sm"
                 onClick={handleJoinClient}
-                disabled={clientState === "launching" || clientState === "running"}
+                disabled={
+                  clientState === "launching" ||
+                  clientState === "running" ||
+                  !room.viewer_access?.can_jam
+                }
                 className={`${!clientError ? "glow-primary" : ""}`}
               >
                 <Music className="h-3.5 w-3.5 mr-1.5" />
-                {clientState === "launching"
+                {!room.viewer_access?.can_jam
+                  ? "Jam Locked"
+                  : clientState === "launching"
                   ? "Launching..."
                   : clientState === "running"
                     ? "Jamming"
@@ -720,6 +768,38 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
               <span className="truncate">
                 {broadcastError || "Listener mode live"}
               </span>
+            </div>
+          )}
+          {!isHost && !isGuest && room.viewer_access && (!room.viewer_access.can_listen || !room.viewer_access.can_jam) && (
+            <div className="glass-solid rounded-lg px-3 py-2 flex items-center gap-2 text-xs mt-2">
+              <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground flex-1">
+                {!room.viewer_access.can_listen
+                  ? "Listening requires host approval."
+                  : "Jamming requires host approval."}
+              </span>
+              {!room.viewer_access.can_listen && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={room.viewer_access.listen_request_status === "pending" || requestingAccess === "listen"}
+                  onClick={() => handleRequestAccess("listen")}
+                >
+                  {room.viewer_access.listen_request_status === "pending" ? "Requested" : "Request Access"}
+                </Button>
+              )}
+              {room.viewer_access.can_listen && !room.viewer_access.can_jam && room.jam_access === "approved" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={room.viewer_access.jam_request_status === "pending" || requestingAccess === "jam"}
+                  onClick={() => handleRequestAccess("jam")}
+                >
+                  {room.viewer_access.jam_request_status === "pending" ? "Requested" : "Request to Jam"}
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -908,38 +988,113 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
 
             {/* Listeners Section */}
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 shrink-0 flex items-center gap-2">
-                <span className="w-1 h-3.5 rounded-full bg-muted-foreground/30" />
-                Listeners ({listeners.length})
-              </h3>
+              <div className="flex items-center gap-1 mb-2 shrink-0">
+                {(["listeners", "requests", "approved"] as const).map((tab) => {
+                  if (!isHost && tab !== "listeners") return null;
+                  const count =
+                    tab === "listeners"
+                      ? listeners.length
+                      : tab === "requests"
+                        ? moderation.pending.length
+                        : moderation.approved.length;
+                  return (
+                    <button
+                      key={tab}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+                        roomPanel === tab
+                          ? "bg-primary/15 text-primary"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      }`}
+                      onClick={() => setRoomPanel(tab)}
+                    >
+                      {tab === "listeners" ? "Listeners" : tab === "requests" ? "Requests" : "Approved"} ({count})
+                    </button>
+                  );
+                })}
+              </div>
               <div className="space-y-0.5 overflow-y-auto flex-1">
-                {listeners.map((p) => (
-                  <div
-                    key={p.profile_id}
-                    className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors ${!p.is_guest ? "cursor-pointer" : ""}`}
-                    onClick={() =>
-                      !p.is_guest && p.profile?.username && navigate(`/profile/${p.profile.username}`)
-                    }
-                  >
-                    <div className="relative">
-                      <Avatar size="sm" className="h-7 w-7">
-                        <AvatarImage src={p.profile?.avatar_url || ""} />
-                        <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
-                          {(p.profile?.username || "??")
-                            .substring(0, 2)
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-                    <span className="text-sm truncate">
-                      {p.profile?.username || "Unknown"}
-                    </span>
-                  </div>
-                ))}
-                {listeners.length === 0 && (
-                  <p className="text-xs text-muted-foreground px-2 py-4">
-                    No listeners yet
-                  </p>
+                {roomPanel === "listeners" && (
+                  <>
+                    {listeners.map((p) => (
+                      <div
+                        key={p.profile_id}
+                        className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors ${!p.is_guest ? "cursor-pointer" : ""}`}
+                        onClick={() =>
+                          !p.is_guest && p.profile?.username && navigate(`/profile/${p.profile.username}`)
+                        }
+                      >
+                        <Avatar size="sm" className="h-7 w-7">
+                          <AvatarImage src={p.profile?.avatar_url || ""} />
+                          <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
+                            {(p.profile?.username || "??").substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm truncate">
+                          {p.profile?.username || "Unknown"}
+                        </span>
+                      </div>
+                    ))}
+                    {listeners.length === 0 && (
+                      <p className="text-xs text-muted-foreground px-2 py-4">
+                        No listeners yet
+                      </p>
+                    )}
+                  </>
+                )}
+                {isHost && roomPanel === "requests" && (
+                  <>
+                    {moderation.pending.map((request) => (
+                      <div key={request.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-muted/50">
+                        <Avatar size="sm" className="h-7 w-7">
+                          <AvatarImage src={request.requester?.avatar_url || ""} />
+                          <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
+                            {(request.requester?.username || "??").substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm truncate">{request.requester?.username || "Unknown"}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            wants to {request.type === "jam" ? "jam" : "listen"}
+                          </p>
+                        </div>
+                        <Button size="sm" className="h-7 text-xs" onClick={() => handleDecideAccessRequest(request.id, "approved")}>
+                          Approve
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleDecideAccessRequest(request.id, "rejected")}>
+                          Reject
+                        </Button>
+                      </div>
+                    ))}
+                    {moderation.pending.length === 0 && (
+                      <p className="text-xs text-muted-foreground px-2 py-4">No pending requests</p>
+                    )}
+                  </>
+                )}
+                {isHost && roomPanel === "approved" && (
+                  <>
+                    {moderation.approved.map((grant) => (
+                      <div key={grant.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-muted/50">
+                        <Avatar size="sm" className="h-7 w-7">
+                          <AvatarImage src={grant.profile?.avatar_url || ""} />
+                          <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
+                            {(grant.profile?.username || "??").substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm truncate">{grant.profile?.username || "Unknown"}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            can {grant.type === "jam" ? "jam" : "listen"}
+                          </p>
+                        </div>
+                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleRevokeAccessGrant(grant.id)}>
+                          Revoke
+                        </Button>
+                      </div>
+                    ))}
+                    {moderation.approved.length === 0 && (
+                      <p className="text-xs text-muted-foreground px-2 py-4">No approved people yet</p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

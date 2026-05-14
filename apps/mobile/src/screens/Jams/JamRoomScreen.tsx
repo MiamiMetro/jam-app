@@ -17,9 +17,13 @@ import JamStreamPlayer from "@/components/jams/JamStreamPlayer";
 import { useJamRoomPresence } from "@/hooks/useJamRoomPresence";
 import {
   useRoom,
+  useRoomModeration,
   useRoomMessages,
   useRoomParticipants,
   useSendRoomMessage,
+  useRequestRoomAccess,
+  useDecideRoomAccessRequest,
+  useRevokeRoomAccessGrant,
 } from "@/hooks/useRooms";
 import { useReportContent } from "@/hooks/usePosts";
 import { useMyProfile } from "@/hooks/useMyProfile";
@@ -36,17 +40,24 @@ export default function JamRoomScreen({ navigation, route }: Props) {
   const { profile } = useMyProfile();
   const { room, isLoading } = useRoom(handle);
   const { participants, totalCount } = useRoomParticipants(room?.id);
+  const isHost = Boolean(profile?.id && room?.host_id === profile.id);
+  const { data: moderation } = useRoomModeration(room?.id, isHost);
   const roomMessages = useRoomMessages(room?.id);
   const sendRoomMessage = useSendRoomMessage();
+  const requestRoomAccess = useRequestRoomAccess();
+  const decideAccessRequest = useDecideRoomAccessRequest();
+  const revokeAccessGrant = useRevokeRoomAccessGrant();
   const reportContent = useReportContent();
   const presence = useJamRoomPresence(
     room?.id,
-    Boolean(room?.is_active && !room?.is_private),
+    Boolean(room?.is_active && room.viewer_access?.can_listen),
   );
   const [message, setMessage] = useState("");
   const [messageError, setMessageError] = useState<string | null>(null);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [roomPanel, setRoomPanel] = useState<"listeners" | "requests" | "approved">("listeners");
+  const [requestingAccess, setRequestingAccess] = useState<"listen" | "jam" | null>(null);
   const hostName = room?.host?.display_name || room?.host?.username || "Unknown host";
   const canReportRoom = Boolean(profile?.id && room?.host_id !== profile.id);
   const canSendMessage =
@@ -67,6 +78,16 @@ export default function JamRoomScreen({ navigation, route }: Props) {
       setMessageError(getRoomMessageError(err));
     } finally {
       setIsSendingMessage(false);
+    }
+  };
+
+  const handleRequestAccess = async (type: "listen" | "jam") => {
+    if (!room) return;
+    setRequestingAccess(type);
+    try {
+      await requestRoomAccess({ roomId: room.id, type });
+    } finally {
+      setRequestingAccess(null);
     }
   };
 
@@ -175,12 +196,41 @@ export default function JamRoomScreen({ navigation, route }: Props) {
 
           <View style={styles.detailRow}>
             <DetailPill icon="people-outline" label={`${totalCount} listeners`} />
-            <DetailPill icon="person-add-outline" label={`${room.max_performers} performers`} />
+            <DetailPill icon="person-add-outline" label={`${room.max_performers} max performers`} />
             {room.genre ? <DetailPill label={room.genre} /> : null}
             {room.is_private ? <DetailPill icon="lock-closed-outline" label="Private" /> : null}
           </View>
 
-          {room.is_private || presence.error ? (
+          {!isHost && profile?.id && room.viewer_access && (!room.viewer_access.can_listen || !room.viewer_access.can_jam) ? (
+            <View style={[styles.accessBox, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <Text style={[styles.accessText, { color: colors.secondaryForeground }]}>
+                {!room.viewer_access.can_listen
+                  ? "Listening requires host approval."
+                  : "Jamming requires host approval."}
+              </Text>
+              {!room.viewer_access.can_listen ? (
+                <Pressable
+                  disabled={room.viewer_access.listen_request_status === "pending" || requestingAccess === "listen"}
+                  onPress={() => handleRequestAccess("listen")}
+                  style={[styles.accessButton, { backgroundColor: colors.primary }]}
+                >
+                  <Text style={[styles.accessButtonText, { color: colors.primaryForeground }]}>
+                    {room.viewer_access.listen_request_status === "pending" ? "Requested" : "Request Access"}
+                  </Text>
+                </Pressable>
+              ) : !room.viewer_access.can_jam && room.jam_access === "approved" ? (
+                <Pressable
+                  disabled={room.viewer_access.jam_request_status === "pending" || requestingAccess === "jam"}
+                  onPress={() => handleRequestAccess("jam")}
+                  style={[styles.accessButton, { backgroundColor: colors.primary }]}
+                >
+                  <Text style={[styles.accessButtonText, { color: colors.primaryForeground }]}>
+                    {room.viewer_access.jam_request_status === "pending" ? "Requested" : "Request to Jam"}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : presence.error ? (
             <View
               style={[
                 styles.warningBox,
@@ -198,7 +248,7 @@ export default function JamRoomScreen({ navigation, route }: Props) {
                 size={16}
               />
               <Text style={[styles.warningText, { color: colors.destructive }]}>
-                {room.is_private ? "This room is private." : presence.error}
+                {presence.error}
               </Text>
             </View>
           ) : (
@@ -316,15 +366,39 @@ export default function JamRoomScreen({ navigation, route }: Props) {
 
         <View style={[styles.infoBlock, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.infoHeader, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>In This Room</Text>
-            <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>{participants.length} shown</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Room Moderation</Text>
+            <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>
+              {roomPanel === "listeners"
+                ? `${participants.length} shown`
+                : roomPanel === "requests"
+                  ? `${moderation.pending.length} pending`
+                  : `${moderation.approved.length} approved`}
+            </Text>
           </View>
 
-          {participants.length === 0 ? (
+          <View style={[styles.tabRow, { borderBottomColor: colors.border }]}>
+            {(["listeners", "requests", "approved"] as const).map((tab) => {
+              if (!isHost && tab !== "listeners") return null;
+              const active = roomPanel === tab;
+              return (
+                <Pressable
+                  key={tab}
+                  onPress={() => setRoomPanel(tab)}
+                  style={[styles.tabButton, { backgroundColor: active ? colors.accentMuted : "transparent" }]}
+                >
+                  <Text style={[styles.tabButtonText, { color: active ? colors.primary : colors.mutedForeground }]}>
+                    {tab === "listeners" ? "Listeners" : tab === "requests" ? "Requests" : "Approved"}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {roomPanel === "listeners" && participants.length === 0 ? (
             <View style={styles.emptyParticipants}>
               <Text style={[styles.emptyParticipantsText, { color: colors.mutedForeground }]}>No listeners visible yet.</Text>
             </View>
-          ) : (
+          ) : roomPanel === "listeners" ? (
             participants.map((participant) => (
               <ParticipantRow
                 isHost={participant.profile_id === room.host_id}
@@ -332,7 +406,39 @@ export default function JamRoomScreen({ navigation, route }: Props) {
                 participant={participant}
               />
             ))
-          )}
+          ) : isHost && roomPanel === "requests" ? (
+            moderation.pending.length === 0 ? (
+              <Text style={[styles.emptyParticipantsText, { color: colors.mutedForeground }]}>No pending requests.</Text>
+            ) : (
+              moderation.pending.map((request) => (
+                <ModerationRow
+                  key={request.id}
+                  name={request.requester?.display_name || request.requester?.username || "Unknown"}
+                  avatar={request.requester?.avatar_url}
+                  detail={`wants to ${request.type === "jam" ? "jam" : "listen"}`}
+                  primaryLabel="Approve"
+                  secondaryLabel="Reject"
+                  onPrimary={() => decideAccessRequest({ requestId: request.id, decision: "approved" })}
+                  onSecondary={() => decideAccessRequest({ requestId: request.id, decision: "rejected" })}
+                />
+              ))
+            )
+          ) : isHost ? (
+            moderation.approved.length === 0 ? (
+              <Text style={[styles.emptyParticipantsText, { color: colors.mutedForeground }]}>No approved people yet.</Text>
+            ) : (
+              moderation.approved.map((grant) => (
+                <ModerationRow
+                  key={grant.id}
+                  name={grant.profile?.display_name || grant.profile?.username || "Unknown"}
+                  avatar={grant.profile?.avatar_url}
+                  detail={`can ${grant.type === "jam" ? "jam" : "listen"}`}
+                  secondaryLabel="Revoke"
+                  onSecondary={() => revokeAccessGrant({ grantId: grant.id })}
+                />
+              ))
+            )
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -477,6 +583,54 @@ function ParticipantRow({
           {participant.role}
         </Text>
       </View>
+    </View>
+  );
+}
+
+function ModerationRow({
+  avatar,
+  detail,
+  name,
+  onPrimary,
+  onSecondary,
+  primaryLabel,
+  secondaryLabel,
+}: {
+  avatar?: string | null;
+  detail: string;
+  name: string;
+  onPrimary?: () => void;
+  onSecondary?: () => void;
+  primaryLabel?: string;
+  secondaryLabel?: string;
+}) {
+  const { colors } = useMobileTheme();
+
+  return (
+    <View style={[styles.participantRow, { borderBottomColor: colors.border }]}>
+      <Avatar image={avatar} label={name} size={38} />
+      <View style={styles.participantText}>
+        <Text numberOfLines={1} style={[styles.participantName, { color: colors.foreground }]}>
+          {name}
+        </Text>
+        <Text numberOfLines={1} style={[styles.participantRole, { color: colors.mutedForeground }]}>
+          {detail}
+        </Text>
+      </View>
+      {primaryLabel ? (
+        <Pressable onPress={onPrimary} style={[styles.smallActionButton, { backgroundColor: colors.primary }]}>
+          <Text style={[styles.smallActionText, { color: colors.primaryForeground }]}>
+            {primaryLabel}
+          </Text>
+        </Pressable>
+      ) : null}
+      {secondaryLabel ? (
+        <Pressable onPress={onSecondary} style={[styles.smallActionButton, { backgroundColor: colors.muted }]}>
+          <Text style={[styles.smallActionText, { color: colors.secondaryForeground }]}>
+            {secondaryLabel}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -672,6 +826,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
+  accessBox: {
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  accessText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  accessButton: {
+    alignItems: "center",
+    borderRadius: 8,
+    minHeight: 38,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  accessButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+  },
   presenceLine: {
     alignItems: "center",
     flexDirection: "row",
@@ -706,6 +882,22 @@ const styles = StyleSheet.create({
   sectionMeta: {
     fontSize: 11,
     fontWeight: "800",
+  },
+  tabRow: {
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  tabButton: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  tabButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
   },
   emptyParticipants: {
     paddingHorizontal: 14,
@@ -809,6 +1001,15 @@ const styles = StyleSheet.create({
   },
   hostBadgeText: {
     fontSize: 10,
+    fontWeight: "900",
+  },
+  smallActionButton: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+  },
+  smallActionText: {
+    fontSize: 11,
     fontWeight: "900",
   },
 });

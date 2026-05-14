@@ -245,6 +245,20 @@ export default defineSchema({
     genre: v.optional(v.string()),
     maxPerformers: v.number(),
     isPrivate: v.boolean(),
+    visibility: v.optional(
+      v.union(v.literal("public"), v.literal("unlisted"), v.literal("private"))
+    ),
+    listenAccess: v.optional(
+      v.union(v.literal("anyone"), v.literal("friends"), v.literal("approved"))
+    ),
+    jamAccess: v.optional(
+      v.union(
+        v.literal("anyone"),
+        v.literal("friends"),
+        v.literal("approved"),
+        v.literal("host")
+      )
+    ),
     isActive: v.boolean(),
     streamUrl: v.optional(v.string()),
     status: v.union(v.literal("idle"), v.literal("live")),
@@ -272,6 +286,33 @@ export default defineSchema({
     .index("by_community_active", ["communityId", "isActive"]),
 
   // Room chat messages — live chat, latest 30 only
+  room_access_requests: defineTable({
+    roomId: v.id("rooms"),
+    requesterId: v.id("profiles"),
+    type: v.union(v.literal("listen"), v.literal("jam")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected")
+    ),
+    decidedBy: v.optional(v.id("profiles")),
+    decidedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  })
+    .index("by_room_status", ["roomId", "status"])
+    .index("by_room_requester_type", ["roomId", "requesterId", "type"])
+    .index("by_requester", ["requesterId"]),
+
+  room_access_grants: defineTable({
+    roomId: v.id("rooms"),
+    profileId: v.id("profiles"),
+    type: v.union(v.literal("listen"), v.literal("jam")),
+    grantedBy: v.id("profiles"),
+    grantedAt: v.number(),
+  })
+    .index("by_room", ["roomId"])
+    .index("by_room_profile_type", ["roomId", "profileId", "type"]),
+
   // Backend-only jam server registry. Secrets must never be returned by public queries.
   jam_servers: defineTable({
     kind: v.union(v.literal("official"), v.literal("community")),

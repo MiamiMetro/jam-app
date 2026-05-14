@@ -2,6 +2,8 @@ import { Presence } from "@convex-dev/presence";
 import { v } from "convex/values";
 import { components } from "./_generated/api";
 import { mutation } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import { requireAuth, areFriends } from "./helpers";
 import { checkRateLimit } from "./rateLimiter";
 
@@ -18,6 +20,29 @@ const MIN_HEARTBEAT_INTERVAL_MS = 5_000;
 const MAX_HEARTBEAT_INTERVAL_MS = 120_000;
 
 const presence = new Presence(components.presence);
+
+function roomVisibility(room: Doc<"rooms">) {
+  return room.visibility ?? (room.isPrivate ? "private" : "public");
+}
+
+function roomListenAccess(room: Doc<"rooms">) {
+  return room.listenAccess ?? (room.isPrivate ? "friends" : "anyone");
+}
+
+async function hasListenGrant(
+  ctx: MutationCtx,
+  roomId: Id<"rooms">,
+  profileId: Id<"profiles">
+) {
+  return Boolean(
+    await ctx.db
+      .query("room_access_grants")
+      .withIndex("by_room_profile_type", (q) =>
+        q.eq("roomId", roomId).eq("profileId", profileId).eq("type", "listen")
+      )
+      .first()
+  );
+}
 
 function clampHeartbeatInterval(interval: number | undefined) {
   if (interval === undefined) {
@@ -82,11 +107,14 @@ export const roomHeartbeat = mutation({
     if (!room) throw new Error("ROOM_NOT_FOUND");
     if (!room.isActive) throw new Error("ROOM_INACTIVE");
 
-    // Private room: friends only
-    if (room.isPrivate && room.hostId !== profile._id) {
-      const friends = await areFriends(ctx, profile._id, room.hostId);
-      if (!friends) {
-        throw new Error("PRIVATE_ROOM: This room is friends only");
+    if (room.hostId !== profile._id) {
+      const listenAccess = roomListenAccess(room);
+      if (listenAccess === "friends") {
+        const friends = await areFriends(ctx, profile._id, room.hostId);
+        if (!friends) throw new Error("ROOM_ACCESS_REQUIRED: Friends only");
+      } else if (listenAccess === "approved") {
+        const granted = await hasListenGrant(ctx, args.roomId, profile._id);
+        if (!granted) throw new Error("ROOM_ACCESS_REQUIRED: Approval required");
       }
     }
 
@@ -123,7 +151,9 @@ export const guestRoomHeartbeat = mutation({
     const room = await ctx.db.get(args.roomId);
     if (!room) throw new Error("ROOM_NOT_FOUND");
     if (!room.isActive) throw new Error("ROOM_INACTIVE");
-    if (room.isPrivate) throw new Error("PRIVATE_ROOM: Sign in to join");
+    if (roomVisibility(room) === "private" || roomListenAccess(room) !== "anyone") {
+      throw new Error("ROOM_ACCESS_REQUIRED: Sign in to join");
+    }
 
     const guestUserId = `guest:${args.sessionId}`;
     const roomPresenceId = `room:${args.roomId}`;

@@ -119,6 +119,21 @@ export function useRoomParticipants(roomId: string | undefined) {
   };
 }
 
+export function useRoomModeration(roomId: string | undefined, enabled = true) {
+  const { isGuest } = useAuthStore();
+  const { isAuthSet } = useConvexAuthStore();
+  const { isProfileReady } = useProfileStore();
+  const canQuery = !!roomId && enabled && !isGuest && isAuthSet && isProfileReady;
+  const data = useQuery(
+    api.rooms.getModeration,
+    canQuery ? { roomId: roomId as Id<"rooms"> } : "skip"
+  );
+  return {
+    data: data ?? { pending: [], approved: [] },
+    isLoading: data === undefined && canQuery,
+  };
+}
+
 export function useFriendsInRooms() {
   const { isGuest } = useAuthStore();
   const { isAuthSet } = useConvexAuthStore();
@@ -161,6 +176,18 @@ export function useCreateRoom() {
 
 export function useUpdateRoom() {
   return useMutation(api.rooms.update);
+}
+
+export function useRequestRoomAccess() {
+  return useMutation(api.rooms.requestAccess);
+}
+
+export function useDecideRoomAccessRequest() {
+  return useMutation(api.rooms.decideAccessRequest);
+}
+
+export function useRevokeRoomAccessGrant() {
+  return useMutation(api.rooms.revokeAccessGrant);
 }
 
 export function useActivateRoom() {

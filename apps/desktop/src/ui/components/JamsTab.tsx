@@ -80,6 +80,9 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
         genre: data.genre.trim() || undefined,
         maxPerformers: data.maxPerformers,
         isPrivate: data.isPrivate,
+        visibility: data.visibility,
+        listenAccess: data.listenAccess,
+        jamAccess: data.jamAccess,
       });
       setIsCreateRoomOpen(false);
     } catch (error) {
@@ -99,6 +102,9 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
         genre: data.genre.trim() || undefined,
         maxPerformers: data.maxPerformers,
         isPrivate: data.isPrivate,
+        visibility: data.visibility,
+        listenAccess: data.listenAccess,
+        jamAccess: data.jamAccess,
       });
       setIsEditRoomOpen(false);
     } catch (error) {
@@ -130,6 +136,9 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
       genre: myRoom.genre || "",
       maxPerformers: myRoom.max_performers,
       isPrivate: myRoom.is_private,
+      visibility: myRoom.visibility,
+      listenAccess: myRoom.listen_access,
+      jamAccess: myRoom.jam_access,
     }
     : undefined;
 

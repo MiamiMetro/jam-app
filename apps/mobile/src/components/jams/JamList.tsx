@@ -218,7 +218,7 @@ function MyRoomSummary({
     statusLabel,
     room.description,
     `${room.participant_count} listeners`,
-    `${room.max_performers} performers`,
+    `${room.max_performers} max performers`,
     room.genre,
     room.is_private ? "Private" : null,
   ]
@@ -287,7 +287,7 @@ function MyRoomSummary({
 
       <View style={styles.detailRow}>
         <DetailPill icon="people-outline" label={`${room.participant_count} listeners`} />
-        <DetailPill icon="person-add-outline" label={`${room.max_performers} performers`} />
+        <DetailPill icon="person-add-outline" label={`${room.max_performers} max performers`} />
         {room.genre ? <DetailPill label={room.genre} /> : null}
         {room.is_private ? <DetailPill icon="lock-closed-outline" label="Private" /> : null}
       </View>
