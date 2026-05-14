@@ -22,6 +22,8 @@ const OVERLAY_SYMBOL = { dark: '#e8e6f0', light: '#2c2518' } as const;
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
 
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 function getSavedTheme(): 'dark' | 'light' {
     try {
         const data = JSON.parse(readFileSync(path.join(app.getPath('userData'), 'theme.json'), 'utf-8'));

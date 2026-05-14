@@ -102,7 +102,6 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const [isPerforming, setIsPerforming] = useState(false);
   const [clientState, setClientState] = useState<JamClientState>("idle");
   const [broadcastState, setBroadcastState] = useState<JamBroadcastState>("idle");
-  const [broadcastHlsUrl, setBroadcastHlsUrl] = useState<string | null>(null);
   const [publishSessionId, setPublishSessionId] = useState<Id<"listener_publish_sessions"> | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const jamSessionIdRef = useRef<Id<"jam_sessions"> | null>(null);
@@ -116,6 +115,12 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   // HLS stream player (shared via context so StatusBar can control it too)
   const hlsPlayer = usePlayer();
   const postAudio = usePostAudio();
+
+  useEffect(() => {
+    if (hlsPlayer.isPlaying && postAudio.isPlaying) {
+      postAudio.pause();
+    }
+  }, [hlsPlayer.isPlaying, postAudio]);
 
   // Presence heartbeat — only beats while user is actively in this room
   const currentJamRoomHandle = useUIStore((s) => s.currentJamRoomHandle);
@@ -307,7 +312,6 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         roomId: room.id as Id<"rooms">,
       });
       setPublishSessionId(launchContext.publishSessionId);
-      setBroadcastHlsUrl(launchContext.hlsUrl);
 
       const result = await window.electron.launchJamBroadcast({
         roomId: String(room.id),
@@ -316,7 +320,6 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         hlsUrl: launchContext.hlsUrl,
       });
       setBroadcastState(result.state);
-      setBroadcastHlsUrl(result.hlsUrl ?? launchContext.hlsUrl);
 
       if (!result.success) {
         await stopListenerMode({
@@ -361,6 +364,18 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   }, [room?.id, publishSessionId, stopListenerMode]);
 
   useEffect(() => {
+    if (
+      !isHost ||
+      (broadcastState !== "running" && broadcastState !== "launching") ||
+      (clientState !== "idle" && clientState !== "failed" && clientState !== "exited")
+    ) {
+      return;
+    }
+
+    handleStopBroadcast().catch(() => {});
+  }, [isHost, broadcastState, clientState, handleStopBroadcast]);
+
+  useEffect(() => {
     if (!window.electron || (clientState !== "launching" && clientState !== "running")) {
       return;
     }
@@ -399,9 +414,6 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
       const status = await window.electron?.getJamBroadcastStatus();
       if (!status) return;
       setBroadcastState(status.state);
-      if (status.hlsUrl) {
-        setBroadcastHlsUrl(status.hlsUrl);
-      }
       if (status.state === "failed") {
         setBroadcastError(status.error || "Native broadcaster failed");
       }
@@ -585,7 +597,9 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
                   disabled={
                     broadcastState === "launching" ||
                     broadcastState === "stopping" ||
-                    (clientState !== "running" && clientState !== "launching")
+                    (broadcastState !== "running" &&
+                      clientState !== "running" &&
+                      clientState !== "launching")
                   }
                 >
                   <Radio className="h-3.5 w-3.5 mr-1.5" />
@@ -634,7 +648,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
                 <Radio className="h-3 w-3 shrink-0" />
               )}
               <span className="truncate">
-                {broadcastError || `Listener mode live: ${broadcastHlsUrl ?? room.stream_url ?? ""}`}
+                {broadcastError || "Listener mode live"}
               </span>
             </div>
           )}

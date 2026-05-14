@@ -19,6 +19,12 @@ export default function StatusBar() {
 
   const isOnRoomPage = location.pathname.startsWith("/jam/");
 
+  useEffect(() => {
+    if (player.isPlaying && postAudio.isPlaying) {
+      postAudio.pause();
+    }
+  }, [player.isPlaying, postAudio]);
+
   // Unread chat badge — track last seen count when on room page
   const { data: messages = [] } = useRoomMessages(room?.id);
   const lastSeenCount = useRef(0);

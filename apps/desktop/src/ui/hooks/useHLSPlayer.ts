@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, useCallback, startTransition } from "react";
 import Hls from "hls.js";
 
+type PlayingRef = { current: boolean };
+type HlsAudioElement = HTMLAudioElement & { __playingRef?: PlayingRef };
+
 export function useHLSPlayer(streamUrl?: string) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -12,6 +15,12 @@ export function useHLSPlayer(streamUrl?: string) {
   const manifestReadyRef = useRef(false);
   const initializedRef = useRef(false);
   const currentStreamUrlRef = useRef<string | undefined>(streamUrl);
+  const userPausedRef = useRef(false);
+  const retryableErrorRef = useRef(false);
+  const savedVolume = parseFloat(localStorage.getItem("jam-volume") || "0.8");
+  const [volume, setVolumeState] = useState(savedVolume);
+  const volumeRef = useRef(savedVolume);
+  const prevVolumeRef = useRef(savedVolume);
 
   // Update current stream URL ref when it changes
   useEffect(() => {
@@ -33,6 +42,8 @@ export function useHLSPlayer(streamUrl?: string) {
       }
       initializedRef.current = false;
       manifestReadyRef.current = false;
+      userPausedRef.current = false;
+      retryableErrorRef.current = false;
       startTransition(() => {
         setError(null);
         setIsLoading(false);
@@ -56,6 +67,8 @@ export function useHLSPlayer(streamUrl?: string) {
       }
       initializedRef.current = false;
       manifestReadyRef.current = false;
+      userPausedRef.current = false;
+      retryableErrorRef.current = false;
       startTransition(() => {
         setError(null);
         setIsLoading(false);
@@ -95,9 +108,11 @@ export function useHLSPlayer(streamUrl?: string) {
     });
     manifestReadyRef.current = false;
 
-    const audio = document.createElement("audio");
+    const audio = document.createElement("audio") as HlsAudioElement;
     audioRef.current = audio;
     audio.preload = "auto";
+    audio.autoplay = true;
+    audio.volume = volumeRef.current;
 
     // Check if HLS is supported
     if (Hls.isSupported()) {
@@ -128,7 +143,7 @@ export function useHLSPlayer(streamUrl?: string) {
 
       // Use a ref to track playing state for event handlers
       const playingRef = { current: false };
-      (audio as any).__playingRef = playingRef;
+      audio.__playingRef = playingRef;
       
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         manifestReadyRef.current = true;
@@ -166,25 +181,29 @@ export function useHLSPlayer(streamUrl?: string) {
       });
       
       // Store playing ref for use in callbacks
-      (audio as any).__playingRef = playingRef;
+      audio.__playingRef = playingRef;
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
-          // Ignore network errors when stopped (cancelled requests)
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && !playingRef.current) {
-            // This is expected when we stop loading - ignore it
+          // Ignore network errors only after an explicit pause (cancelled requests).
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && userPausedRef.current) {
             return;
           }
           console.error("HLS fatal error:", data);
+          retryableErrorRef.current = data.type === Hls.ErrorTypes.NETWORK_ERROR;
           hls.destroy();
-          setError("Failed to load stream");
+          if (hlsRef.current === hls) {
+            hlsRef.current = null;
+          }
+          initializedRef.current = false;
+          setError(retryableErrorRef.current ? "Waiting for live stream..." : "Failed to load stream");
           setIsLoading(false);
           setIsPlaying(false);
           setIsReady(false);
           manifestReadyRef.current = false;
         } else {
-          // Ignore network errors when stopped
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && !playingRef.current) {
+          // Ignore network errors only after an explicit pause.
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && userPausedRef.current) {
             return;
           }
           // Handle buffer stall errors - HLS.js will auto-recover, just log it
@@ -199,6 +218,8 @@ export function useHLSPlayer(streamUrl?: string) {
     } else if (audio.canPlayType("application/vnd.apple.mpegurl")) {
       // Native HLS support (Safari)
       audio.src = streamUrlToUse;
+      audio.autoplay = true;
+      audio.volume = volumeRef.current;
       audio.addEventListener("loadedmetadata", () => {
         setIsLoading(false);
         setError(null);
@@ -221,6 +242,8 @@ export function useHLSPlayer(streamUrl?: string) {
 
   const play = useCallback(async () => {
     if (!currentStreamUrlRef.current) return;
+    userPausedRef.current = false;
+    retryableErrorRef.current = false;
 
     // Initialize HLS/audio if not already initialized
     if (!initializedRef.current) {
@@ -237,7 +260,7 @@ export function useHLSPlayer(streamUrl?: string) {
       // For HLS streams, always seek to live position when playing
       if (hlsRef.current) {
         // Update playing ref first
-        const playingRef = (audioRef.current as any).__playingRef;
+        const playingRef = (audioRef.current as HlsAudioElement).__playingRef;
         if (playingRef) playingRef.current = true;
         
         // Start loading to get latest live content
@@ -246,6 +269,7 @@ export function useHLSPlayer(streamUrl?: string) {
         // Wait for manifest to be ready and buffer to fill
         const waitAndPlay = () => {
           if (!audioRef.current) return;
+          if (userPausedRef.current || retryableErrorRef.current || !initializedRef.current) return;
           
           // Wait for buffer to have some content
           if (audioRef.current.buffered.length > 0) {
@@ -256,12 +280,16 @@ export function useHLSPlayer(streamUrl?: string) {
             // Try to play
             audioRef.current.play()
               .then(() => {
+                retryableErrorRef.current = false;
                 setIsPlaying(true);
                 setIsLoading(false);
               })
               .catch((err) => {
                 console.error("Error playing audio:", err);
-                setError("Failed to play stream");
+                retryableErrorRef.current = false;
+                setError(err instanceof DOMException && err.name === "NotAllowedError"
+                  ? "Click play to start audio"
+                  : "Failed to play stream");
                 setIsPlaying(false);
                 setIsLoading(false);
                 if (playingRef) playingRef.current = false;
@@ -282,26 +310,32 @@ export function useHLSPlayer(streamUrl?: string) {
         }
         
         await audioRef.current.play();
+        retryableErrorRef.current = false;
         setIsPlaying(true);
         setIsLoading(false);
       }
     } catch (error) {
       console.error("Error playing HLS stream:", error);
-      setError("Failed to play stream");
+      retryableErrorRef.current = false;
+      setError(error instanceof DOMException && error.name === "NotAllowedError"
+        ? "Click play to start audio"
+        : "Failed to play stream");
       setIsPlaying(false);
       setIsLoading(false);
-      const playingRef = (audioRef.current as any).__playingRef;
+      const playingRef = (audioRef.current as HlsAudioElement | null)?.__playingRef;
       if (playingRef) playingRef.current = false;
     }
   }, [initializeHLS]);
 
   const pause = useCallback(() => {
+    userPausedRef.current = true;
+    retryableErrorRef.current = false;
     if (audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
       
       // Update playing ref
-      const playingRef = (audioRef.current as any).__playingRef;
+      const playingRef = (audioRef.current as HlsAudioElement).__playingRef;
       if (playingRef) playingRef.current = false;
     }
     // Stop loading the stream when paused to save bandwidth
@@ -319,6 +353,8 @@ export function useHLSPlayer(streamUrl?: string) {
   }, [isPlaying, play, pause]);
 
   const retry = useCallback(() => {
+    userPausedRef.current = false;
+    retryableErrorRef.current = false;
     setError(null);
     setIsLoading(false);
     setIsPlaying(false);
@@ -327,12 +363,30 @@ export function useHLSPlayer(streamUrl?: string) {
     initializedRef.current = false;
   }, []);
 
-  const savedVolume = parseFloat(localStorage.getItem("jam-volume") || "0.8");
-  const [volume, setVolumeState] = useState(savedVolume);
-  const prevVolumeRef = useRef(savedVolume);
+  useEffect(() => {
+    if (!streamUrl) return;
+    userPausedRef.current = false;
+    const timer = window.setTimeout(() => {
+      void play();
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [streamUrl, play]);
+
+  useEffect(() => {
+    if (!streamUrl || !error || !retryableErrorRef.current || userPausedRef.current) return;
+    const timer = window.setTimeout(() => {
+      if (userPausedRef.current) return;
+      retry();
+      window.setTimeout(() => {
+        if (!userPausedRef.current) void play();
+      }, 150);
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [streamUrl, error, retry, play]);
 
   const setVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(1, v));
+    volumeRef.current = clamped;
     if (clamped > 0) {
       prevVolumeRef.current = clamped;
       localStorage.setItem("jam-volume", String(clamped));
