@@ -20,7 +20,6 @@
     "convex:pull": "npm --prefix ../.. run convex:codegen"
   },
   "dependencies": {
-    "@jam-app/convex": "0.0.0",
     "@base-ui/react": "^1.0.0",
     "@better-auth/expo": "1.5.3",
     "@convex-dev/better-auth": "^0.11.4",
@@ -29,6 +28,7 @@
     "@fontsource-variable/bricolage-grotesque": "^5.2.10",
     "@fontsource-variable/noto-sans": "^5.2.10",
     "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
+    "@jam-app/convex": "0.0.0",
     "@tanstack/pacer": "^0.17.2",
     "@tanstack/react-pacer": "^0.19.2",
     "@tanstack/react-query": "^5.90.11",
@@ -37,6 +37,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.35.1",
+    "electron-updater": "^6.8.3",
     "hls.js": "^1.6.15",
     "lucide-react": "^0.561.0",
     "react": "^19.2.0",

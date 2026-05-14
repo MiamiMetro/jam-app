@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, Menu, session, shell } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -55,6 +56,12 @@ type JamBroadcastLaunchContext = {
     srtUrl: string;
     hlsUrl: string;
 };
+type UpdateStatus = {
+    state: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'unavailable' | 'error';
+    version?: string;
+    progress?: number;
+    error?: string;
+};
 let jamClientState: JamClientState = 'idle';
 let jamClientExitCode: number | null = null;
 let jamClientError: string | undefined;
@@ -64,6 +71,51 @@ let jamBroadcastExitCode: number | null = null;
 let jamBroadcastError: string | undefined;
 let jamBroadcastHlsUrl: string | undefined;
 let jamBroadcastStopRequested = false;
+let updateStatus: UpdateStatus = { state: 'idle' };
+
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+function setUpdateStatus(status: UpdateStatus) {
+    updateStatus = status;
+    for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) {
+            window.webContents.send('update-status', updateStatus);
+        }
+    }
+}
+
+function setupAutoUpdates() {
+    autoUpdater.on('checking-for-update', () => {
+        setUpdateStatus({ state: 'checking' });
+    });
+
+    autoUpdater.on('update-available', (info) => {
+        setUpdateStatus({ state: 'available', version: info.version });
+    });
+
+    autoUpdater.on('download-progress', (progress) => {
+        setUpdateStatus({
+            state: 'downloading',
+            progress: Math.round(progress.percent),
+        });
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+        setUpdateStatus({ state: 'downloaded', version: info.version });
+    });
+
+    autoUpdater.on('update-not-available', () => {
+        setUpdateStatus({ state: 'unavailable' });
+    });
+
+    autoUpdater.on('error', (error) => {
+        setUpdateStatus({
+            state: 'error',
+            error: error instanceof Error ? error.message : 'Update check failed',
+        });
+    });
+}
 
 function getClientExecutablePath() {
     const platform = process.platform;
@@ -265,6 +317,37 @@ if (!gotTheLock) {
     });
 
     let mainWindow: BrowserWindow | null = null;
+
+    setupAutoUpdates();
+
+    ipcMain.handle('get-update-status', async () => updateStatus);
+
+    ipcMain.handle('check-for-updates', async () => {
+        if (isDev()) {
+            setUpdateStatus({ state: 'unavailable' });
+            return updateStatus;
+        }
+
+        try {
+            await autoUpdater.checkForUpdates();
+            return updateStatus;
+        } catch (error) {
+            setUpdateStatus({
+                state: 'error',
+                error: error instanceof Error ? error.message : 'Update check failed',
+            });
+            return updateStatus;
+        }
+    });
+
+    ipcMain.handle('install-update', async () => {
+        if (updateStatus.state !== 'downloaded') {
+            return { success: false, error: 'No downloaded update is ready to install.' };
+        }
+
+        autoUpdater.quitAndInstall(false, true);
+        return { success: true };
+    });
 
     // IPC handler for opening external links
     ipcMain.handle('open-external', async (_event, url: string) => {
@@ -676,6 +759,14 @@ if (!gotTheLock) {
         // Show window when ready to prevent white screen flash
         mainWindow.once('ready-to-show', () => {
             mainWindow?.show();
+            if (!isDev()) {
+                void autoUpdater.checkForUpdates().catch((error) => {
+                    setUpdateStatus({
+                        state: 'error',
+                        error: error instanceof Error ? error.message : 'Update check failed',
+                    });
+                });
+            }
         });
 
         if (isDev()) {

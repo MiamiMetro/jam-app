@@ -18,6 +18,11 @@
     "icon": "desktopIcon.png",
     "asar": true,
     "npmRebuild": false,
+    "publish": {
+        "provider": "github",
+        "owner": "MiamiMetro",
+        "repo": "jam-app"
+    },
     "mac": {
         "target": "dmg"
     },
