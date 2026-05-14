@@ -9,7 +9,9 @@
         {
             "from": "resources/client",
             "to": "client",
-            "filter": ["**/*"]
+            "filter": [
+                "**/*"
+            ]
         }
     ],
     "directories": {
@@ -24,7 +26,10 @@
         "repo": "jam-app"
     },
     "mac": {
-        "target": "dmg"
+        "target": [
+            "dmg",
+            "zip"
+        ]
     },
     "linux": {
         "target": "AppImage",
