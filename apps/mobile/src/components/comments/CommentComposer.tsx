@@ -95,6 +95,8 @@ export default function CommentComposer({
           {text.length}/{MAX_COMMENT_LENGTH}
         </Text>
         <Pressable
+          accessibilityLabel={buttonLabel}
+          accessibilityRole="button"
           disabled={!canSubmit}
           onPress={handleSubmit}
           style={({ pressed }) => [

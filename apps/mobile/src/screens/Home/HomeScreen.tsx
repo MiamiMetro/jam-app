@@ -1,5 +1,5 @@
-import { SafeAreaView, StyleSheet, Text, View } from "react-native";
-import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import PostList from "@/components/posts/PostList";
 import ComposePost from "@/components/posts/ComposePost";
 import { usePosts } from "@/hooks/usePosts";
@@ -12,7 +12,7 @@ const HomeScreen = () => {
   const { profile } = useMyProfile();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: colors.background }]}>
       <PostList
         posts={posts}
         isLoading={isLoading}

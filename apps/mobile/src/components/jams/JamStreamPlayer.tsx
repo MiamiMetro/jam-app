@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import React from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useMobileTheme } from "@/theme/MobileTheme";
 
 type Props = {
   roomName: string;
@@ -12,6 +13,7 @@ const DEFAULT_VOLUME = 0.8;
 const VOLUME_STEPS = [0.2, 0.4, 0.6, 0.8, 1];
 
 export default function JamStreamPlayer({ roomName, streamUrl }: Props) {
+  const { colors } = useMobileTheme();
   const player = useAudioPlayer(null, {
     keepAudioSessionActive: true,
     preferredForwardBufferDuration: 8,
@@ -123,16 +125,16 @@ export default function JamStreamPlayer({ roomName, streamUrl }: Props) {
 
   if (!streamUrl) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.waitingVisualizer}>
-          <View style={[styles.waitingBar, styles.waitingBarShort]} />
-          <View style={styles.waitingBar} />
-          <View style={[styles.waitingBar, styles.waitingBarTall]} />
-          <View style={styles.waitingBar} />
-          <View style={[styles.waitingBar, styles.waitingBarShort]} />
+          <View style={[styles.waitingBar, styles.waitingBarShort, { backgroundColor: colors.accentMuted }]} />
+          <View style={[styles.waitingBar, { backgroundColor: colors.accentMuted }]} />
+          <View style={[styles.waitingBar, styles.waitingBarTall, { backgroundColor: colors.accentMuted }]} />
+          <View style={[styles.waitingBar, { backgroundColor: colors.accentMuted }]} />
+          <View style={[styles.waitingBar, styles.waitingBarShort, { backgroundColor: colors.accentMuted }]} />
         </View>
-        <Text style={styles.waitingTitle}>Waiting for the jam to start</Text>
-        <Text style={styles.waitingBody}>
+        <Text style={[styles.waitingTitle, { color: colors.foreground }]}>Waiting for the jam to start</Text>
+        <Text style={[styles.waitingBody, { color: colors.mutedForeground }]}>
           The stream will appear when the host starts performing.
         </Text>
       </View>
@@ -140,23 +142,27 @@ export default function JamStreamPlayer({ roomName, streamUrl }: Props) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.topRow}>
         <Pressable
           accessibilityLabel={status.playing ? "Pause jam stream" : "Play jam stream"}
+          accessibilityRole="button"
           disabled={isPreparing}
           onPress={togglePlayback}
           style={({ pressed }) => [
             styles.playButton,
-            pressed ? styles.playButtonPressed : null,
+            { backgroundColor: colors.primary },
+            pressed ? { opacity: 0.82 } : null,
             isPreparing ? styles.playButtonDisabled : null,
           ]}
         >
           {isPreparing ? (
-            <ActivityIndicator color="#251B0A" size="small" />
+            <ActivityIndicator color={colors.primaryForeground} size="small" />
           ) : (
             <Ionicons
-              color="#251B0A"
+              accessibilityElementsHidden
+              color={colors.primaryForeground}
+              importantForAccessibility="no-hide-descendants"
               name={status.playing ? "pause" : "play"}
               size={22}
             />
@@ -165,34 +171,58 @@ export default function JamStreamPlayer({ roomName, streamUrl }: Props) {
 
         <View style={styles.meta}>
           <View style={styles.titleLine}>
-            <Text numberOfLines={1} style={styles.title}>
+            <Text numberOfLines={1} style={[styles.title, { color: colors.foreground }]}>
               Live Session
             </Text>
-            <View style={[styles.statusBadge, status.playing ? styles.statusBadgeLive : null]}>
-              <View style={[styles.statusDot, status.playing ? styles.statusDotLive : null]} />
-              <Text style={[styles.statusText, status.playing ? styles.statusTextLive : null]}>
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: status.playing ? colors.destructiveMuted : colors.muted },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: status.playing ? colors.destructive : colors.mutedForeground },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.statusText,
+                  { color: status.playing ? colors.destructive : colors.mutedForeground },
+                ]}
+              >
                 {statusLabel}
               </Text>
             </View>
           </View>
-          <Text numberOfLines={1} style={styles.subtitle}>
+          <Text numberOfLines={1} style={[styles.subtitle, { color: colors.mutedForeground }]}>
             {status.playing ? "Listening at the live edge" : "Listener mode"}
           </Text>
         </View>
       </View>
 
-      <View style={styles.liveTrack}>
-        <View style={[styles.liveFill, status.playing ? styles.liveFillOn : null]} />
+      <View style={[styles.liveTrack, { backgroundColor: colors.muted }]}>
+        <View
+          style={[
+            styles.liveFill,
+            { backgroundColor: colors.accentMuted },
+            status.playing ? styles.liveFillOn : null,
+          ]}
+        />
       </View>
 
       <View style={styles.controlsRow}>
         <Pressable
           accessibilityLabel={volume > 0 ? "Mute stream" : "Unmute stream"}
+          accessibilityRole="button"
           onPress={toggleMute}
           style={styles.iconButton}
         >
           <Ionicons
-            color="#AEB6C4"
+            accessibilityElementsHidden
+            color={colors.secondaryForeground}
+            importantForAccessibility="no-hide-descendants"
             name={volume > 0 ? "volume-high-outline" : "volume-mute-outline"}
             size={18}
           />
@@ -202,33 +232,43 @@ export default function JamStreamPlayer({ roomName, streamUrl }: Props) {
           {VOLUME_STEPS.map((step) => (
             <Pressable
               accessibilityLabel={`Set volume to ${Math.round(step * 100)} percent`}
+              accessibilityRole="button"
               key={step}
               onPress={() => setVolume(step)}
               style={[
                 styles.volumeStep,
-                volume >= step ? styles.volumeStepActive : null,
+                { backgroundColor: volume >= step ? colors.primary : colors.muted },
               ]}
             />
           ))}
         </View>
 
         {error ? (
-          <Pressable onPress={() => startPlayback(true)} style={styles.retryButton}>
-            <Ionicons color="#D8A64A" name="refresh" size={14} />
-            <Text style={styles.retryText}>Retry</Text>
+          <Pressable
+            accessibilityLabel="Retry stream"
+            accessibilityRole="button"
+            onPress={() => startPlayback(true)}
+            style={[styles.retryButton, { borderColor: colors.ring }]}
+          >
+            <Ionicons
+              accessibilityElementsHidden
+              color={colors.primary}
+              importantForAccessibility="no-hide-descendants"
+              name="refresh"
+              size={14}
+            />
+            <Text style={[styles.retryText, { color: colors.primary }]}>Retry</Text>
           </Pressable>
         ) : null}
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#222733",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     gap: 13,
@@ -241,14 +281,10 @@ const styles = StyleSheet.create({
   },
   playButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
     height: 48,
     justifyContent: "center",
     width: 48,
-  },
-  playButtonPressed: {
-    backgroundColor: "#C89434",
   },
   playButtonDisabled: {
     opacity: 0.72,
@@ -263,54 +299,38 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    color: "#EEF0F5",
     flex: 1,
     fontSize: 16,
     fontWeight: "900",
   },
   subtitle: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 4,
   },
   statusBadge: {
     alignItems: "center",
-    backgroundColor: "#303644",
     borderRadius: 8,
     flexDirection: "row",
     gap: 6,
     paddingHorizontal: 8,
     paddingVertical: 5,
   },
-  statusBadgeLive: {
-    backgroundColor: "rgba(239,68,68,0.13)",
-  },
   statusDot: {
-    backgroundColor: "#737D8C",
     borderRadius: 4,
     height: 8,
     width: 8,
   },
-  statusDotLive: {
-    backgroundColor: "#EF4444",
-  },
   statusText: {
-    color: "#AEB6C4",
     fontSize: 11,
     fontWeight: "900",
   },
-  statusTextLive: {
-    color: "#FCA5A5",
-  },
   liveTrack: {
-    backgroundColor: "#303644",
     borderRadius: 8,
     height: 7,
     overflow: "hidden",
   },
   liveFill: {
-    backgroundColor: "rgba(216,166,74,0.34)",
     height: "100%",
     width: "0%",
   },
@@ -337,17 +357,12 @@ const styles = StyleSheet.create({
     minHeight: 24,
   },
   volumeStep: {
-    backgroundColor: "#303644",
     borderRadius: 3,
     flex: 1,
     height: 7,
   },
-  volumeStepActive: {
-    backgroundColor: "#D8A64A",
-  },
   retryButton: {
     alignItems: "center",
-    borderColor: "rgba(216,166,74,0.28)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -356,12 +371,10 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   retryText: {
-    color: "#D8A64A",
     fontSize: 12,
     fontWeight: "900",
   },
   error: {
-    color: "#FCA5A5",
     fontSize: 12,
     fontWeight: "700",
   },
@@ -373,7 +386,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   waitingBar: {
-    backgroundColor: "rgba(216,166,74,0.24)",
     borderRadius: 3,
     height: 22,
     width: 6,
@@ -385,13 +397,11 @@ const styles = StyleSheet.create({
     height: 30,
   },
   waitingTitle: {
-    color: "#EEF0F5",
     fontSize: 15,
     fontWeight: "900",
     textAlign: "center",
   },
   waitingBody: {
-    color: "#8F98A8",
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 19,

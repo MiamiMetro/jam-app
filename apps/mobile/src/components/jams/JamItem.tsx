@@ -14,9 +14,24 @@ export default function JamItem({ onPress, room }: Props) {
   const hostAvatar = room.host?.avatar_url ?? "";
   const initials = hostName.slice(0, 2).toUpperCase();
   const isLive = room.status === "live" || room.participant_count > 0;
+  const accessibilityLabel = [
+    room.name,
+    `jam ${room.handle}`,
+    isLive ? "Live" : "Idle",
+    room.description,
+    `${room.participant_count} listeners`,
+    `${room.max_performers} performers`,
+    room.stream_url ? "Stream ready" : null,
+    `Host ${hostName}`,
+    room.genre,
+    room.is_private ? "Private" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <Pressable
+      accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
@@ -49,10 +64,15 @@ export default function JamItem({ onPress, room }: Props) {
         <View
           style={[
             styles.liveBadge,
-            { backgroundColor: isLive ? "rgba(34,197,94,0.12)" : colors.muted },
+            { backgroundColor: isLive ? colors.successMuted : colors.muted },
           ]}
         >
-          <View style={[styles.liveDot, isLive ? styles.liveDotOn : null]} />
+          <View
+            style={[
+              styles.liveDot,
+              { backgroundColor: isLive ? colors.success : colors.mutedForeground },
+            ]}
+          />
           <Text
             style={[
               styles.liveText,
@@ -212,13 +232,9 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   liveDot: {
-    backgroundColor: "#737D8C",
     borderRadius: 4,
     height: 8,
     width: 8,
-  },
-  liveDotOn: {
-    backgroundColor: "#22C55E",
   },
   liveText: {
     fontSize: 11,

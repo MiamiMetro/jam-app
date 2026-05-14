@@ -8,81 +8,34 @@ import React, {
 } from "react";
 import { useColorScheme } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import {
+  createMobileRecipes,
+  darkMobileColors,
+  lightMobileColors,
+  mobileRadii,
+  mobileSpacing,
+  type MobileThemePalette,
+  type MobileThemeRadii,
+  type MobileThemeRecipes,
+  type MobileThemeSpacing,
+} from "./mobileTokens";
 
 export type MobileThemeMode = "light" | "dark" | "system";
 export type ResolvedMobileTheme = "light" | "dark";
 
-export type MobileThemeColors = {
-  accent: string;
-  accentMuted: string;
-  background: string;
-  border: string;
-  borderStrong: string;
-  card: string;
-  cardPressed: string;
-  destructive: string;
-  destructiveMuted: string;
-  foreground: string;
-  input: string;
-  muted: string;
-  mutedForeground: string;
-  primary: string;
-  primaryForeground: string;
-  secondary: string;
-  secondaryForeground: string;
-  success: string;
-};
+export type MobileThemeColors = MobileThemePalette;
 
 type MobileThemeContextValue = {
   colors: MobileThemeColors;
+  radii: MobileThemeRadii;
+  recipes: MobileThemeRecipes;
   resolvedTheme: ResolvedMobileTheme;
   setTheme: (theme: MobileThemeMode) => void;
+  spacing: MobileThemeSpacing;
   theme: MobileThemeMode;
 };
 
 const THEME_STORAGE_KEY = "mobile-theme";
-
-const darkColors: MobileThemeColors = {
-  accent: "#D8A64A",
-  accentMuted: "rgba(216,166,74,0.14)",
-  background: "#1A1E29",
-  border: "rgba(255,255,255,0.08)",
-  borderStrong: "rgba(255,255,255,0.12)",
-  card: "#262B37",
-  cardPressed: "#2C3240",
-  destructive: "#FECACA",
-  destructiveMuted: "rgba(248,113,113,0.14)",
-  foreground: "#EEF0F5",
-  input: "#1E2330",
-  muted: "#353B49",
-  mutedForeground: "#8F98A8",
-  primary: "#D8A64A",
-  primaryForeground: "#251B0A",
-  secondary: "#353B49",
-  secondaryForeground: "#D5D9E2",
-  success: "#8BE0AD",
-};
-
-const lightColors: MobileThemeColors = {
-  accent: "#C55A18",
-  accentMuted: "rgba(197,90,24,0.12)",
-  background: "#F3F0E8",
-  border: "#D9D0C0",
-  borderStrong: "#CFC4B1",
-  card: "#FBFAF6",
-  cardPressed: "#EFE8DA",
-  destructive: "#B42318",
-  destructiveMuted: "rgba(180,35,24,0.1)",
-  foreground: "#332A20",
-  input: "#E6DDCE",
-  muted: "#EDE6D8",
-  mutedForeground: "#766B5F",
-  primary: "#C55A18",
-  primaryForeground: "#FFF8ED",
-  secondary: "#EDE6D8",
-  secondaryForeground: "#3E3328",
-  success: "#248A4C",
-};
 
 const MobileThemeContext = createContext<MobileThemeContextValue | null>(null);
 
@@ -118,11 +71,14 @@ export function MobileThemeProvider({ children }: { children: ReactNode }) {
         : "dark"
       : theme;
 
-  const colors = resolvedTheme === "light" ? lightColors : darkColors;
+  const colors = resolvedTheme === "light" ? lightMobileColors : darkMobileColors;
+  const recipes = useMemo(() => createMobileRecipes(colors), [colors]);
 
   const value = useMemo<MobileThemeContextValue>(
     () => ({
       colors,
+      radii: mobileRadii,
+      recipes,
       resolvedTheme,
       setTheme: (nextTheme) => {
         setThemeState(nextTheme);
@@ -130,9 +86,10 @@ export function MobileThemeProvider({ children }: { children: ReactNode }) {
           console.warn("Failed to save theme", error);
         });
       },
+      spacing: mobileSpacing,
       theme,
     }),
-    [colors, resolvedTheme, theme]
+    [colors, recipes, resolvedTheme, theme]
   );
 
   return (

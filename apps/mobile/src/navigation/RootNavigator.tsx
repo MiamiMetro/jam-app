@@ -14,6 +14,7 @@ import CommunityScreen from "../screens/Community/CommunityScreen";
 import CommunityDetailScreen from "../screens/Community/CommunityDetailScreen";
 import BandsScreen from "../screens/Bands/BandsScreen";
 import SettingsScreen from "../screens/Settings/SettingsScreen";
+import PublicProfileScreen from "../screens/Profile/PublicProfileScreen";
 import { authClient } from "../lib/auth-client";
 import { api } from "@jam-app/convex";
 import { useMobileTheme } from "../theme/MobileTheme";
@@ -30,6 +31,7 @@ export type RootStackParamList = {
   CommunityDetail: { handle: string };
   Bands: undefined;
   Settings: undefined;
+  UserProfile: { username: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -64,6 +66,7 @@ export default function RootNavigator() {
           <Stack.Screen name="CommunityDetail" component={CommunityDetailScreen} />
           <Stack.Screen name="Bands" component={BandsScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="UserProfile" component={PublicProfileScreen} />
         </>
       ) : (
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />

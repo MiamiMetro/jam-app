@@ -1,12 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import React, { useMemo, useState } from "react";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,25 +16,28 @@ import CommentItem from "@/components/comments/CommentItem";
 import AudioPostPlayer from "@/components/posts/AudioPostPlayer";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 import { useMyProfile } from "@/hooks/useMyProfile";
+import {
+  useComments,
+  useCreateComment,
+  useDeletePost,
+  usePost,
+  useToggleLike,
+} from "@/hooks/usePosts";
 import { useMobileTheme } from "@/theme/MobileTheme";
-import { api } from "@jam-app/convex";
-import type { Id } from "@jam-app/convex";
 
 type Props = NativeStackScreenProps<RootStackParamList, "PostDetail">;
 
 export default function PostDetailScreen({ navigation, route }: Props) {
   const { colors } = useMobileTheme();
+  const insets = useSafeAreaInsets();
   const { postId } = route.params;
-  const post = useQuery(api.posts.getById, { postId: postId as Id<"posts"> });
+  const postQuery = usePost(postId);
+  const post = postQuery.data;
   const { profile } = useMyProfile();
-  const createComment = useMutation(api.comments.create);
-  const toggleLike = useMutation(api.posts.toggleLike);
-  const removePost = useMutation(api.posts.remove);
-  const commentsQuery = usePaginatedQuery(
-    api.comments.getByPostPaginated,
-    { postId: postId as Id<"posts"> },
-    { initialNumItems: 20 }
-  );
+  const createComment = useCreateComment();
+  const toggleLike = useToggleLike();
+  const removePost = useDeletePost();
+  const commentsQuery = useComments(postId);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [isCommentSubmitting, setIsCommentSubmitting] = useState(false);
   const [isPostLikeSubmitting, setIsPostLikeSubmitting] = useState(false);
@@ -43,17 +45,17 @@ export default function PostDetailScreen({ navigation, route }: Props) {
 
   const topLevelComments = useMemo(
     () =>
-      commentsQuery.results.filter(
-        (comment) => comment.depth === 0 && (!comment.deleted_at || comment.replies_count > 0)
+      commentsQuery.data.filter(
+        (comment) => comment.depth === 0 && (!comment.isDeleted || (comment.repliesCount ?? 0) > 0)
       ),
-    [commentsQuery.results]
+    [commentsQuery.data]
   );
 
   const authorName = post?.author?.username ?? "unknown";
-  const isOwnPost = profile?.id === post?.author_id;
+  const isOwnPost = profile?.username === post?.author?.username;
   const createdAt = useMemo(
-    () => (post?.created_at ? formatRelativeTime(post.created_at) : ""),
-    [post?.created_at]
+    () => (post?.timestamp ? formatRelativeTime(post.timestamp) : ""),
+    [post?.timestamp]
   );
   const fallbackLetters = useMemo(
     () => authorName.slice(0, 2).toUpperCase(),
@@ -63,10 +65,7 @@ export default function PostDetailScreen({ navigation, route }: Props) {
   const handleCreateComment = async (text: string) => {
     try {
       setIsCommentSubmitting(true);
-      await createComment({
-        postId: postId as Id<"posts">,
-        text,
-      });
+      await createComment.mutateAsync({ postId, content: text });
     } finally {
       setIsCommentSubmitting(false);
     }
@@ -76,7 +75,7 @@ export default function PostDetailScreen({ navigation, route }: Props) {
     if (!post || isPostLikeSubmitting) return;
     try {
       setIsPostLikeSubmitting(true);
-      await toggleLike({ postId: post.id as Id<"posts"> });
+      await toggleLike.mutateAsync(post.id);
     } finally {
       setIsPostLikeSubmitting(false);
     }
@@ -87,14 +86,14 @@ export default function PostDetailScreen({ navigation, route }: Props) {
 
     try {
       setIsDeletingPost(true);
-      await removePost({ postId: post.id as Id<"posts"> });
+      await removePost.mutateAsync(post.id);
       navigation.goBack();
     } finally {
       setIsDeletingPost(false);
     }
   };
 
-  if (post === undefined) {
+  if (postQuery.isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerState}>
@@ -111,8 +110,19 @@ export default function PostDetailScreen({ navigation, route }: Props) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons color={colors.secondaryForeground} name="arrow-back" size={20} />
+          <Pressable
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons
+              accessibilityElementsHidden
+              color={colors.secondaryForeground}
+              importantForAccessibility="no-hide-descendants"
+              name="arrow-back"
+              size={20}
+            />
           </Pressable>
           <Text style={[styles.headerTitle, { color: colors.secondaryForeground }]}>
             Post
@@ -133,8 +143,19 @@ export default function PostDetailScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons color={colors.secondaryForeground} name="arrow-back" size={20} />
+        <Pressable
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Ionicons
+            accessibilityElementsHidden
+            color={colors.secondaryForeground}
+            importantForAccessibility="no-hide-descendants"
+            name="arrow-back"
+            size={20}
+          />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.secondaryForeground }]}>
           Post by {authorName}
@@ -142,11 +163,15 @@ export default function PostDetailScreen({ navigation, route }: Props) {
         {isOwnPost ? (
           <Pressable
             disabled={isDeletingPost}
+            accessibilityLabel="Delete post"
+            accessibilityRole="button"
             onPress={handleDeletePost}
             style={styles.deleteButton}
           >
             <Ionicons
+              accessibilityElementsHidden
               color={isDeletingPost ? colors.muted : colors.mutedForeground}
+              importantForAccessibility="no-hide-descendants"
               name="trash-outline"
               size={20}
             />
@@ -154,7 +179,7 @@ export default function PostDetailScreen({ navigation, route }: Props) {
         ) : null}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}>
         <View style={[styles.postBlock, { borderBottomColor: colors.border }]}>
           <View style={styles.postHeader}>
             <View
@@ -163,10 +188,10 @@ export default function PostDetailScreen({ navigation, route }: Props) {
                 { backgroundColor: colors.muted, borderColor: colors.border },
               ]}
             >
-              {post.author?.avatar_url && !avatarFailed ? (
+              {post.author?.avatar && !avatarFailed ? (
                 <Image
                   onError={() => setAvatarFailed(true)}
-                  source={{ uri: post.author.avatar_url }}
+                  source={{ uri: post.author.avatar }}
                   style={styles.avatarImage}
                 />
               ) : (
@@ -192,33 +217,51 @@ export default function PostDetailScreen({ navigation, route }: Props) {
           {post.audio_url ? (
             <AudioPostPlayer
               audioUrl={post.audio_url}
-              duration={post.audio_duration}
+              duration={post.audioFile?.duration}
               style={styles.audioPlayer}
-              title={post.audio_title}
+              title={post.audioFile?.title}
             />
           ) : null}
 
           <View style={[styles.postActions, { borderTopColor: colors.border }]}>
-            <Pressable onPress={handleTogglePostLike} style={styles.action}>
+            <Pressable
+              accessibilityLabel={`${post.isLiked ? "Unlike" : "Like"} post. ${post.likes} likes`}
+              accessibilityRole="button"
+              disabled={isPostLikeSubmitting}
+              onPress={handleTogglePostLike}
+              style={styles.action}
+            >
               <Ionicons
-                color={post.is_liked ? "#EF4444" : colors.mutedForeground}
-                name={post.is_liked ? "heart" : "heart-outline"}
+                accessibilityElementsHidden
+                color={post.isLiked ? colors.destructive : colors.mutedForeground}
+                importantForAccessibility="no-hide-descendants"
+                name={post.isLiked ? "heart" : "heart-outline"}
                 size={20}
               />
               <Text
                 style={[
                   styles.actionText,
                   { color: colors.mutedForeground },
-                  post.is_liked ? styles.likedText : null,
+                  post.isLiked ? { color: colors.destructive } : null,
                 ]}
               >
-                {post.likes_count}
+                {post.likes}
               </Text>
             </Pressable>
-            <View style={styles.action}>
-              <Ionicons color={colors.mutedForeground} name="chatbubble-outline" size={19} />
+            <View
+              accessibilityLabel={`${post.comments} comments`}
+              accessibilityRole="text"
+              style={styles.action}
+            >
+              <Ionicons
+                accessibilityElementsHidden
+                color={colors.mutedForeground}
+                importantForAccessibility="no-hide-descendants"
+                name="chatbubble-outline"
+                size={19}
+              />
               <Text style={[styles.actionText, { color: colors.mutedForeground }]}>
-                {post.comments_count}
+                {post.comments}
               </Text>
             </View>
           </View>
@@ -240,7 +283,7 @@ export default function PostDetailScreen({ navigation, route }: Props) {
           />
         </View>
 
-        {commentsQuery.status === "LoadingFirstPage" ? (
+        {commentsQuery.isLoading ? (
           <View style={styles.centerStateInline}>
             <ActivityIndicator color={colors.primary} />
             <Text style={[styles.stateText, { color: colors.mutedForeground }]}>
@@ -250,7 +293,9 @@ export default function PostDetailScreen({ navigation, route }: Props) {
         ) : topLevelComments.length === 0 ? (
           <View style={styles.centerStateInline}>
             <Ionicons
+              accessibilityElementsHidden
               color={colors.mutedForeground}
+              importantForAccessibility="no-hide-descendants"
               name="chatbubble-ellipses-outline"
               size={34}
             />
@@ -269,8 +314,8 @@ export default function PostDetailScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {commentsQuery.status === "CanLoadMore" ? (
-          <Pressable onPress={() => commentsQuery.loadMore(20)} style={styles.loadMoreButton}>
+        {commentsQuery.hasNextPage ? (
+          <Pressable onPress={commentsQuery.fetchNextPage} style={styles.loadMoreButton}>
             <Text style={[styles.loadMoreText, { color: colors.primary }]}>
               Load more comments
             </Text>
@@ -281,8 +326,8 @@ export default function PostDetailScreen({ navigation, route }: Props) {
   );
 }
 
-function formatRelativeTime(value: string) {
-  const createdAt = new Date(value).getTime();
+function formatRelativeTime(value: string | Date) {
+  const createdAt = value instanceof Date ? value.getTime() : new Date(value).getTime();
   if (Number.isNaN(createdAt)) return "";
 
   const diffSeconds = Math.max(0, Math.floor((Date.now() - createdAt) / 1000));
@@ -297,7 +342,7 @@ function formatRelativeTime(value: string) {
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d`;
 
-  return new Date(value).toLocaleDateString();
+  return (value instanceof Date ? value : new Date(value)).toLocaleDateString();
 }
 
 const styles = StyleSheet.create({
@@ -396,9 +441,6 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 14,
     fontWeight: "800",
-  },
-  likedText: {
-    color: "#EF4444",
   },
   commentsHeader: {
     alignItems: "center",

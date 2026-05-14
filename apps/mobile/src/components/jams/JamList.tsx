@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { FriendInRoomItem, MyRoom, RoomFeedItem } from "@/types";
 import JamItem from "./JamItem";
 import { useMobileTheme } from "@/theme/MobileTheme";
@@ -41,13 +42,14 @@ export default function JamList({
   searchValue = "",
 }: Props) {
   const { colors } = useMobileTheme();
+  const insets = useSafeAreaInsets();
   const hasSearch = searchValue.trim().length > 0;
 
   return (
     <FlatList
       contentContainerStyle={[
         styles.content,
-        { backgroundColor: colors.background },
+        { backgroundColor: colors.background, paddingBottom: 28 + insets.bottom },
         rooms.length === 0 ? styles.emptyContent : null,
       ]}
       data={rooms}
@@ -99,7 +101,13 @@ export default function JamList({
               { backgroundColor: colors.input, borderColor: colors.border },
             ]}
           >
-            <Ionicons color={colors.mutedForeground} name="search" size={17} />
+            <Ionicons
+              accessibilityElementsHidden
+              color={colors.mutedForeground}
+              importantForAccessibility="no-hide-descendants"
+              name="search"
+              size={17}
+            />
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
@@ -115,7 +123,13 @@ export default function JamList({
                 onPress={() => onSearchChange?.("")}
                 style={styles.clearSearchButton}
               >
-                <Ionicons color={colors.mutedForeground} name="close" size={17} />
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.mutedForeground}
+                  importantForAccessibility="no-hide-descendants"
+                  name="close"
+                  size={17}
+                />
               </Pressable>
             ) : null}
           </View>
@@ -177,9 +191,23 @@ function MyRoomSummary({
   if (!room) return null;
 
   const statusLabel = room.is_active ? "Active" : "Disabled";
+  const accessibilityLabel = [
+    "My Room",
+    room.name,
+    statusLabel,
+    room.description,
+    `${room.participant_count} listeners`,
+    `${room.max_performers} performers`,
+    room.genre,
+    room.is_private ? "Private" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
       disabled={!room.is_active}
       onPress={() => onOpenRoomHandle?.(room.handle)}
       style={({ pressed }) => [
@@ -202,12 +230,17 @@ function MyRoomSummary({
             styles.statusPill,
             {
               backgroundColor: room.is_active
-                ? "rgba(34,197,94,0.12)"
+                ? colors.successMuted
                 : colors.muted,
             },
           ]}
         >
-          <View style={[styles.statusDot, room.is_active ? styles.statusDotActive : null]} />
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: room.is_active ? colors.success : colors.mutedForeground },
+            ]}
+          />
           <Text
             style={[
               styles.statusText,
@@ -264,6 +297,8 @@ function FriendsJammingNow({
       >
         {friendsInRooms.slice(0, 8).map((item) => (
           <Pressable
+            accessibilityLabel={`Open ${item.room_name} with ${item.friend.username}`}
+            accessibilityRole="button"
             key={`${item.friend.id}-${item.room_id}`}
             onPress={() => onOpenRoomHandle?.(item.room_handle)}
             style={({ pressed }) => [
@@ -359,7 +394,6 @@ function EmptyState({
 
 const styles = StyleSheet.create({
   content: {
-    backgroundColor: "#1A1E29",
     paddingBottom: 18,
   },
   emptyContent: {
@@ -367,7 +401,6 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -379,22 +412,18 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   eyebrow: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0,
     textTransform: "uppercase",
   },
   title: {
-    color: "#EEF0F5",
     fontSize: 24,
     fontWeight: "900",
     marginTop: 2,
   },
   liveCount: {
     alignItems: "center",
-    backgroundColor: "rgba(216,166,74,0.13)",
-    borderColor: "rgba(216,166,74,0.34)",
     borderRadius: 8,
     borderWidth: 1,
     minWidth: 58,
@@ -402,20 +431,16 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   liveCountNumber: {
-    color: "#D8A64A",
     fontSize: 16,
     fontWeight: "900",
   },
   liveCountLabel: {
-    color: "#AEB6C4",
     fontSize: 10,
     fontWeight: "800",
     textTransform: "uppercase",
   },
   searchBox: {
     alignItems: "center",
-    backgroundColor: "#222733",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -426,7 +451,6 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   searchInput: {
-    color: "#EEF0F5",
     flex: 1,
     fontSize: 14,
     minHeight: 42,
@@ -439,8 +463,6 @@ const styles = StyleSheet.create({
     width: 32,
   },
   myRoomCard: {
-    backgroundColor: "#222733",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     gap: 9,
@@ -448,14 +470,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     padding: 14,
   },
-  myRoomActive: {
-    borderColor: "rgba(216,166,74,0.34)",
-  },
-  myRoomPressed: {
-    backgroundColor: "#262C39",
-  },
   myRoomLoading: {
-    color: "#8F98A8",
     fontSize: 13,
     fontWeight: "700",
   },
@@ -471,7 +486,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   myRoomLabel: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0,
@@ -479,40 +493,26 @@ const styles = StyleSheet.create({
   },
   statusPill: {
     alignItems: "center",
-    backgroundColor: "#303644",
     borderRadius: 8,
     flexDirection: "row",
     gap: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  statusPillActive: {
-    backgroundColor: "rgba(34,197,94,0.12)",
-  },
   statusDot: {
-    backgroundColor: "#737D8C",
     borderRadius: 4,
     height: 8,
     width: 8,
   },
-  statusDotActive: {
-    backgroundColor: "#22C55E",
-  },
   statusText: {
-    color: "#AEB6C4",
     fontSize: 11,
     fontWeight: "900",
   },
-  statusTextActive: {
-    color: "#86EFAC",
-  },
   myRoomName: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
   },
   myRoomDescription: {
-    color: "#AEB6C4",
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 19,
@@ -524,8 +524,6 @@ const styles = StyleSheet.create({
   },
   detailPill: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -535,7 +533,6 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   detailPillText: {
-    color: "#AEB6C4",
     fontSize: 11,
     fontWeight: "800",
   },
@@ -543,7 +540,6 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   friendsTitle: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0,
@@ -557,8 +553,6 @@ const styles = StyleSheet.create({
   },
   friendChip: {
     alignItems: "center",
-    backgroundColor: "#222733",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -567,13 +561,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 8,
   },
-  friendChipPressed: {
-    backgroundColor: "#262C39",
-  },
   friendAvatar: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(34,197,94,0.35)",
     borderRadius: 14,
     borderWidth: 1,
     height: 28,
@@ -581,7 +570,6 @@ const styles = StyleSheet.create({
     width: 28,
   },
   friendAvatarText: {
-    color: "#C7CCD6",
     fontSize: 10,
     fontWeight: "900",
   },
@@ -589,12 +577,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   friendName: {
-    color: "#EEF0F5",
     fontSize: 12,
     fontWeight: "900",
   },
   friendRoom: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "700",
     marginTop: 2,
@@ -608,14 +594,12 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
   sectionLabel: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0,
     textTransform: "uppercase",
   },
   sectionMeta: {
-    color: "#737D8C",
     fontSize: 11,
     fontWeight: "800",
   },
@@ -626,14 +610,12 @@ const styles = StyleSheet.create({
     paddingVertical: 52,
   },
   emptyTitle: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
     marginTop: 12,
     textAlign: "center",
   },
   emptyMessage: {
-    color: "#8F98A8",
     fontSize: 13,
     lineHeight: 19,
     marginTop: 6,

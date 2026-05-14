@@ -283,3 +283,33 @@ export function useRejectBandApplication() {
     mutateAsync: run,
   };
 }
+
+export function useRespondToBandApplication() {
+  const respondMutation = useMutation(api.bands.respondToApplication);
+  const [isPending, setIsPending] = useState(false);
+
+  const run = async (variables: {
+    applicationId: string;
+    response: "accepted" | "rejected";
+  }) => {
+    setIsPending(true);
+    try {
+      return await respondMutation({
+        applicationId: variables.applicationId as Id<"band_applications">,
+        response: variables.response,
+      });
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return {
+    isPending,
+    mutate: (variables: Parameters<typeof run>[0], options?: MutationOptions) => {
+      run(variables)
+        .then(() => options?.onSuccess?.())
+        .catch((error) => options?.onError?.(error as Error));
+    },
+    mutateAsync: run,
+  };
+}

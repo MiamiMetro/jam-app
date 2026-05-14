@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, usePaginatedQuery } from "convex/react";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -9,14 +8,19 @@ import {
   Text,
   View,
 } from "react-native";
-import { api } from "@jam-app/convex";
-import type { Id } from "@jam-app/convex";
-import type { Comment, User } from "@/types";
+import type { User } from "@/types";
+import {
+  useCreateReply,
+  useDeleteComment,
+  useReplies,
+  useToggleCommentLike,
+  type FrontendComment,
+} from "@/hooks/usePosts";
 import CommentComposer from "./CommentComposer";
 import { useMobileTheme } from "@/theme/MobileTheme";
 
 type Props = {
-  comment: Comment;
+  comment: FrontendComment;
   currentProfile: User | null | undefined;
   depth?: number;
 };
@@ -26,39 +30,35 @@ const MAX_VISIBLE_DEPTH = 4;
 
 export default function CommentItem({ comment, currentProfile, depth = 0 }: Props) {
   const { colors } = useMobileTheme();
-  const toggleLike = useMutation(api.comments.toggleLike);
-  const deleteComment = useMutation(api.comments.remove);
-  const createReply = useMutation(api.comments.reply);
+  const toggleLike = useToggleCommentLike();
+  const deleteComment = useDeleteComment();
+  const createReply = useCreateReply();
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [repliesExpanded, setRepliesExpanded] = useState(false);
   const [replying, setReplying] = useState(false);
   const [isReplySubmitting, setIsReplySubmitting] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
 
-  const repliesQuery = usePaginatedQuery(
-    api.comments.getRepliesPaginated,
-    repliesExpanded ? { parentId: comment.id as Id<"comments"> } : "skip",
-    { initialNumItems: 10 }
-  );
+  const repliesQuery = useReplies(repliesExpanded ? comment.id : null);
 
   const authorName = comment.author?.username ?? "unknown";
   const isOwn = currentProfile?.username === authorName;
-  const isDeleted = Boolean(comment.deleted_at);
+  const isDeleted = Boolean(comment.isDeleted);
   const visibleReplies = useMemo(
-    () => repliesQuery.results.filter((reply) => !reply.deleted_at || reply.replies_count > 0),
-    [repliesQuery.results]
+    () => repliesQuery.data.filter((reply) => !reply.isDeleted || (reply.repliesCount ?? 0) > 0),
+    [repliesQuery.data]
   );
   const fallbackLetters = useMemo(
     () => authorName.slice(0, 2).toUpperCase(),
     [authorName]
   );
-  const createdAt = useMemo(() => formatRelativeTime(comment.created_at), [comment.created_at]);
+  const createdAt = useMemo(() => formatRelativeTime(comment.timestamp), [comment.timestamp]);
 
   const handleToggleLike = async () => {
     if (isDeleted || isMutating) return;
     try {
       setIsMutating(true);
-      await toggleLike({ commentId: comment.id as Id<"comments"> });
+      await toggleLike.mutateAsync(comment.id);
     } finally {
       setIsMutating(false);
     }
@@ -68,7 +68,7 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
     if (!isOwn || isMutating) return;
     try {
       setIsMutating(true);
-      await deleteComment({ commentId: comment.id as Id<"comments"> });
+      await deleteComment.mutateAsync(comment.id);
     } finally {
       setIsMutating(false);
     }
@@ -77,10 +77,7 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
   const handleReply = async (text: string) => {
     try {
       setIsReplySubmitting(true);
-      await createReply({
-        parentId: comment.id as Id<"comments">,
-        text,
-      });
+      await createReply.mutateAsync({ parentId: comment.id, content: text });
       setReplying(false);
       setRepliesExpanded(true);
     } finally {
@@ -108,10 +105,10 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
             { backgroundColor: colors.muted, borderColor: colors.border },
           ]}
         >
-          {comment.author?.avatar_url && !avatarFailed && !isDeleted ? (
+          {comment.author?.avatar && !avatarFailed && !isDeleted ? (
             <Image
               onError={() => setAvatarFailed(true)}
-              source={{ uri: comment.author.avatar_url }}
+              source={{ uri: comment.author.avatar }}
               style={styles.avatarImage}
             />
           ) : (
@@ -137,55 +134,84 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
             </Text>
           ) : (
             <Text style={[styles.content, { color: colors.foreground }]}>
-              {comment.text}
+              {comment.content}
             </Text>
           )}
 
           <View style={styles.actionsRow}>
             <Pressable
+              accessibilityLabel={`${comment.isLiked ? "Unlike" : "Like"} comment. ${comment.likes} likes`}
+              accessibilityRole="button"
               disabled={isDeleted || isMutating}
               onPress={handleToggleLike}
               style={styles.action}
             >
               <Ionicons
-                color={comment.is_liked ? "#EF4444" : colors.mutedForeground}
-                name={comment.is_liked ? "heart" : "heart-outline"}
+                accessibilityElementsHidden
+                color={comment.isLiked ? colors.destructive : colors.mutedForeground}
+                importantForAccessibility="no-hide-descendants"
+                name={comment.isLiked ? "heart" : "heart-outline"}
                 size={15}
               />
               <Text
                 style={[
                   styles.actionText,
                   { color: colors.mutedForeground },
-                  comment.is_liked ? styles.likedText : null,
+                  comment.isLiked ? { color: colors.destructive } : null,
                 ]}
               >
-                {comment.likes_count}
+                {comment.likes}
               </Text>
             </Pressable>
 
             {!isDeleted ? (
-              <Pressable onPress={() => setReplying((value) => !value)} style={styles.action}>
-                <Ionicons color={colors.mutedForeground} name="chatbubble-outline" size={14} />
+              <Pressable
+                accessibilityLabel="Reply to comment"
+                accessibilityRole="button"
+                onPress={() => setReplying((value) => !value)}
+                style={styles.action}
+              >
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.mutedForeground}
+                  importantForAccessibility="no-hide-descendants"
+                  name="chatbubble-outline"
+                  size={14}
+                />
                 <Text style={[styles.actionText, { color: colors.mutedForeground }]}>
                   Reply
                 </Text>
               </Pressable>
             ) : null}
 
-            {comment.replies_count > 0 ? (
+            {(comment.repliesCount ?? 0) > 0 ? (
               <Pressable
+                accessibilityLabel={`${repliesExpanded ? "Hide" : "View"} ${comment.repliesCount} replies`}
+                accessibilityRole="button"
                 onPress={() => setRepliesExpanded((value) => !value)}
                 style={styles.action}
               >
                 <Text style={[styles.primaryActionText, { color: colors.primary }]}>
-                  {repliesExpanded ? "Hide" : `View ${comment.replies_count}`}
+                  {repliesExpanded ? "Hide" : `View ${comment.repliesCount}`}
                 </Text>
               </Pressable>
             ) : null}
 
             {isOwn && !isDeleted ? (
-              <Pressable disabled={isMutating} onPress={handleDelete} style={styles.action}>
-                <Ionicons color={colors.mutedForeground} name="trash-outline" size={14} />
+              <Pressable
+                accessibilityLabel="Delete comment"
+                accessibilityRole="button"
+                disabled={isMutating}
+                onPress={handleDelete}
+                style={styles.action}
+              >
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.mutedForeground}
+                  importantForAccessibility="no-hide-descendants"
+                  name="trash-outline"
+                  size={14}
+                />
               </Pressable>
             ) : null}
           </View>
@@ -196,7 +222,11 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
                 <Text style={[styles.replyingText, { color: colors.mutedForeground }]}>
                   Replying to @{authorName}
                 </Text>
-                <Pressable onPress={() => setReplying(false)}>
+                <Pressable
+                  accessibilityLabel="Cancel reply"
+                  accessibilityRole="button"
+                  onPress={() => setReplying(false)}
+                >
                   <Text style={[styles.cancelText, { color: colors.primary }]}>
                     Cancel
                   </Text>
@@ -214,7 +244,7 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
 
           {repliesExpanded ? (
             <View style={styles.replies}>
-              {repliesQuery.status === "LoadingFirstPage" ? (
+              {repliesQuery.isLoading ? (
                 <View style={styles.loadingReplies}>
                   <ActivityIndicator color={colors.primary} />
                   <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
@@ -232,9 +262,9 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
                 ))
               )}
 
-              {repliesQuery.status === "CanLoadMore" ? (
+              {repliesQuery.hasNextPage ? (
                 <Pressable
-                  onPress={() => repliesQuery.loadMore(10)}
+                  onPress={repliesQuery.fetchNextPage}
                   style={styles.loadMoreReplies}
                 >
                   <Text style={[styles.primaryActionText, { color: colors.primary }]}>
@@ -250,8 +280,8 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
   );
 }
 
-function formatRelativeTime(value: string) {
-  const createdAt = new Date(value).getTime();
+function formatRelativeTime(value: Date) {
+  const createdAt = value.getTime();
   if (Number.isNaN(createdAt)) return "";
 
   const diffSeconds = Math.max(0, Math.floor((Date.now() - createdAt) / 1000));
@@ -266,7 +296,7 @@ function formatRelativeTime(value: string) {
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d`;
 
-  return new Date(value).toLocaleDateString();
+  return value.toLocaleDateString();
 }
 
 const styles = StyleSheet.create({
@@ -345,9 +375,6 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 12,
     fontWeight: "700",
-  },
-  likedText: {
-    color: "#EF4444",
   },
   primaryActionText: {
     fontSize: 12,

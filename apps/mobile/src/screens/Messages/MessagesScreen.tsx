@@ -1,83 +1,64 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useMutation, usePaginatedQuery } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
 import React, { useMemo, useState } from "react";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   FlatList,
   Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { api } from "@jam-app/convex";
-import type { Id } from "@jam-app/convex";
+import {
+  useAcceptFriend,
+  useDeleteFriend,
+  useFriendRequests,
+  useFriends,
+  useRequestFriend,
+  useSentFriendRequests,
+  type FriendProfile,
+} from "@/hooks/useFriends";
+import {
+  useAllUsers,
+  useConversations,
+  useEnsureDmConversation,
+  type UIConversation,
+} from "@/hooks/useUsers";
 import { useMobileTheme } from "@/theme/MobileTheme";
+import type { User } from "@/types";
 
 type TabKey = "chats" | "friends" | "find";
-
-type ConversationsReturn = FunctionReturnType<typeof api.messages.getConversationsPaginated>;
-type ConversationItem = ConversationsReturn["page"][number];
-type FriendsReturn = FunctionReturnType<typeof api.friends.listPaginated>;
-type FriendItem = NonNullable<FriendsReturn["page"][number]>;
-type RequestsReturn = FunctionReturnType<typeof api.friends.getRequestsPaginated>;
-type RequestItem = NonNullable<RequestsReturn["page"][number]>;
-type SentRequestsReturn = FunctionReturnType<typeof api.friends.getSentRequestsWithDataPaginated>;
-type SentRequestItem = NonNullable<SentRequestsReturn["page"][number]>;
-type UsersReturn = FunctionReturnType<typeof api.users.searchPaginated>;
-type SearchUserItem = UsersReturn["page"][number];
 
 const INITIAL_PAGE_SIZE = 25;
 
 export default function MessagesScreen() {
   const navigation = useNavigation<any>();
   const { colors } = useMobileTheme();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>("chats");
   const [friendSearch, setFriendSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const conversationsQuery = usePaginatedQuery(
-    api.messages.getConversationsPaginated,
-    {},
-    { initialNumItems: INITIAL_PAGE_SIZE }
-  );
-  const friendsQuery = usePaginatedQuery(
-    api.friends.listPaginated,
-    { search: friendSearch.trim() || undefined },
-    { initialNumItems: INITIAL_PAGE_SIZE }
-  );
-  const requestsQuery = usePaginatedQuery(
-    api.friends.getRequestsPaginated,
-    {},
-    { initialNumItems: 10 }
-  );
-  const sentRequestsQuery = usePaginatedQuery(
-    api.friends.getSentRequestsWithDataPaginated,
-    {},
-    { initialNumItems: 10 }
-  );
-  const usersQuery = usePaginatedQuery(
-    api.users.searchPaginated,
-    { search: userSearch.trim() || undefined },
-    { initialNumItems: INITIAL_PAGE_SIZE }
-  );
+  const conversationsQuery = useConversations();
+  const friendsQuery = useFriends(friendSearch);
+  const requestsQuery = useFriendRequests();
+  const sentRequestsQuery = useSentFriendRequests();
+  const usersQuery = useAllUsers(userSearch.trim(), true);
+  const ensureDm = useEnsureDmConversation();
+  const sendFriendRequest = useRequestFriend();
+  const acceptFriendRequest = useAcceptFriend();
+  const removeFriend = useDeleteFriend();
 
-  const ensureDm = useMutation(api.messages.ensureDmWithUser);
-  const sendFriendRequest = useMutation(api.friends.sendRequest);
-  const acceptFriendRequest = useMutation(api.friends.acceptRequest);
-  const removeFriend = useMutation(api.friends.remove);
-
-  const friends = friendsQuery.results.filter(Boolean) as FriendItem[];
-  const incomingRequests = requestsQuery.results.filter(Boolean) as RequestItem[];
-  const sentRequests = sentRequestsQuery.results.filter(Boolean) as SentRequestItem[];
-  const conversations = conversationsQuery.results;
-  const users = usersQuery.results;
+  const friends = friendsQuery.data;
+  const incomingRequests = requestsQuery.data;
+  const sentRequests = sentRequestsQuery.data;
+  const conversations = conversationsQuery.data;
+  const users = usersQuery.data;
 
   const friendIds = useMemo(
     () => new Set(friends.map((friend) => String(friend.id))),
@@ -98,9 +79,9 @@ export default function MessagesScreen() {
     try {
       setError(null);
       setBusyUserId(userId);
-      const result = await ensureDm({ userId: userId as Id<"profiles"> });
+      const conversationId = await ensureDm.mutateAsync(userId);
       navigation.navigate("Conversation", {
-        conversationId: result.conversationId,
+        conversationId,
         title,
       });
     } catch (err) {
@@ -116,7 +97,7 @@ export default function MessagesScreen() {
     try {
       setError(null);
       setBusyUserId(userId);
-      await sendFriendRequest({ friendId: userId as Id<"profiles"> });
+      await sendFriendRequest.mutateAsync(userId);
     } catch (err) {
       setError(getFriendlyError(err));
     } finally {
@@ -130,7 +111,7 @@ export default function MessagesScreen() {
     try {
       setError(null);
       setBusyUserId(userId);
-      await acceptFriendRequest({ userId: userId as Id<"profiles"> });
+      await acceptFriendRequest.mutateAsync(userId);
     } catch (err) {
       setError(getFriendlyError(err));
     } finally {
@@ -144,7 +125,7 @@ export default function MessagesScreen() {
     try {
       setError(null);
       setBusyUserId(userId);
-      await removeFriend({ userId: userId as Id<"profiles"> });
+      await removeFriend.mutateAsync(userId);
     } catch (err) {
       setError(getFriendlyError(err));
     } finally {
@@ -153,7 +134,7 @@ export default function MessagesScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View>
           <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>
@@ -173,6 +154,8 @@ export default function MessagesScreen() {
       <View style={styles.tabs}>
         {(["chats", "friends", "find"] as TabKey[]).map((tab) => (
           <Pressable
+            accessibilityLabel={`Show ${getTabLabel(tab)}`}
+            accessibilityRole="button"
             key={tab}
             onPress={() => {
               setError(null);
@@ -220,11 +203,11 @@ export default function MessagesScreen() {
 
       {activeTab === "chats" ? (
         <FlatList
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 32 }]}
           data={conversations}
           keyExtractor={(item) => String(item.id)}
           ListEmptyComponent={
-            conversationsQuery.status === "LoadingFirstPage" ? (
+            conversationsQuery.isLoading ? (
               <LoadingState label="Loading conversations..." />
             ) : (
               <EmptyState
@@ -235,12 +218,12 @@ export default function MessagesScreen() {
             )
           }
           ListFooterComponent={
-            conversationsQuery.status === "CanLoadMore" ? (
+            conversationsQuery.hasNextPage ? (
               <LoadMoreButton
                 label="Load more conversations"
-                onPress={() => conversationsQuery.loadMore(INITIAL_PAGE_SIZE)}
+                onPress={conversationsQuery.fetchNextPage}
               />
-            ) : conversationsQuery.status === "LoadingMore" ? (
+            ) : conversationsQuery.isFetchingNextPage ? (
               <LoadingMore />
             ) : null
           }
@@ -260,7 +243,7 @@ export default function MessagesScreen() {
 
       {activeTab === "friends" ? (
         <FlatList
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 32 }]}
           data={friends}
           keyExtractor={(item) => String(item.id)}
           ListHeaderComponent={
@@ -282,7 +265,7 @@ export default function MessagesScreen() {
             </View>
           }
           ListEmptyComponent={
-            friendsQuery.status === "LoadingFirstPage" ? (
+            friendsQuery.isLoading ? (
               <LoadingState label="Loading friends..." />
             ) : (
               <EmptyState
@@ -293,12 +276,12 @@ export default function MessagesScreen() {
             )
           }
           ListFooterComponent={
-            friendsQuery.status === "CanLoadMore" ? (
+            friendsQuery.hasNextPage ? (
               <LoadMoreButton
                 label="Load more friends"
-                onPress={() => friendsQuery.loadMore(INITIAL_PAGE_SIZE)}
+                onPress={friendsQuery.fetchNextPage}
               />
-            ) : friendsQuery.status === "LoadingMore" ? (
+            ) : friendsQuery.isFetchingNextPage ? (
               <LoadingMore />
             ) : null
           }
@@ -315,7 +298,7 @@ export default function MessagesScreen() {
 
       {activeTab === "find" ? (
         <FlatList
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 32 }]}
           data={users}
           keyExtractor={(item) => String(item.id)}
           ListHeaderComponent={
@@ -336,7 +319,7 @@ export default function MessagesScreen() {
             </View>
           }
           ListEmptyComponent={
-            usersQuery.status === "LoadingFirstPage" ? (
+            usersQuery.isLoading ? (
               <LoadingState label="Loading users..." />
             ) : (
               <EmptyState
@@ -347,12 +330,12 @@ export default function MessagesScreen() {
             )
           }
           ListFooterComponent={
-            usersQuery.status === "CanLoadMore" ? (
+            usersQuery.hasNextPage ? (
               <LoadMoreButton
                 label="Load more users"
-                onPress={() => usersQuery.loadMore(INITIAL_PAGE_SIZE)}
+                onPress={usersQuery.fetchNextPage}
               />
-            ) : usersQuery.status === "LoadingMore" ? (
+            ) : usersQuery.isFetchingNextPage ? (
               <LoadingMore />
             ) : null
           }
@@ -379,7 +362,7 @@ function ConversationRow({
   conversation,
   onPress,
 }: {
-  conversation: ConversationItem;
+  conversation: UIConversation;
   onPress: () => void;
 }) {
   const { colors } = useMobileTheme();
@@ -388,6 +371,8 @@ function ConversationRow({
 
   return (
     <Pressable
+      accessibilityLabel={`Open conversation with ${title}. ${lastMessage}`}
+      accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
@@ -397,14 +382,14 @@ function ConversationRow({
         },
       ]}
     >
-      <Avatar user={conversation.other_user ?? undefined} />
+      <Avatar user={conversation.otherUser ?? undefined} />
       <View style={styles.rowBody}>
         <View style={styles.rowTitleLine}>
           <Text numberOfLines={1} style={[styles.rowTitle, { color: colors.foreground }]}>
             {title}
           </Text>
           <Text style={[styles.rowTime, { color: colors.mutedForeground }]}>
-            {formatRelativeTime(conversation.updated_at)}
+            {formatRelativeTime(conversation.lastMessage?.timestamp)}
           </Text>
         </View>
         <Text numberOfLines={1} style={[styles.rowSubtext, { color: colors.mutedForeground }]}>
@@ -430,7 +415,7 @@ function FriendRow({
   onRemove,
 }: {
   busy: boolean;
-  friend: FriendItem;
+  friend: FriendProfile;
   onMessage: () => void;
   onRemove: () => void;
 }) {
@@ -448,6 +433,8 @@ function FriendRow({
         </Text>
       </View>
       <Pressable
+        accessibilityLabel={`Message ${friend.username}`}
+        accessibilityRole="button"
         disabled={busy}
         onPress={onMessage}
         style={[styles.smallPrimaryButton, { backgroundColor: colors.primary }]}
@@ -456,8 +443,20 @@ function FriendRow({
           {busy ? "..." : "DM"}
         </Text>
       </Pressable>
-      <Pressable disabled={busy} onPress={onRemove} style={styles.iconButton}>
-        <Ionicons color={colors.mutedForeground} name="person-remove-outline" size={17} />
+      <Pressable
+        accessibilityLabel={`Remove ${friend.username}`}
+        accessibilityRole="button"
+        disabled={busy}
+        onPress={onRemove}
+        style={styles.iconButton}
+      >
+        <Ionicons
+          accessibilityElementsHidden
+          color={colors.mutedForeground}
+          importantForAccessibility="no-hide-descendants"
+          name="person-remove-outline"
+          size={17}
+        />
       </Pressable>
     </View>
   );
@@ -482,7 +481,7 @@ function SearchUserRow({
   onCancel: () => void;
   onMessage: () => void;
   onRequest: () => void;
-  user: SearchUserItem;
+  user: User;
 }) {
   const { colors } = useMobileTheme();
   let actionLabel = "Add";
@@ -515,6 +514,8 @@ function SearchUserRow({
         </Text>
       </View>
       <Pressable
+        accessibilityLabel={`${actionLabel} ${user.username}`}
+        accessibilityRole="button"
         disabled={busy}
         onPress={action}
         style={[
@@ -542,8 +543,20 @@ function SearchUserRow({
         </Text>
       </Pressable>
       {secondaryAction && secondaryIcon ? (
-        <Pressable disabled={busy} onPress={secondaryAction} style={styles.iconButton}>
-          <Ionicons color={colors.mutedForeground} name={secondaryIcon} size={18} />
+        <Pressable
+          accessibilityLabel={`Cancel request to ${user.username}`}
+          accessibilityRole="button"
+          disabled={busy}
+          onPress={secondaryAction}
+          style={styles.iconButton}
+        >
+          <Ionicons
+            accessibilityElementsHidden
+            color={colors.mutedForeground}
+            importantForAccessibility="no-hide-descendants"
+            name={secondaryIcon}
+            size={18}
+          />
         </Pressable>
       ) : null}
     </View>
@@ -557,7 +570,7 @@ function RequestsSection({
   onDecline,
 }: {
   busyUserId: string | null;
-  incomingRequests: RequestItem[];
+  incomingRequests: FriendProfile[];
   onAccept: (userId: string) => void;
   onDecline: (userId: string) => void;
 }) {
@@ -584,6 +597,8 @@ function RequestsSection({
               </Text>
             </View>
             <Pressable
+              accessibilityLabel={`Accept friend request from ${request.username}`}
+              accessibilityRole="button"
               disabled={busy}
               onPress={() => onAccept(String(request.id))}
               style={[styles.smallPrimaryButton, { backgroundColor: colors.primary }]}
@@ -593,11 +608,19 @@ function RequestsSection({
               </Text>
             </Pressable>
             <Pressable
+              accessibilityLabel={`Decline friend request from ${request.username}`}
+              accessibilityRole="button"
               disabled={busy}
               onPress={() => onDecline(String(request.id))}
               style={styles.iconButton}
             >
-              <Ionicons color={colors.mutedForeground} name="close" size={18} />
+              <Ionicons
+                accessibilityElementsHidden
+                color={colors.mutedForeground}
+                importantForAccessibility="no-hide-descendants"
+                name="close"
+                size={18}
+              />
             </Pressable>
           </View>
         );
@@ -613,7 +636,7 @@ function SentRequestsSection({
 }: {
   busyUserId: string | null;
   onCancel: (userId: string) => void;
-  sentRequests: SentRequestItem[];
+  sentRequests: FriendProfile[];
 }) {
   const { colors } = useMobileTheme();
 
@@ -638,6 +661,8 @@ function SentRequestsSection({
               </Text>
             </View>
             <Pressable
+              accessibilityLabel={`Cancel friend request to ${request.username}`}
+              accessibilityRole="button"
               disabled={busy}
               onPress={() => onCancel(String(request.id))}
               style={[
@@ -717,7 +742,13 @@ function SearchBox({
         { backgroundColor: colors.input, borderColor: colors.border },
       ]}
     >
-      <Ionicons color={colors.mutedForeground} name="search" size={17} />
+      <Ionicons
+        accessibilityElementsHidden
+        color={colors.mutedForeground}
+        importantForAccessibility="no-hide-descendants"
+        name="search"
+        size={17}
+      />
       <TextInput
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -742,7 +773,13 @@ function EmptyState({
 
   return (
     <View style={styles.emptyState}>
-      <Ionicons color={colors.mutedForeground} name={icon} size={36} />
+      <Ionicons
+        accessibilityElementsHidden
+        color={colors.mutedForeground}
+        importantForAccessibility="no-hide-descendants"
+        name={icon}
+        size={36}
+      />
       <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{title}</Text>
       <Text style={[styles.emptyBody, { color: colors.mutedForeground }]}>{body}</Text>
     </View>
@@ -780,21 +817,26 @@ function LoadMoreButton({
   const { colors } = useMobileTheme();
 
   return (
-    <Pressable onPress={onPress} style={styles.loadMoreButton}>
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.loadMoreButton}
+    >
       <Text style={[styles.loadMoreText, { color: colors.primary }]}>{label}</Text>
     </Pressable>
   );
 }
 
-function getConversationTitle(conversation: ConversationItem) {
+function getConversationTitle(conversation: UIConversation) {
   if (conversation.isGroup) return conversation.name || "Group conversation";
-  return conversation.other_user?.username || "Conversation";
+  return conversation.otherUser?.username || "Conversation";
 }
 
-function getLastMessagePreview(conversation: ConversationItem) {
-  if (!conversation.last_message) return "No messages yet";
-  if (conversation.last_message.text) return conversation.last_message.text;
-  if (conversation.last_message.audio_url) return "Audio message";
+function getLastMessagePreview(conversation: UIConversation) {
+  if (!conversation.lastMessage) return "No messages yet";
+  if (conversation.lastMessage.content) return conversation.lastMessage.content;
+  if (conversation.lastMessage.audio_url) return "Audio message";
   return "Message";
 }
 
@@ -804,7 +846,8 @@ function getTabLabel(tab: TabKey) {
   return "Find";
 }
 
-function formatShortDate(value: string) {
+function formatShortDate(value?: string) {
+  if (!value) return "recently";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "recently";
   return date.toLocaleDateString();

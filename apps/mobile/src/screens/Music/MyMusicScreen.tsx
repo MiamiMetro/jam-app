@@ -2,12 +2,12 @@ import React, { useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import * as DocumentPicker from "expo-document-picker";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   FlatList,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,6 +17,7 @@ import {
 import AudioPostPlayer from "@/components/posts/AudioPostPlayer";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
 import { useAddTrack, useDeleteTrack, useMyTrackCount, useMyTracks } from "@/hooks/useMyTracks";
+import { useMobileTheme } from "@/theme/MobileTheme";
 import type { MyTrackItem } from "@/types";
 
 const MAX_AUDIO_SIZE = 25 * 1024 * 1024;
@@ -30,6 +31,8 @@ type SelectedAudio = {
 
 export default function MyMusicScreen() {
   const navigation = useNavigation<any>();
+  const { colors } = useMobileTheme();
+  const insets = useSafeAreaInsets();
   const addTrack = useAddTrack();
   const deleteTrack = useDeleteTrack();
   const { isUploading, uploadFile } = useMediaUpload();
@@ -137,10 +140,11 @@ export default function MyMusicScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         contentContainerStyle={[
           styles.content,
+          { paddingBottom: insets.bottom + 32 },
           tracks.length === 0 ? styles.emptyContent : null,
         ]}
         data={tracks}
@@ -149,70 +153,113 @@ export default function MyMusicScreen() {
           <View style={styles.emptyState}>
             {isLoading ? (
               <>
-                <ActivityIndicator color="#D8A64A" />
-                <Text style={styles.stateText}>Loading your tracks...</Text>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={[styles.stateText, { color: colors.mutedForeground }]}>Loading your tracks...</Text>
               </>
             ) : (
               <>
-                <Ionicons color="#8F98A8" name="musical-notes-outline" size={32} />
-                <Text style={styles.emptyTitle}>No uploads yet</Text>
-                <Text style={styles.stateText}>Pick an audio file and start your library.</Text>
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.mutedForeground}
+                  importantForAccessibility="no-hide-descendants"
+                  name="musical-notes-outline"
+                  size={32}
+                />
+                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No uploads yet</Text>
+                <Text style={[styles.stateText, { color: colors.mutedForeground }]}>Pick an audio file and start your library.</Text>
               </>
             )}
           </View>
         }
         ListFooterComponent={
           isFetchingNextPage ? (
-            <ActivityIndicator color="#D8A64A" style={styles.footerLoader} />
+            <ActivityIndicator color={colors.primary} style={styles.footerLoader} />
           ) : null
         }
         ListHeaderComponent={
           <>
-            <View style={styles.header}>
-              <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-                <Ionicons color="#EEF0F5" name="chevron-back" size={22} />
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+              <Pressable
+                accessibilityLabel="Back"
+                accessibilityRole="button"
+                onPress={() => navigation.goBack()}
+                style={styles.backButton}
+              >
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.secondaryForeground}
+                  importantForAccessibility="no-hide-descendants"
+                  name="chevron-back"
+                  size={22}
+                />
               </Pressable>
               <View style={styles.headerText}>
-                <Text style={styles.headerEyebrow}>Library</Text>
-                <Text style={styles.headerTitle}>My Music</Text>
+                <Text style={[styles.headerEyebrow, { color: colors.mutedForeground }]}>Library</Text>
+                <Text style={[styles.headerTitle, { color: colors.foreground }]}>My Music</Text>
               </View>
             </View>
 
-            <View style={styles.uploadPanel}>
+            <View
+              style={[
+                styles.uploadPanel,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
               <View style={styles.panelHeader}>
-                <View style={styles.panelIcon}>
-                  <Ionicons color="#D8A64A" name="cloud-upload-outline" size={20} />
+                <View style={[styles.panelIcon, { backgroundColor: colors.accentMuted }]}>
+                  <Ionicons
+                    accessibilityElementsHidden
+                    color={colors.primary}
+                    importantForAccessibility="no-hide-descendants"
+                    name="cloud-upload-outline"
+                    size={20}
+                  />
                 </View>
                 <View style={styles.panelText}>
-                  <Text style={styles.panelTitle}>Upload music</Text>
-                  <Text style={styles.panelSubtitle}>MP3, M4A, MP4, AAC, or WAV works best.</Text>
+                  <Text style={[styles.panelTitle, { color: colors.foreground }]}>Upload music</Text>
+                  <Text style={[styles.panelSubtitle, { color: colors.mutedForeground }]}>MP3, M4A, MP4, AAC, or WAV works best.</Text>
                 </View>
               </View>
 
               <Pressable
+                accessibilityLabel="Choose audio"
+                accessibilityRole="button"
                 disabled={isBusy}
                 onPress={handlePickAudio}
                 style={({ pressed }) => [
                   styles.pickButton,
-                  pressed && !isBusy ? styles.pickButtonPressed : null,
+                  { backgroundColor: pressed && !isBusy ? colors.cardPressed : colors.input, borderColor: colors.borderStrong },
                   isBusy ? styles.buttonDisabled : null,
                 ]}
               >
-                <Ionicons color="#D8A64A" name="folder-open-outline" size={18} />
-                <Text style={styles.pickButtonText}>
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.primary}
+                  importantForAccessibility="no-hide-descendants"
+                  name="folder-open-outline"
+                  size={18}
+                />
+                <Text style={[styles.pickButtonText, { color: colors.secondaryForeground }]}>
                   {selectedAudio ? selectedAudio.name : "Choose audio"}
                 </Text>
               </Pressable>
 
               {selectedAudio ? (
-                <View style={styles.selectedBox}>
+                <View
+                  style={[
+                    styles.selectedBox,
+                    { backgroundColor: colors.input, borderColor: colors.border },
+                  ]}
+                >
                   <View style={styles.selectedMeta}>
-                    <Text numberOfLines={1} style={styles.selectedName}>
+                    <Text numberOfLines={1} style={[styles.selectedName, { color: colors.secondaryForeground }]}>
                       {selectedAudio.name}
                     </Text>
-                    <Text style={styles.selectedSize}>{formatFileSize(selectedAudio.size)}</Text>
+                    <Text style={[styles.selectedSize, { color: colors.mutedForeground }]}>{formatFileSize(selectedAudio.size)}</Text>
                   </View>
                   <Pressable
+                    accessibilityLabel="Remove selected audio"
+                    accessibilityRole="button"
                     disabled={isBusy}
                     onPress={() => {
                       setSelectedAudio(null);
@@ -220,7 +267,13 @@ export default function MyMusicScreen() {
                     }}
                     style={styles.removeButton}
                   >
-                    <Ionicons color="#8F98A8" name="close" size={18} />
+                    <Ionicons
+                      accessibilityElementsHidden
+                      color={colors.mutedForeground}
+                      importantForAccessibility="no-hide-descendants"
+                      name="close"
+                      size={18}
+                    />
                   </Pressable>
                 </View>
               ) : null}
@@ -232,33 +285,57 @@ export default function MyMusicScreen() {
                   setError(null);
                 }}
                 placeholder="Track title"
-                placeholderTextColor="#7E8796"
-                style={styles.input}
+                placeholderTextColor={colors.mutedForeground}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.borderStrong,
+                    color: colors.foreground,
+                  },
+                ]}
                 value={trackTitle}
               />
 
-              {error ? <Text style={styles.error}>{error}</Text> : null}
+              {error ? (
+                <Text
+                  style={[
+                    styles.error,
+                    {
+                      backgroundColor: colors.destructiveMuted,
+                      borderColor: colors.destructive,
+                      color: colors.destructive,
+                    },
+                  ]}
+                >
+                  {error}
+                </Text>
+              ) : null}
 
               <Pressable
+                accessibilityLabel="Upload to My Music"
+                accessibilityRole="button"
                 disabled={!canUpload}
                 onPress={handleUpload}
                 style={({ pressed }) => [
                   styles.uploadButton,
-                  !canUpload ? styles.uploadButtonDisabled : null,
+                  {
+                    backgroundColor: canUpload ? colors.primary : colors.muted,
+                  },
                   pressed && canUpload ? styles.uploadButtonPressed : null,
                 ]}
               >
                 {isBusy ? (
-                  <ActivityIndicator color="#251B0A" />
+                  <ActivityIndicator color={colors.primaryForeground} />
                 ) : (
-                  <Text style={styles.uploadButtonText}>Upload to My Music</Text>
+                  <Text style={[styles.uploadButtonText, { color: colors.primaryForeground }]}>Upload to My Music</Text>
                 )}
               </Pressable>
             </View>
 
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Uploads</Text>
-              <Text style={styles.sectionMeta}>{trackCount} tracks</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Uploads</Text>
+              <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>{trackCount} tracks</Text>
             </View>
           </>
         }
@@ -289,22 +366,36 @@ function TrackRow({
   onDelete: () => void;
   track: MyTrackItem;
 }) {
+  const { colors } = useMobileTheme();
+
   return (
-    <View style={styles.trackRow}>
+    <View style={[styles.trackRow, { borderBottomColor: colors.border }]}>
       <View style={styles.trackHeader}>
         <View style={styles.trackTitleWrap}>
-          <Text numberOfLines={1} style={styles.trackTitle}>
+          <Text numberOfLines={1} style={[styles.trackTitle, { color: colors.foreground }]}>
             {track.title}
           </Text>
-          <Text style={styles.trackMeta}>
+          <Text style={[styles.trackMeta, { color: colors.mutedForeground }]}>
             {formatFileSize(track.file_size)} - {formatDate(track.created_at)}
           </Text>
         </View>
-        <Pressable disabled={deleting} onPress={onDelete} style={styles.deleteButton}>
+        <Pressable
+          accessibilityLabel={`Delete ${track.title}`}
+          accessibilityRole="button"
+          disabled={deleting}
+          onPress={onDelete}
+          style={styles.deleteButton}
+        >
           {deleting ? (
-            <ActivityIndicator color="#8F98A8" size="small" />
+            <ActivityIndicator color={colors.mutedForeground} size="small" />
           ) : (
-            <Ionicons color="#8F98A8" name="trash-outline" size={18} />
+            <Ionicons
+              accessibilityElementsHidden
+              color={colors.mutedForeground}
+              importantForAccessibility="no-hide-descendants"
+              name="trash-outline"
+              size={18}
+            />
           )}
         </Pressable>
       </View>
@@ -313,11 +404,22 @@ function TrackRow({
         <AudioPostPlayer
           audioUrl={track.audio_url}
           duration={track.duration}
-          style={styles.trackPlayer}
+          style={[styles.trackPlayer, { backgroundColor: colors.card }]}
           title={track.title}
         />
       ) : (
-        <Text style={styles.error}>Audio URL is not available for this track.</Text>
+        <Text
+          style={[
+            styles.error,
+            {
+              backgroundColor: colors.destructiveMuted,
+              borderColor: colors.destructive,
+              color: colors.destructive,
+            },
+          ]}
+        >
+          Audio URL is not available for this track.
+        </Text>
       )}
     </View>
   );
@@ -391,7 +493,6 @@ function isSupportedAudioFile(filename: string, mimeType?: string) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#1A1E29",
     flex: 1,
   },
   content: {
@@ -402,7 +503,6 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -421,22 +521,18 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   headerEyebrow: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0,
     textTransform: "uppercase",
   },
   headerTitle: {
-    color: "#EEF0F5",
     fontSize: 22,
     fontWeight: "900",
     letterSpacing: 0,
     marginTop: 2,
   },
   uploadPanel: {
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     marginHorizontal: 14,
@@ -451,7 +547,6 @@ const styles = StyleSheet.create({
   },
   panelIcon: {
     alignItems: "center",
-    backgroundColor: "rgba(216,166,74,0.12)",
     borderRadius: 8,
     height: 40,
     justifyContent: "center",
@@ -462,12 +557,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   panelTitle: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
   },
   panelSubtitle: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 17,
@@ -475,8 +568,6 @@ const styles = StyleSheet.create({
   },
   pickButton: {
     alignItems: "center",
-    backgroundColor: "#1E2330",
-    borderColor: "rgba(255,255,255,0.1)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -484,11 +575,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 12,
   },
-  pickButtonPressed: {
-    backgroundColor: "#2C3240",
-  },
   pickButtonText: {
-    color: "#D5D9E2",
     flex: 1,
     fontSize: 13,
     fontWeight: "800",
@@ -498,8 +585,6 @@ const styles = StyleSheet.create({
   },
   selectedBox: {
     alignItems: "center",
-    backgroundColor: "#1E2330",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -513,12 +598,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   selectedName: {
-    color: "#D5D9E2",
     fontSize: 13,
     fontWeight: "800",
   },
   selectedSize: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "600",
     marginTop: 2,
@@ -531,22 +614,16 @@ const styles = StyleSheet.create({
     width: 32,
   },
   input: {
-    backgroundColor: "#1E2330",
-    borderColor: "rgba(255,255,255,0.1)",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#EEF0F5",
     fontSize: 15,
     minHeight: 44,
     marginTop: 10,
     paddingHorizontal: 12,
   },
   error: {
-    backgroundColor: "rgba(127,29,29,0.5)",
-    borderColor: "rgba(248,113,113,0.35)",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#FECACA",
     fontSize: 12,
     lineHeight: 17,
     marginTop: 10,
@@ -555,20 +632,15 @@ const styles = StyleSheet.create({
   },
   uploadButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
     justifyContent: "center",
     minHeight: 44,
     marginTop: 12,
   },
-  uploadButtonDisabled: {
-    backgroundColor: "#4B4F5D",
-  },
   uploadButtonPressed: {
     opacity: 0.82,
   },
   uploadButtonText: {
-    color: "#251B0A",
     fontSize: 14,
     fontWeight: "900",
   },
@@ -581,17 +653,14 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
   sectionTitle: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
   },
   sectionMeta: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "800",
   },
   trackRow: {
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     paddingHorizontal: 18,
     paddingVertical: 14,
@@ -607,12 +676,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   trackTitle: {
-    color: "#EEF0F5",
     fontSize: 15,
     fontWeight: "900",
   },
   trackMeta: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 3,
@@ -624,9 +691,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 34,
   },
-  trackPlayer: {
-    backgroundColor: "#262B37",
-  },
+  trackPlayer: {},
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
@@ -634,14 +699,12 @@ const styles = StyleSheet.create({
     paddingVertical: 42,
   },
   emptyTitle: {
-    color: "#EEF0F5",
     fontSize: 17,
     fontWeight: "900",
     marginTop: 10,
     textAlign: "center",
   },
   stateText: {
-    color: "#8F98A8",
     marginTop: 10,
     textAlign: "center",
   },

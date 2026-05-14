@@ -1,21 +1,26 @@
 import React from "react";
-import { Ionicons } from "@expo/vector-icons";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import type { User } from "@/types";
 import { useMobileTheme } from "@/theme/MobileTheme";
+import Surface from "@/components/ui/Surface";
 
 type Props = {
   profile: User;
-  onOpenSettings?: () => void;
   onSignOut?: () => void;
 };
 
-export default function ProfileHeader({ profile, onOpenSettings, onSignOut }: Props) {
+export default function ProfileHeader({ profile, onSignOut }: Props) {
   const { colors } = useMobileTheme();
-  const hasAvatar = Boolean(profile.avatar_url);
+  const [avatarLoadFailed, setAvatarLoadFailed] = React.useState(false);
+  const avatarUri = profile.avatar_url || "";
+  const showAvatarImage = Boolean(avatarUri) && !avatarLoadFailed;
   const fallbackLetter = (profile.display_name || profile.username || "?")
     .slice(0, 1)
     .toUpperCase();
+
+  React.useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatarUri]);
 
   return (
     <View
@@ -25,25 +30,15 @@ export default function ProfileHeader({ profile, onOpenSettings, onSignOut }: Pr
       ]}
     >
       <View style={styles.headerRow}>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Profile</Text>
+        <View>
+          <Text style={[styles.headerEyebrow, { color: colors.mutedForeground }]}>Account</Text>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Profile</Text>
+        </View>
         <View style={styles.headerActions}>
-          {onOpenSettings ? (
-            <Pressable
-              accessibilityLabel="Settings"
-              onPress={onOpenSettings}
-              style={({ pressed }) => [
-                styles.iconButton,
-                {
-                  backgroundColor: pressed ? colors.cardPressed : colors.card,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <Ionicons color={colors.secondaryForeground} name="settings-outline" size={17} />
-            </Pressable>
-          ) : null}
           {onSignOut ? (
             <Pressable
+              accessibilityLabel="Sign out"
+              accessibilityRole="button"
               onPress={onSignOut}
               style={({ pressed }) => [
                 styles.signOutButton,
@@ -61,29 +56,53 @@ export default function ProfileHeader({ profile, onOpenSettings, onSignOut }: Pr
         </View>
       </View>
 
-      <View style={styles.avatarWrapper}>
-        {hasAvatar ? (
-          <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-        ) : (
-          <View
-            style={[
-              styles.avatarFallback,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.avatarFallbackText, { color: colors.foreground }]}>
-              {fallbackLetter}
-            </Text>
+      <Surface variant="hero" style={styles.profileHero}>
+        <View style={styles.profileHeroRow}>
+          <View style={styles.avatarWrapper}>
+            {showAvatarImage ? (
+              <Image
+                onError={() => setAvatarLoadFailed(true)}
+                source={{ uri: avatarUri }}
+                style={[
+                  styles.avatar,
+                  { backgroundColor: colors.muted, borderColor: colors.border },
+                ]}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.avatarFallback,
+                  { backgroundColor: colors.muted, borderColor: colors.border },
+                ]}
+              >
+                <Text style={[styles.avatarFallbackText, { color: colors.foreground }]}>
+                  {fallbackLetter}
+                </Text>
+              </View>
+            )}
           </View>
-        )}
-      </View>
-
-      <Text style={[styles.displayName, { color: colors.foreground }]}>
-        {profile.display_name || "No display name"}
-      </Text>
-      <Text style={[styles.username, { color: colors.mutedForeground }]}>
-        @{profile.username}
-      </Text>
+          <View style={styles.identity}>
+            <Text style={[styles.displayName, { color: colors.foreground }]}>
+              {profile.display_name || profile.username}
+            </Text>
+            <Text style={[styles.username, { color: colors.mutedForeground }]}>
+              @{profile.username}
+            </Text>
+            <View style={styles.statsRow}>
+              <View style={[styles.statPill, { backgroundColor: colors.muted }]}>
+                <Text style={[styles.statText, { color: colors.secondaryForeground }]}>
+                  Profile
+                </Text>
+              </View>
+            </View>
+            {profile.bio ? (
+              <Text numberOfLines={3} style={[styles.bio, { color: colors.secondaryForeground }]}>
+                {profile.bio}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </Surface>
     </View>
   );
 }
@@ -91,7 +110,7 @@ export default function ProfileHeader({ profile, onOpenSettings, onSignOut }: Pr
 const styles = StyleSheet.create({
   container: {
     borderBottomWidth: 1,
-    paddingBottom: 20,
+    paddingBottom: 14,
     paddingHorizontal: 16,
     paddingTop: 12,
   },
@@ -99,16 +118,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 14,
   },
   headerActions: {
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
   },
+  headerEyebrow: {
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: "700",
+    fontSize: 24,
+    fontWeight: "900",
+    marginTop: 2,
   },
   iconButton: {
     alignItems: "center",
@@ -129,29 +155,63 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   avatarWrapper: {
-    marginBottom: 16,
+    flexShrink: 0,
   },
   avatar: {
-    borderRadius: 44,
-    height: 88,
-    width: 88,
+    borderRadius: 52,
+    borderWidth: 1,
+    height: 104,
+    width: 104,
+  },
+  bio: {
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 19,
+    marginTop: 8,
   },
   avatarFallback: {
     alignItems: "center",
-    borderRadius: 44,
+    borderRadius: 52,
     borderWidth: 1,
-    height: 88,
+    height: 104,
     justifyContent: "center",
-    width: 88,
+    width: 104,
   },
   avatarFallbackText: {
-    fontSize: 30,
-    fontWeight: "700",
+    fontSize: 34,
+    fontWeight: "900",
   },
   displayName: {
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 6,
+    fontSize: 22,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+  identity: {
+    flex: 1,
+    minWidth: 0,
+  },
+  profileHero: {
+    padding: 16,
+  },
+  profileHeroRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 16,
+  },
+  statPill: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    marginTop: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  statsRow: {
+    flexDirection: "row",
+  },
+  statText: {
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
   username: {
     fontSize: 15,
