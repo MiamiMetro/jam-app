@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   StyleSheet,
@@ -12,10 +13,12 @@ import type { User } from "@/types";
 import {
   useCreateReply,
   useDeleteComment,
+  useReportContent,
   useReplies,
   useToggleCommentLike,
   type FrontendComment,
 } from "@/hooks/usePosts";
+import { useBlockUser } from "@/hooks/useUsers";
 import CommentComposer from "./CommentComposer";
 import { useMobileTheme } from "@/theme/MobileTheme";
 
@@ -32,12 +35,16 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
   const { colors } = useMobileTheme();
   const toggleLike = useToggleCommentLike();
   const deleteComment = useDeleteComment();
+  const reportContent = useReportContent();
+  const blockUser = useBlockUser();
   const createReply = useCreateReply();
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [repliesExpanded, setRepliesExpanded] = useState(false);
   const [replying, setReplying] = useState(false);
   const [isReplySubmitting, setIsReplySubmitting] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
 
   const repliesQuery = useReplies(repliesExpanded ? comment.id : null);
 
@@ -83,6 +90,32 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
     } finally {
       setIsReplySubmitting(false);
     }
+  };
+
+  const handleReport = async () => {
+    setMenuOpen(false);
+    Alert.alert("Report comment", "Send this comment to Jam for review?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Report",
+        style: "destructive",
+        onPress: async () => {
+          await reportContent.mutateAsync({
+            targetType: "comment",
+            targetId: comment.id,
+            reason: "other",
+          });
+          setReportSubmitted(true);
+          setTimeout(() => setReportSubmitted(false), 1000);
+        },
+      },
+    ]);
+  };
+
+  const handleBlock = async () => {
+    if (!comment.authorId) return;
+    setMenuOpen(false);
+    await blockUser.mutateAsync(comment.authorId);
   };
 
   const leftOffset = Math.min(depth, MAX_VISIBLE_DEPTH) * INDENT_WIDTH;
@@ -197,22 +230,44 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
               </Pressable>
             ) : null}
 
-            {isOwn && !isDeleted ? (
-              <Pressable
-                accessibilityLabel="Delete comment"
-                accessibilityRole="button"
-                disabled={isMutating}
-                onPress={handleDelete}
-                style={styles.action}
-              >
-                <Ionicons
-                  accessibilityElementsHidden
-                  color={colors.mutedForeground}
-                  importantForAccessibility="no-hide-descendants"
-                  name="trash-outline"
-                  size={14}
-                />
-              </Pressable>
+            {!isDeleted ? (
+              <View style={styles.menuWrap}>
+                <Pressable
+                  accessibilityLabel="Comment actions"
+                  accessibilityRole="button"
+                  onPress={() => setMenuOpen((value) => !value)}
+                  style={styles.action}
+                >
+                  <Ionicons
+                    accessibilityElementsHidden
+                    color={reportSubmitted ? colors.success : colors.mutedForeground}
+                    importantForAccessibility="no-hide-descendants"
+                    name={reportSubmitted ? "checkmark" : "ellipsis-horizontal"}
+                    size={15}
+                  />
+                </Pressable>
+                {menuOpen ? (
+                  <View style={[styles.menu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    {isOwn ? (
+                      <MenuAction
+                        color={colors.destructive}
+                        disabled={isMutating}
+                        icon="trash-outline"
+                        label="Delete"
+                        onPress={async () => {
+                          setMenuOpen(false);
+                          await handleDelete();
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <MenuAction color={colors.destructive} icon="flag-outline" label="Report" onPress={handleReport} />
+                        <MenuAction color={colors.destructive} icon="ban-outline" label="Block user" onPress={handleBlock} />
+                      </>
+                    )}
+                  </View>
+                ) : null}
+              </View>
             ) : null}
           </View>
 
@@ -277,6 +332,33 @@ export default function CommentItem({ comment, currentProfile, depth = 0 }: Prop
         </View>
       </View>
     </View>
+  );
+}
+
+function MenuAction({
+  color,
+  disabled,
+  icon,
+  label,
+  onPress,
+}: {
+  color: string;
+  disabled?: boolean;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void | Promise<void>;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={styles.menuAction}
+    >
+      <Ionicons color={color} name={icon} size={15} />
+      <Text style={[styles.menuActionText, { color }]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -412,5 +494,30 @@ const styles = StyleSheet.create({
   },
   loadMoreReplies: {
     paddingVertical: 10,
+  },
+  menu: {
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 134,
+    padding: 5,
+    position: "absolute",
+    right: 0,
+    top: 24,
+    zIndex: 20,
+  },
+  menuAction: {
+    alignItems: "center",
+    borderRadius: 7,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 34,
+    paddingHorizontal: 9,
+  },
+  menuActionText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  menuWrap: {
+    position: "relative",
   },
 });

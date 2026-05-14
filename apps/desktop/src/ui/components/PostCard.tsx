@@ -7,6 +7,9 @@ import {
   Check,
   Hash as HashIcon,
   Trash2,
+  Flag,
+  Ban,
+  MoreHorizontal,
 } from "lucide-react";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -14,7 +17,15 @@ import { Timestamp } from "@/components/Timestamp";
 import { AutoLinkedText } from "@/components/AutoLinkedText";
 
 import type { FrontendPost } from '@/hooks/usePosts';
+import { useReportContent } from '@/hooks/usePosts';
+import { useBlockUser } from '@/hooks/useUsers';
 import { getCommunityColors } from '@/lib/communityColors';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface PostCardProps {
   post: FrontendPost;
@@ -42,6 +53,9 @@ export function PostCard({
   const communityColors = getCommunityColors(post.communityThemeColor);
   const isOwn = !isGuest && !!currentUsername && currentUsername === post.author.username;
   const [copied, setCopied] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+  const reportContent = useReportContent();
+  const blockUser = useBlockUser();
 
   const handleShare = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -52,6 +66,20 @@ export function PostCard({
       setTimeout(() => setCopied(false), 2000);
     });
   }, [post.id]);
+
+  const handleReport = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!window.confirm("Report this post to Jam for review?")) return;
+    await reportContent.mutateAsync({ targetType: "post", targetId: post.id, reason: "other" });
+    setReportSubmitted(true);
+    window.setTimeout(() => setReportSubmitted(false), 1000);
+  };
+
+  const handleBlock = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!post.authorId) return;
+    await blockUser.mutateAsync(post.authorId);
+  };
 
   if (post.isDeleted) {
     return (
@@ -101,15 +129,38 @@ export function PostCard({
             <Timestamp date={post.timestamp} className="text-xs text-muted-foreground">
               • {formatTimeAgo(post.timestamp)}
             </Timestamp>
-            {isOwn && onDelete && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onDelete(post.id); }}
-                className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1 rounded"
-                title="Delete post"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+            {!isGuest && (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground p-1 rounded"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Post actions"
+                >
+                  {reportSubmitted ? <Check className="h-4 w-4 text-green-500" /> : <MoreHorizontal className="h-4 w-4" />}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  {isOwn && onDelete ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={(e) => { e.stopPropagation(); onDelete(post.id); }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  ) : (
+                    <>
+                      <DropdownMenuItem variant="destructive" onClick={handleReport}>
+                        <Flag className="h-4 w-4" />
+                        Report
+                      </DropdownMenuItem>
+                      <DropdownMenuItem variant="destructive" onClick={handleBlock}>
+                        <Ban className="h-4 w-4" />
+                        Block user
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
           {post.content && (

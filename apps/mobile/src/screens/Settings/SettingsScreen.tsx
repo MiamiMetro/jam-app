@@ -3,6 +3,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +16,9 @@ import {
   useMobileTheme,
   type MobileThemeMode,
 } from "@/theme/MobileTheme";
+import { authClient } from "@/lib/auth-client";
+import { LEGAL_LINKS } from "@/lib/legal";
+import { useSoftDeleteProfile } from "@/hooks/useUsers";
 
 const themeOptions: Array<{
   description: string;
@@ -45,6 +50,25 @@ export default function SettingsScreen() {
   const navigation = useNavigation();
   const { colors, resolvedTheme, setTheme, theme } = useMobileTheme();
   const insets = useSafeAreaInsets();
+  const softDeleteProfile = useSoftDeleteProfile();
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete account",
+      "Your login will be removed and public identity anonymized. Some content may remain without profile details.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            await softDeleteProfile.mutateAsync();
+            await authClient.deleteUser();
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -169,6 +193,89 @@ export default function SettingsScreen() {
             })}
           </View>
         </View>
+
+        <View
+          style={[
+            styles.section,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+            Legal
+          </Text>
+          <View style={styles.linkList}>
+            {[
+              ["Terms of Service", LEGAL_LINKS.terms],
+              ["Privacy Policy", LEGAL_LINKS.privacy],
+              ["KVKK Notice", LEGAL_LINKS.kvkk],
+              ["Privacy Choices", LEGAL_LINKS.privacyChoices],
+              ["Contact & Report Abuse", LEGAL_LINKS.support],
+              ["Open Source Licenses", LEGAL_LINKS.openSource],
+            ].map(([label, url]) => (
+              <Pressable
+                accessibilityLabel={`Open ${label}`}
+                accessibilityRole="link"
+                key={label}
+                onPress={() => Linking.openURL(url)}
+                style={({ pressed }) => [
+                  styles.legalLink,
+                  {
+                    backgroundColor: pressed ? colors.cardPressed : colors.input,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.legalLinkText, { color: colors.foreground }]}>
+                  {label}
+                </Text>
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.mutedForeground}
+                  importantForAccessibility="no-hide-descendants"
+                  name="open-outline"
+                  size={17}
+                />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.section,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.destructive,
+            },
+          ]}
+        >
+          <Text style={[styles.sectionLabel, { color: colors.destructive }]}>
+            Account
+          </Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+            Delete account
+          </Text>
+          <Text style={[styles.sectionText, { color: colors.mutedForeground }]}>
+            Removes your login and anonymizes your public identity. Some posts and messages may remain without your profile details.
+          </Text>
+          <Pressable
+            accessibilityLabel="Delete account"
+            accessibilityRole="button"
+            onPress={handleDeleteAccount}
+            style={({ pressed }) => [
+              styles.deleteButton,
+              { backgroundColor: colors.destructive },
+              pressed ? { opacity: 0.8 } : null,
+            ]}
+          >
+            <Text style={[styles.deleteButtonText, { color: colors.primaryForeground }]}>
+              Delete Account
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -207,6 +314,34 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 0,
     marginTop: 2,
+  },
+  deleteButton: {
+    alignItems: "center",
+    borderRadius: 8,
+    justifyContent: "center",
+    marginTop: 16,
+    minHeight: 46,
+  },
+  deleteButtonText: {
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  legalLink: {
+    alignItems: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 46,
+    paddingHorizontal: 12,
+  },
+  legalLinkText: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  linkList: {
+    gap: 9,
+    marginTop: 14,
   },
   option: {
     alignItems: "center",

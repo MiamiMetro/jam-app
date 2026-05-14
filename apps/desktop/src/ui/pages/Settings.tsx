@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ShieldAlert, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, ShieldAlert, Eye, EyeOff, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMe, useSoftDeleteProfile, useUpdateProfile } from "@/hooks/useUsers";
@@ -10,6 +10,8 @@ import { useProfileStore } from "@/hooks/useEnsureProfile";
 import { useUIStore } from "@/stores/uiStore";
 import { authClient } from "@/lib/auth-client";
 import { Switch } from "@/components/ui/switch";
+import { LEGAL_LINKS } from "@/lib/legal";
+import { openExternal } from "@/lib/openExternal";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -271,12 +273,37 @@ export default function Settings() {
             </div>
           </section>
 
+          <section className="rounded-lg border border-border glass-solid p-4 space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Legal</h2>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                ["Terms of Service", LEGAL_LINKS.terms],
+                ["Privacy Policy", LEGAL_LINKS.privacy],
+                ["KVKK Notice", LEGAL_LINKS.kvkk],
+                ["Privacy Choices", LEGAL_LINKS.privacyChoices],
+                ["Contact & Report Abuse", LEGAL_LINKS.support],
+                ["Open Source Licenses", LEGAL_LINKS.openSource],
+              ].map(([label, url]) => (
+                <Button
+                  key={label}
+                  type="button"
+                  variant="outline"
+                  className="justify-between"
+                  onClick={() => openExternal(url)}
+                >
+                  {label}
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Button>
+              ))}
+            </div>
+          </section>
+
           <section className="rounded-lg border border-destructive/40 p-4 space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-destructive">Danger Zone</h2>
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <ShieldAlert className="h-4 w-4 mt-0.5 text-destructive" />
               <p>
-                Soft delete your account. Posts and DMs remain, but your identity is anonymized.
+                Delete your Jam account. Your login is removed and public identity is anonymized; content needed for conversation integrity may remain without your profile details.
               </p>
             </div>
             <div className="space-y-2">

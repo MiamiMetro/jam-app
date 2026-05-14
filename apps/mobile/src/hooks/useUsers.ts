@@ -505,3 +505,30 @@ export function useDeleteMessage() {
       deleteMessage({ messageId: messageId as Id<"messages"> }),
   };
 }
+
+export function useBlockUser() {
+  const blockUser = useMutation(api.blocks.block);
+  return {
+    mutateAsync: async (userId: string) =>
+      blockUser({ userId: userId as Id<"profiles"> }),
+  };
+}
+
+export function useUnblockUser() {
+  const unblockUser = useMutation(api.blocks.unblock);
+  return {
+    mutateAsync: async (userId: string) =>
+      unblockUser({ userId: userId as Id<"profiles"> }),
+  };
+}
+
+export function useIsBlockedByMe(userId?: string | null) {
+  const result = useQuery(
+    api.blocks.isBlockedByMe,
+    userId ? { userId: userId as Id<"profiles"> } : "skip",
+  );
+  return {
+    data: result ?? false,
+    isLoading: result === undefined && !!userId,
+  };
+}

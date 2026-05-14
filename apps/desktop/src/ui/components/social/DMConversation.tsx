@@ -242,15 +242,16 @@ export default function DMConversation({
                     </p>
                   ) : (
                     <>
-                      {isOwn && (
+                      {isOwn ? (
                         <button
+                          type="button"
                           onClick={() => deleteMessageMutation.mutate(message.id)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1 rounded shrink-0"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1 rounded shrink-0 cursor-pointer"
                           title="Delete message"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
-                      )}
+                      ) : null}
                       <div className={`max-w-[75%] rounded-xl px-3.5 py-2 text-sm ${
                         isOwn
                           ? "bg-primary text-primary-foreground rounded-br-md shadow-sm"

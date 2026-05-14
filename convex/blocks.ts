@@ -120,3 +120,20 @@ export const listPaginated = query({
   },
 });
 
+export const isBlockedByMe = query({
+  args: {
+    userId: v.id("profiles"),
+  },
+  handler: async (ctx, args) => {
+    const profile = await requireAuth(ctx);
+    const block = await ctx.db
+      .query("blocks")
+      .withIndex("by_blocker_and_blocked", (q) =>
+        q.eq("blockerId", profile._id).eq("blockedId", args.userId)
+      )
+      .first();
+
+    return block !== null;
+  },
+});
+

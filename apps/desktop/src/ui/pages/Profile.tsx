@@ -16,6 +16,9 @@ import {
   Users as UsersIcon,
   MapPin,
   X,
+  Flag,
+  Ban,
+  Check,
 } from "lucide-react";
 import {
   Dialog,
@@ -24,9 +27,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuthStore } from "@/stores/authStore";
-import { useProfileCatalog, useUpdateProfile, useUser } from "@/hooks/useUsers";
+import { useBlockUser, useIsBlockedByMe, useProfileCatalog, useUnblockUser, useUpdateProfile, useUser } from "@/hooks/useUsers";
 import { useR2Upload } from "@/hooks/useR2Upload";
-import { useUserPosts, useToggleLike, useDeletePost, type FrontendPost } from "@/hooks/usePosts";
+import { useReportContent, useUserPosts, useToggleLike, useDeletePost, type FrontendPost } from "@/hooks/usePosts";
 import { useFriends, useFriendsCount, useRequestFriend, useSentFriendRequests, useDeleteFriend } from "@/hooks/useFriends";
 import { useUserBandListings } from "@/hooks/useBands";
 import { EmptyState } from "@/components/EmptyState";
@@ -78,6 +81,9 @@ function Profile() {
   const toggleLikeMutation = useToggleLike();
   const deletePostMutation = useDeletePost();
   const updateProfileMutation = useUpdateProfile();
+  const reportContent = useReportContent();
+  const blockUser = useBlockUser();
+  const unblockUser = useUnblockUser();
   const { hasPendingRequest } = useSentFriendRequests();
 
   const [activeTab, setActiveTab] = useState<"posts" | "friends">("posts");
@@ -93,6 +99,7 @@ function Profile() {
   const [customGenre, setCustomGenre] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [previewDraft, setPreviewDraft] = useState<ProfileDraft | null>(null);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
   const [stopPreviewAnimPhase, setStopPreviewAnimPhase] = useState<"hidden" | "enter" | "idle">("idle");
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [pendingBannerFile, setPendingBannerFile] = useState<File | null>(null);
@@ -126,6 +133,7 @@ function Profile() {
   }, [profileUser]);
 
   const isOwnProfile = currentUser?.username === profileUser?.username;
+  const { data: isBlockedByMe } = useIsBlockedByMe(!isOwnProfile ? profileUser?.id : null);
   const isPreviewing = isOwnProfile && previewDraft !== null;
   const showFriendActionRow = !isGuest;
   const isFriend = currentUserFriends.some((friend: User) => friend.id === profileUser?.id);
@@ -196,6 +204,28 @@ function Profile() {
     } catch (error) {
       console.error("Error unfriending:", error);
     }
+  };
+
+  const handleReportProfile = async () => {
+    if (isGuest || !profileUser?.id) return;
+    if (!window.confirm(`Report @${profileUser.username}'s profile to Jam for review?`)) return;
+    await reportContent.mutateAsync({
+      targetType: "profile",
+      targetId: profileUser.id,
+      reason: "other",
+    });
+    setReportSubmitted(true);
+    window.setTimeout(() => setReportSubmitted(false), 1000);
+  };
+
+  const handleBlockProfile = async () => {
+    if (isGuest || !profileUser?.id) return;
+    await blockUser.mutateAsync(profileUser.id);
+  };
+
+  const handleUnblockProfile = async () => {
+    if (isGuest || !profileUser?.id) return;
+    await unblockUser.mutateAsync(profileUser.id);
   };
 
   const handleLikePost = async (postId: string) => {
@@ -499,7 +529,7 @@ function Profile() {
             )}
 
             {showFriendActionRow && (
-              <div className="mb-4">
+              <div className="mb-4 space-y-2">
                 {isOwnProfile && !isPreviewing ? (
                   <Button
                     size="sm"
@@ -527,6 +557,25 @@ function Profile() {
                     <UserPlus className="h-4 w-4 mr-2" />
                     Add Friend
                   </Button>
+                )}
+                {!isOwnProfile && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button onClick={handleReportProfile} size="sm" variant="outline">
+                      {reportSubmitted ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <Flag className="h-4 w-4 mr-2" />}
+                      {reportSubmitted ? "Reported" : "Report"}
+                    </Button>
+                    {isBlockedByMe ? (
+                      <Button onClick={handleUnblockProfile} size="sm" variant="outline">
+                        <Ban className="h-4 w-4 mr-2" />
+                        Unblock
+                      </Button>
+                    ) : (
+                      <Button onClick={handleBlockProfile} size="sm" variant="outline">
+                        <Ban className="h-4 w-4 mr-2" />
+                        Block
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             )}

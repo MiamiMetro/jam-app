@@ -3,17 +3,19 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Check, X, ChevronDown, Send } from "lucide-react";
+import { Check, X, ChevronDown, Send, Ban } from "lucide-react";
 import {
   useFriendRequests, useSentFriendRequests,
   useAcceptFriend, useDeclineFriend, useCancelFriendRequest,
 } from "@/hooks/useFriends";
+import { useBlockedUsers, useUnblockUser } from "@/hooks/useUsers";
 import type { User } from "@/lib/api/types";
 
 export default function FriendRequestsPanel() {
   const navigate = useNavigate();
   const [showPending, setShowPending] = useState(true);
   const [showSent, setShowSent] = useState(true);
+  const [showBlocked, setShowBlocked] = useState(true);
 
   const {
     data: friendRequests = [],
@@ -32,6 +34,13 @@ export default function FriendRequestsPanel() {
   const acceptMutation = useAcceptFriend();
   const declineMutation = useDeclineFriend();
   const cancelMutation = useCancelFriendRequest();
+  const unblockMutation = useUnblockUser();
+  const {
+    data: blockedUsers = [],
+    fetchNextPage: fetchMoreBlocked,
+    hasNextPage: hasMoreBlocked,
+    isFetchingNextPage: isLoadingMoreBlocked,
+  } = useBlockedUsers();
 
   return (
     <>
@@ -169,6 +178,74 @@ export default function FriendRequestsPanel() {
                   className="w-full py-2 text-xs text-primary hover:text-primary/80 transition-colors text-center disabled:opacity-50 glass-solid rounded-lg"
                 >
                   {isLoadingMoreSent ? 'Loading more...' : 'Load more'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Blocked */}
+      <div>
+        <button
+          onClick={() => setShowBlocked(!showBlocked)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-heading font-semibold text-muted-foreground hover:text-primary transition-colors cursor-pointer border-b border-border/30"
+        >
+          <span className="flex items-center gap-2 uppercase tracking-wider">
+            <span className="w-1 h-3.5 rounded-full bg-destructive/60" />
+            Blocked
+            {blockedUsers.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">
+                {blockedUsers.length}
+              </span>
+            )}
+          </span>
+          <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showBlocked ? "" : "-rotate-90"}`} />
+        </button>
+        {showBlocked && (
+          <>
+            {blockedUsers.length === 0 ? (
+              <div className="text-center py-6 text-xs text-muted-foreground/60">No blocked people</div>
+            ) : (
+              <div>
+                {blockedUsers.map((blocked: User) => (
+                  <div key={blocked.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-primary/5 transition-colors">
+                    <button className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/profile/${blocked.username}`)}>
+                      <Avatar size="sm" className="h-9 w-9 flex-shrink-0">
+                        <AvatarImage src={blocked.avatar_url || ""} alt={blocked.username} />
+                        <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+                          {blocked.username.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate text-left">{blocked.username}</div>
+                        <div className="text-[10px] text-muted-foreground/50 flex items-center gap-1 mt-0.5">
+                          <Ban className="h-2.5 w-2.5" />
+                          Blocked
+                        </div>
+                      </div>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-primary hover:text-primary/80 hover:bg-primary/10"
+                      onClick={() => unblockMutation.mutateAsync(blocked.id)}
+                      title="Unblock"
+                    >
+                      Unblock
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {hasMoreBlocked && (
+              <div className="px-4 pb-2">
+                <button
+                  onClick={() => fetchMoreBlocked()}
+                  disabled={isLoadingMoreBlocked}
+                  className="w-full py-2 text-xs text-primary hover:text-primary/80 transition-colors text-center disabled:opacity-50 glass-solid rounded-lg"
+                >
+                  {isLoadingMoreBlocked ? 'Loading more...' : 'Load more'}
                 </button>
               </div>
             )}

@@ -1,11 +1,13 @@
 import { app, BrowserWindow, ipcMain, Menu, session, shell } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import electronUpdater from 'electron-updater';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { isDev } from './util.js';
+
+const { autoUpdater } = electronUpdater;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

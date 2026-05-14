@@ -11,6 +11,7 @@ type MutationOptions<T = void> = {
 
 export interface FrontendPost {
   id: string;
+  authorId?: string;
   author: {
     avatar?: string;
     username: string;
@@ -47,6 +48,7 @@ export interface FrontendComment {
   content?: string;
   depth?: number;
   id: string;
+  authorId?: string;
   isDeleted?: boolean;
   isLiked?: boolean;
   likes?: number;
@@ -60,6 +62,7 @@ export interface FrontendComment {
 function convertPost(post: Post): FrontendPost {
   return {
     id: post.id,
+    authorId: post.author_id,
     author: {
       username: post.author?.username || "unknown",
       avatar: post.author?.avatar_url || undefined,
@@ -88,6 +91,7 @@ function convertPost(post: Post): FrontendPost {
 function convertComment(comment: Comment): FrontendComment {
   return {
     id: comment.id,
+    authorId: comment.author_id,
     postId: comment.post_id,
     parentId: comment.parent_id ?? null,
     path: comment.path,
@@ -422,4 +426,36 @@ export function useCreateReply() {
     },
     mutateAsync: run,
   };
+}
+
+export type ReportTargetType = "profile" | "post" | "comment" | "message" | "room" | "community" | "track";
+export type ReportReason =
+  | "harassment"
+  | "hate"
+  | "sexual_content"
+  | "violence"
+  | "spam"
+  | "impersonation"
+  | "illegal"
+  | "other";
+
+export function useReportContent() {
+  const report = useMutation(api.reports.create);
+  const [isPending, setIsPending] = useState(false);
+
+  const run = async (variables: {
+    details?: string;
+    reason: ReportReason;
+    targetId: string;
+    targetType: ReportTargetType;
+  }) => {
+    setIsPending(true);
+    try {
+      return await report(variables);
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { isPending, mutateAsync: run };
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
+import type { MouseEvent } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Disc3 } from "lucide-react";
+import { Check, Disc3, Flag, MoreHorizontal } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/authStore";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -10,6 +11,13 @@ import { LoadingState } from "@/components/LoadingState";
 import { LoadMoreButton } from "@/components/LoadMoreButton";
 import { getCommunityColors, COMMUNITY_TAGS } from "@/lib/communityColors";
 import { CreateCommunityDialog } from "@/components/community/CreateCommunityDialog";
+import { useReportContent } from "@/hooks/usePosts";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 function CommunitiesTab() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -18,6 +26,8 @@ function CommunitiesTab() {
   const tagFilter = searchParams.get("tag") || "";
   const searchQuery = searchParams.get("search") || "";
   const [createOpen, setCreateOpen] = useState(false);
+  const [reportedCommunityId, setReportedCommunityId] = useState<string | null>(null);
+  const reportContent = useReportContent();
 
   const {
     data: communities = [],
@@ -42,6 +52,18 @@ function CommunitiesTab() {
     if (tagFilter !== tag) params.tag = tag;
     if (searchQuery) params.search = searchQuery;
     setSearchParams(params);
+  };
+
+  const handleReportCommunity = async (event: MouseEvent, communityId: string) => {
+    event.stopPropagation();
+    if (!window.confirm("Report this community to Jam for review?")) return;
+    await reportContent.mutateAsync({
+      targetType: "community",
+      targetId: communityId,
+      reason: "other",
+    });
+    setReportedCommunityId(communityId);
+    window.setTimeout(() => setReportedCommunityId(null), 1000);
   };
 
   return (
@@ -140,6 +162,24 @@ function CommunitiesTab() {
                         ))}
                       </div>
                     </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        className="text-muted-foreground hover:text-foreground p-1 rounded"
+                        onClick={(event) => event.stopPropagation()}
+                        title="Community actions"
+                      >
+                        {reportedCommunityId === community.id ? <Check className="h-4 w-4 text-green-500" /> : <MoreHorizontal className="h-4 w-4" />}
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={(event) => handleReportCommunity(event, community.id)}
+                        >
+                          <Flag className="h-4 w-4" />
+                          Report
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 );
               })}

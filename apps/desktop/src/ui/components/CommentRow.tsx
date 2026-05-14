@@ -1,7 +1,7 @@
 // CommentRow.tsx — Single comment with inline reply compose and threaded replies
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, Trash2, MessageCircle } from "lucide-react";
+import { Ban, Check, Flag, Heart, MoreHorizontal, Trash2, MessageCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { AutoLinkedText } from "@/components/AutoLinkedText";
@@ -9,7 +9,14 @@ import { ComposePost } from "@/components/ComposePost";
 import { Spinner } from "@/components/ui/spinner";
 import { Timestamp } from "@/components/Timestamp";
 import { formatTimeAgo } from "@/lib/postUtils";
-import { useReplies, useCreateReply, type FrontendComment } from "@/hooks/usePosts";
+import { useReplies, useCreateReply, useReportContent, type FrontendComment } from "@/hooks/usePosts";
+import { useBlockUser } from "@/hooks/useUsers";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface CommentRowProps {
   comment: FrontendComment;
@@ -36,11 +43,14 @@ export function CommentRow({
   const navigate = useNavigate();
   const [repliesExpanded, setRepliesExpanded] = useState(false);
   const [replyComposing, setReplyComposing] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
   // Tracks which @username to mention — defaults to the comment author, changes when replying to a reply
   const [replyingToUsername, setReplyingToUsername] = useState(comment.author.username);
 
   const repliesQuery = useReplies(!isReply && repliesExpanded ? comment.id : null);
   const createReplyMutation = useCreateReply();
+  const reportContent = useReportContent();
+  const blockUser = useBlockUser();
 
   const isOwn = !isGuest && currentUsername === comment.author.username;
   const repliesCount = comment.repliesCount ?? 0;
@@ -59,6 +69,18 @@ export function CommentRow({
     setReplyingToUsername(username);
     setReplyComposing(true);
     setRepliesExpanded(true);
+  };
+
+  const handleReport = async () => {
+    if (!window.confirm("Report this comment to Jam for review?")) return;
+    await reportContent.mutateAsync({ targetType: "comment", targetId: comment.id, reason: "other" });
+    setReportSubmitted(true);
+    window.setTimeout(() => setReportSubmitted(false), 1000);
+  };
+
+  const handleBlock = async () => {
+    if (!comment.authorId) return;
+    await blockUser.mutateAsync(comment.authorId);
   };
 
   return (
@@ -164,16 +186,34 @@ export function CommentRow({
                   </button>
                 )}
 
-                {/* Delete */}
-                {isOwn && (
-                  <button
-                    type="button"
-                    onClick={() => onDeleteComment(comment.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive cursor-pointer"
-                    title="Delete comment"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+                {!isGuest && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                      title="Comment actions"
+                    >
+                      {reportSubmitted ? <Check className="h-3.5 w-3.5 text-green-500" /> : <MoreHorizontal className="h-3.5 w-3.5" />}
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      {isOwn ? (
+                        <DropdownMenuItem variant="destructive" onClick={() => onDeleteComment(comment.id)}>
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      ) : (
+                        <>
+                          <DropdownMenuItem variant="destructive" onClick={handleReport}>
+                            <Flag className="h-4 w-4" />
+                            Report
+                          </DropdownMenuItem>
+                          <DropdownMenuItem variant="destructive" onClick={handleBlock}>
+                            <Ban className="h-4 w-4" />
+                            Block user
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             </div>

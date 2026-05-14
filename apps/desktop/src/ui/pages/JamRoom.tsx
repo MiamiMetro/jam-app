@@ -16,6 +16,8 @@ import {
   Settings,
   RefreshCw,
   AlertTriangle,
+  Check,
+  Flag,
   Volume2,
   VolumeX,
   Radio,
@@ -44,6 +46,7 @@ import { Timestamp } from "@/components/Timestamp";
 import { LoadingState } from "@/components/LoadingState";
 import { EmptyState } from "@/components/EmptyState";
 import { censorText } from "@/lib/bannedWords";
+import { useReportContent } from "@/hooks/usePosts";
 
 interface JamRoomProps {
   roomHandle?: string;
@@ -95,6 +98,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const startListenerMode = useStartListenerMode();
   const stopListenerMode = useStopListenerMode();
   const refreshListenerMode = useRefreshListenerMode();
+  const reportContent = useReportContent();
   const censorshipEnabled = useUIStore((s) => s.censorshipEnabled);
   const [message, setMessage] = useState("");
   const [clientError, setClientError] = useState<string | null>(null);
@@ -102,6 +106,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const [isPerforming, setIsPerforming] = useState(false);
   const [clientState, setClientState] = useState<JamClientState>("idle");
   const [broadcastState, setBroadcastState] = useState<JamBroadcastState>("idle");
+  const [reportSubmitted, setReportSubmitted] = useState(false);
   const [publishSessionId, setPublishSessionId] = useState<Id<"listener_publish_sessions"> | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const jamSessionIdRef = useRef<Id<"jam_sessions"> | null>(null);
@@ -247,6 +252,18 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     setCurrentJamRoomHandle(null);
     navigate("/jams");
   }, [isHost, room?.id, publishSessionId, navigate, setCurrentJamRoomHandle, disconnectPresence, stopListenerMode]);
+
+  const handleReportRoom = useCallback(async () => {
+    if (!room?.id) return;
+    if (!window.confirm("Report this room to Jam for review?")) return;
+    await reportContent.mutateAsync({
+      targetType: "room",
+      targetId: room.id,
+      reason: "other",
+    });
+    setReportSubmitted(true);
+    window.setTimeout(() => setReportSubmitted(false), 1000);
+  }, [reportContent, room?.id]);
 
   const handleJoinClient = useCallback(async () => {
     try {
@@ -621,6 +638,21 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
                 >
                   <Settings className="h-3.5 w-3.5 mr-1.5" />
                   Manage
+                </Button>
+              )}
+              {!isGuest && !isHost && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="glass-solid border-border/50 text-muted-foreground hover:text-red-400 hover:border-red-500/30"
+                  onClick={handleReportRoom}
+                >
+                  {reportSubmitted ? (
+                    <Check className="h-3.5 w-3.5 mr-1.5 text-green-500" />
+                  ) : (
+                    <Flag className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  {reportSubmitted ? "Reported" : "Report"}
                 </Button>
               )}
               <Button

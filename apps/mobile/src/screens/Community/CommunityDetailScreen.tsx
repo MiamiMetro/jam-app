@@ -31,7 +31,7 @@ import {
   useSearchCommunityMembers,
 } from "@/hooks/useCommunities";
 import { useMyProfile } from "@/hooks/useMyProfile";
-import { useCommunityPosts } from "@/hooks/usePosts";
+import { useCommunityPosts, useReportContent } from "@/hooks/usePosts";
 import {
   useActivateRoom,
   useCommunityRooms,
@@ -72,6 +72,7 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
   const updateRoom = useUpdateRoom();
   const activateRoom = useActivateRoom();
   const deactivateRoom = useDeactivateRoom();
+  const reportContent = useReportContent();
 
   const [activeTab, setActiveTab] = useState<DetailTab>("feed");
   const [memberSearch, setMemberSearch] = useState("");
@@ -182,6 +183,25 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
     } catch (err) {
       setError(getCommunityErrorMessage(err));
     }
+  };
+
+  const handleReportCommunity = async (onSubmitted?: () => void) => {
+    if (!community) return;
+    Alert.alert("Report community", `Send ${community.name} to Jam for review?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Report",
+        style: "destructive",
+        onPress: async () => {
+          await reportContent.mutateAsync({
+            targetType: "community",
+            targetId: community.id,
+            reason: "other",
+          });
+          onSubmitted?.();
+        },
+      },
+    ]);
   };
 
   const handleLeave = async () => {
@@ -434,7 +454,11 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
         }
         ListHeaderComponent={
           <>
-            <Header onBack={() => navigation.goBack()} title={community.name} />
+            <Header
+              onBack={() => navigation.goBack()}
+              onReport={handleReportCommunity}
+              title={community.name}
+            />
 
             <View style={[styles.banner, { backgroundColor: `${accent}22`, borderBottomColor: colors.border }]}>
               {community.banner_url && !bannerFailed ? (
@@ -763,8 +787,10 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
   );
 }
 
-function Header({ onBack, title }: { onBack: () => void; title: string }) {
+function Header({ onBack, onReport, title }: { onBack: () => void; onReport?: (onSubmitted?: () => void) => void; title: string }) {
   const { colors } = useMobileTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
 
   return (
     <View style={[styles.header, { borderBottomColor: colors.border }]}>
@@ -779,6 +805,43 @@ function Header({ onBack, title }: { onBack: () => void; title: string }) {
       <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.secondaryForeground }]}>
         {title}
       </Text>
+      {onReport ? (
+        <View style={styles.headerMenuWrap}>
+          <Pressable
+            accessibilityLabel="Community actions"
+            accessibilityRole="button"
+            onPress={() => setMenuOpen((value) => !value)}
+            style={styles.backButton}
+          >
+            <Ionicons
+              color={reportSubmitted ? colors.success : colors.mutedForeground}
+              name={reportSubmitted ? "checkmark" : "ellipsis-horizontal"}
+              size={18}
+            />
+          </Pressable>
+          {menuOpen ? (
+            <View style={[styles.headerMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Pressable
+                accessibilityLabel="Report community"
+                accessibilityRole="button"
+                onPress={() => {
+                  setMenuOpen(false);
+                  onReport(() => {
+                    setReportSubmitted(true);
+                    setTimeout(() => setReportSubmitted(false), 1000);
+                  });
+                }}
+                style={styles.headerMenuAction}
+              >
+                <Ionicons color={colors.destructive} name="flag-outline" size={15} />
+                <Text style={[styles.headerMenuActionText, { color: colors.destructive }]}>
+                  Report
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1370,6 +1433,31 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: "900",
+  },
+  headerMenu: {
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 112,
+    padding: 5,
+    position: "absolute",
+    right: 0,
+    top: 42,
+    zIndex: 20,
+  },
+  headerMenuAction: {
+    alignItems: "center",
+    borderRadius: 7,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 34,
+    paddingHorizontal: 9,
+  },
+  headerMenuActionText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  headerMenuWrap: {
+    position: "relative",
   },
   iconButton: {
     alignItems: "center",

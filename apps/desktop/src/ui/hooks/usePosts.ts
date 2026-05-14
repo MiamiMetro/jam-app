@@ -25,6 +25,7 @@ function getAudioDuration(file: File): Promise<number> {
 
 export interface FrontendPost {
   id: string;
+  authorId?: string;
   author: {
     username: string;
     avatar?: string;
@@ -49,6 +50,7 @@ export interface FrontendPost {
 
 export interface FrontendComment {
   id: string;
+  authorId?: string;
   postId: string;
   parentId?: string | null;
   path?: string;
@@ -77,6 +79,7 @@ function convertPost(post: Post): FrontendPost {
   const isDeleted = post.deleted_at != null;
   return {
     id: post.id,
+    authorId: post.author_id,
     author: {
       username: post.author?.username || "unknown",
       avatar: post.author?.avatar_url || undefined,
@@ -106,6 +109,7 @@ function convertComment(comment: Comment): FrontendComment {
   const isDeleted = comment.deleted_at != null;
   return {
     id: comment.id,
+    authorId: comment.author_id,
     postId: comment.post_id,
     parentId: comment.parent_id ?? null,
     path: comment.path,
@@ -446,6 +450,41 @@ export const useReplies = (parentId: string | null) => {
     data: results.map(convertComment),
     ...flags,
     fetchNextPage: () => loadMore(10),
+  };
+};
+
+export type ReportTargetType = "profile" | "post" | "comment" | "message" | "room" | "community" | "track";
+export type ReportReason =
+  | "harassment"
+  | "hate"
+  | "sexual_content"
+  | "violence"
+  | "spam"
+  | "impersonation"
+  | "illegal"
+  | "other";
+
+export const useReportContent = () => {
+  const report = useMutation(api.reports.create);
+  const [isPending, setIsPending] = useState(false);
+
+  const run = async (variables: {
+    targetType: ReportTargetType;
+    targetId: string;
+    reason: ReportReason;
+    details?: string;
+  }) => {
+    setIsPending(true);
+    try {
+      return await report(variables);
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return {
+    mutateAsync: run,
+    isPending,
   };
 };
 

@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import AudioPostPlayer from "@/components/posts/AudioPostPlayer";
 import type { PostFeedItem } from "@/types";
 import { useMyProfile } from "@/hooks/useMyProfile";
-import { useDeletePost, useToggleLike } from "@/hooks/usePosts";
+import { useDeletePost, useReportContent, useToggleLike } from "@/hooks/usePosts";
+import { useBlockUser } from "@/hooks/useUsers";
 import { useMobileTheme } from "@/theme/MobileTheme";
 
 type Props = {
@@ -17,10 +18,14 @@ export default function PostItem({ post }: Props) {
   const { colors } = useMobileTheme();
   const removePost = useDeletePost();
   const toggleLike = useToggleLike();
+  const reportContent = useReportContent();
+  const blockUser = useBlockUser();
   const { profile } = useMyProfile();
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
   const authorName = post.author?.username ?? "unknown";
   const isOwnPost = profile?.id === post.author_id;
   const fallbackLetters = useMemo(
@@ -64,6 +69,32 @@ export default function PostItem({ post }: Props) {
     } finally {
       setIsLiking(false);
     }
+  };
+
+  const handleReport = async () => {
+    setMenuOpen(false);
+    Alert.alert("Report post", "Send this post to Jam for review?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Report",
+        style: "destructive",
+        onPress: async () => {
+          await reportContent.mutateAsync({
+            targetType: "post",
+            targetId: post.id,
+            reason: "other",
+          });
+          setReportSubmitted(true);
+          setTimeout(() => setReportSubmitted(false), 1000);
+        },
+      },
+    ]);
+  };
+
+  const handleBlock = async () => {
+    if (!post.author_id) return;
+    setMenuOpen(false);
+    await blockUser.mutateAsync(post.author_id);
   };
 
   const openAuthorProfile = () => {
@@ -129,26 +160,43 @@ export default function PostItem({ post }: Props) {
               View profile
             </Text>
           </Pressable>
-          {isOwnPost ? (
+          <View style={styles.menuWrap}>
             <Pressable
-              accessibilityLabel="Delete post"
+              accessibilityLabel="Post actions"
               accessibilityRole="button"
-              disabled={isDeleting}
-              onPress={(event) => {
-                event.stopPropagation();
-                handleDelete();
-              }}
-              style={styles.deleteButton}
+              onPress={() => setMenuOpen((value) => !value)}
+              style={styles.iconButton}
             >
               <Ionicons
                 accessibilityElementsHidden
-                color={isDeleting ? colors.muted : colors.mutedForeground}
+                color={reportSubmitted ? colors.success : colors.mutedForeground}
                 importantForAccessibility="no-hide-descendants"
-                name="trash-outline"
-                size={14}
+                name={reportSubmitted ? "checkmark" : "ellipsis-horizontal"}
+                size={16}
               />
             </Pressable>
-          ) : null}
+            {menuOpen ? (
+              <View style={[styles.menu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {isOwnPost ? (
+                  <MenuAction
+                    color={colors.destructive}
+                    disabled={isDeleting}
+                    icon="trash-outline"
+                    label="Delete"
+                    onPress={async () => {
+                      setMenuOpen(false);
+                      await handleDelete();
+                    }}
+                  />
+                ) : (
+                  <>
+                    <MenuAction color={colors.destructive} icon="flag-outline" label="Report" onPress={handleReport} />
+                    <MenuAction color={colors.destructive} icon="ban-outline" label="Block user" onPress={handleBlock} />
+                  </>
+                )}
+              </View>
+            ) : null}
+          </View>
           {post.community_handle ? (
             <View style={[styles.communityBadge, { backgroundColor: colors.accentMuted }]}>
               <Text style={[styles.communityText, { color: colors.primary }]}>
@@ -231,6 +279,33 @@ export default function PostItem({ post }: Props) {
         </View>
       </View>
     </View>
+  );
+}
+
+function MenuAction({
+  color,
+  disabled,
+  icon,
+  label,
+  onPress,
+}: {
+  color: string;
+  disabled?: boolean;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void | Promise<void>;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={styles.menuAction}
+    >
+      <Ionicons color={color} name={icon} size={15} />
+      <Text style={[styles.menuActionText, { color }]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -317,6 +392,39 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginLeft: "auto",
     width: 28,
+  },
+  iconButton: {
+    alignItems: "center",
+    borderRadius: 8,
+    height: 28,
+    justifyContent: "center",
+    width: 28,
+  },
+  menu: {
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 134,
+    padding: 5,
+    position: "absolute",
+    right: 0,
+    top: 32,
+    zIndex: 20,
+  },
+  menuAction: {
+    alignItems: "center",
+    borderRadius: 7,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 34,
+    paddingHorizontal: 9,
+  },
+  menuActionText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  menuWrap: {
+    marginLeft: "auto",
+    position: "relative",
   },
   communityBadge: {
     borderRadius: 6,

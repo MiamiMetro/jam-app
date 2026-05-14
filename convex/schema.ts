@@ -161,6 +161,44 @@ export default defineSchema({
     .index("by_blocked", ["blockedId"])
     .index("by_blocker_and_blocked", ["blockerId", "blockedId"]),
 
+  reports: defineTable({
+    reporterId: v.id("profiles"),
+    reportedUserId: v.optional(v.id("profiles")),
+    targetType: v.union(
+      v.literal("profile"),
+      v.literal("post"),
+      v.literal("comment"),
+      v.literal("message"),
+      v.literal("room"),
+      v.literal("community"),
+      v.literal("track")
+    ),
+    targetId: v.string(),
+    reason: v.union(
+      v.literal("harassment"),
+      v.literal("hate"),
+      v.literal("sexual_content"),
+      v.literal("violence"),
+      v.literal("spam"),
+      v.literal("impersonation"),
+      v.literal("illegal"),
+      v.literal("other")
+    ),
+    details: v.optional(v.string()),
+    status: v.union(
+      v.literal("open"),
+      v.literal("reviewing"),
+      v.literal("resolved"),
+      v.literal("dismissed")
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_reporter", ["reporterId"])
+    .index("by_reporter_and_target", ["reporterId", "targetType", "targetId"])
+    .index("by_status_and_created_at", ["status", "createdAt"])
+    .index("by_target", ["targetType", "targetId"]),
+
   // Communities table
   communities: defineTable({
     name: v.string(),

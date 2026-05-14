@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +16,7 @@ import type { AuthStackParamList } from "../../navigation/AuthStack";
 import { authClient } from "../../lib/auth-client";
 import { useMobileTheme } from "@/theme/MobileTheme";
 import FormField from "@/components/ui/FormField";
+import { LEGAL_LINKS } from "@/lib/legal";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Register">;
 
@@ -25,10 +27,15 @@ const RegisterScreen = ({ navigation }: Props) => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
 
   const handleRegister = async () => {
     if (password !== confirmPassword) {
       setError("Passwords don't match.");
+      return;
+    }
+    if (!acceptedLegal) {
+      setError("Accept the Terms, Privacy Policy, and KVKK notice to continue.");
       return;
     }
 
@@ -133,6 +140,46 @@ const RegisterScreen = ({ navigation }: Props) => {
                 {error}
               </Text>
             ) : null}
+
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: acceptedLegal }}
+              disabled={isSubmitting}
+              onPress={() => {
+                setAcceptedLegal((value) => !value);
+                setError(null);
+              }}
+              style={styles.legalRow}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  {
+                    backgroundColor: acceptedLegal ? colors.primary : colors.input,
+                    borderColor: acceptedLegal ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                {acceptedLegal ? (
+                  <Text style={[styles.checkmark, { color: colors.primaryForeground }]}>✓</Text>
+                ) : null}
+              </View>
+              <Text style={[styles.legalText, { color: colors.mutedForeground }]}>
+                I agree to Jam's{" "}
+                <Text style={{ color: colors.primary }} onPress={() => Linking.openURL(LEGAL_LINKS.terms)}>
+                  Terms
+                </Text>
+                ,{" "}
+                <Text style={{ color: colors.primary }} onPress={() => Linking.openURL(LEGAL_LINKS.privacy)}>
+                  Privacy Policy
+                </Text>
+                , and{" "}
+                <Text style={{ color: colors.primary }} onPress={() => Linking.openURL(LEGAL_LINKS.kvkk)}>
+                  KVKK notice
+                </Text>
+                .
+              </Text>
+            </Pressable>
 
             <Pressable
               accessibilityRole="button"
@@ -244,5 +291,30 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.7,
+  },
+  checkbox: {
+    alignItems: "center",
+    borderRadius: 4,
+    borderWidth: 1,
+    height: 20,
+    justifyContent: "center",
+    marginTop: 1,
+    width: 20,
+  },
+  checkmark: {
+    fontSize: 14,
+    fontWeight: "900",
+    lineHeight: 18,
+  },
+  legalRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+  },
+  legalText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18,
   },
 });

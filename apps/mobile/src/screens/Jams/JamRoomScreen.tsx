@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -20,6 +21,8 @@ import {
   useRoomParticipants,
   useSendRoomMessage,
 } from "@/hooks/useRooms";
+import { useReportContent } from "@/hooks/usePosts";
+import { useMyProfile } from "@/hooks/useMyProfile";
 import { useMobileTheme } from "@/theme/MobileTheme";
 import type { RoomParticipant } from "@/types";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
@@ -30,10 +33,12 @@ export default function JamRoomScreen({ navigation, route }: Props) {
   const { colors } = useMobileTheme();
   const insets = useSafeAreaInsets();
   const { handle } = route.params;
+  const { profile } = useMyProfile();
   const { room, isLoading } = useRoom(handle);
   const { participants, totalCount } = useRoomParticipants(room?.id);
   const roomMessages = useRoomMessages(room?.id);
   const sendRoomMessage = useSendRoomMessage();
+  const reportContent = useReportContent();
   const presence = useJamRoomPresence(
     room?.id,
     Boolean(room?.is_active && !room?.is_private),
@@ -41,7 +46,9 @@ export default function JamRoomScreen({ navigation, route }: Props) {
   const [message, setMessage] = useState("");
   const [messageError, setMessageError] = useState<string | null>(null);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
   const hostName = room?.host?.display_name || room?.host?.username || "Unknown host";
+  const canReportRoom = Boolean(profile?.id && room?.host_id !== profile.id);
   const canSendMessage =
     Boolean(room?.is_active) && message.trim().length > 0 && !isSendingMessage;
 
@@ -61,6 +68,26 @@ export default function JamRoomScreen({ navigation, route }: Props) {
     } finally {
       setIsSendingMessage(false);
     }
+  };
+
+  const handleReportRoom = async () => {
+    if (!room) return;
+    Alert.alert("Report room", "Send this jam room to Jam for review?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Report",
+        style: "destructive",
+        onPress: async () => {
+          await reportContent.mutateAsync({
+            targetType: "room",
+            targetId: room.id,
+            reason: "other",
+          });
+          setReportSubmitted(true);
+          setTimeout(() => setReportSubmitted(false), 1000);
+        },
+      },
+    ]);
   };
 
   if (isLoading) {
@@ -93,6 +120,8 @@ export default function JamRoomScreen({ navigation, route }: Props) {
       <Header
         meta={`jam/${room.handle}`}
         onBack={navigation.goBack}
+        onReport={canReportRoom ? handleReportRoom : undefined}
+        reportSubmitted={reportSubmitted}
         title={room.name}
       />
 
@@ -313,10 +342,14 @@ export default function JamRoomScreen({ navigation, route }: Props) {
 function Header({
   meta,
   onBack,
+  onReport,
+  reportSubmitted,
   title,
 }: {
   meta?: string;
   onBack: () => void;
+  onReport?: () => void;
+  reportSubmitted?: boolean;
   title: string;
 }) {
   const { colors } = useMobileTheme();
@@ -347,6 +380,20 @@ function Header({
           </Text>
         ) : null}
       </View>
+      {onReport ? (
+        <Pressable
+          accessibilityLabel="Report room"
+          accessibilityRole="button"
+          onPress={onReport}
+          style={styles.backButton}
+        >
+          <Ionicons
+            color={reportSubmitted ? colors.success : colors.mutedForeground}
+            name={reportSubmitted ? "checkmark" : "flag-outline"}
+            size={18}
+          />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

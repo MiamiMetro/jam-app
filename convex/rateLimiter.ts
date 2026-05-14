@@ -82,6 +82,14 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE, 
     capacity: 3 
   },
+
+  // User safety reports: enough for active moderation, capped for abuse
+  reportAction: {
+    kind: "token bucket",
+    rate: 10,
+    period: MINUTE,
+    capacity: 3,
+  },
   
   // Profile creation: 3 per minute (strict - should only need 1)
   createProfile: {
@@ -257,6 +265,7 @@ export type RateLimitName =
   | "updateProfile"
   | "deleteAction"
   | "blockAction"
+  | "reportAction"
   | "createProfile"
   | "general"
   | "uploadInit"

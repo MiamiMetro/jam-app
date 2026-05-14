@@ -7,6 +7,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useAuthModalStore } from "@/stores/authModalStore";
 import { AuthModalShell } from "./AuthModalShell";
+import { LEGAL_LINKS } from "@/lib/legal";
+import { openExternal } from "@/lib/openExternal";
 
 export default function SignupModal() {
   const location = useLocation();
@@ -18,6 +20,7 @@ export default function SignupModal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
 
   const open = isOpen && mode === "signup";
 
@@ -25,6 +28,10 @@ export default function SignupModal() {
     e.preventDefault();
     if (password !== confirmPassword) {
       setError("Passwords don't match");
+      return;
+    }
+    if (!acceptedLegal) {
+      setError("Accept the Terms, Privacy Policy, and KVKK notice to continue.");
       return;
     }
     try {
@@ -35,6 +42,7 @@ export default function SignupModal() {
       setEmail("");
       setPassword("");
       setConfirmPassword("");
+      setAcceptedLegal(false);
       setError(null);
       openUsernameSetup();
     } catch (err: any) {
@@ -48,6 +56,7 @@ export default function SignupModal() {
     setEmail("");
     setPassword("");
     setConfirmPassword("");
+    setAcceptedLegal(false);
     setError(null);
     close();
   };
@@ -129,6 +138,30 @@ export default function SignupModal() {
           </button>
         </div>
       </div>
+      <label className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={acceptedLegal}
+          disabled={isSubmitting}
+          onChange={(e) => { setAcceptedLegal(e.target.checked); setError(null); }}
+          className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+        />
+        <span>
+          I agree to Jam's{" "}
+          <button type="button" className="text-primary hover:underline" onClick={() => openExternal(LEGAL_LINKS.terms)}>
+            Terms
+          </button>
+          ,{" "}
+          <button type="button" className="text-primary hover:underline" onClick={() => openExternal(LEGAL_LINKS.privacy)}>
+            Privacy Policy
+          </button>
+          , and{" "}
+          <button type="button" className="text-primary hover:underline" onClick={() => openExternal(LEGAL_LINKS.kvkk)}>
+            KVKK notice
+          </button>
+          .
+        </span>
+      </label>
     </AuthModalShell>
   );
 }

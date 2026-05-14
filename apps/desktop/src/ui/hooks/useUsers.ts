@@ -617,3 +617,49 @@ export const useDeleteMessage = () => {
     },
   };
 };
+
+export const useBlockUser = () => {
+  const blockUser = useMutation(api.blocks.block);
+  return {
+    mutateAsync: async (userId: string) => {
+      return await blockUser({ userId: userId as Id<"profiles"> });
+    },
+  };
+};
+
+export const useUnblockUser = () => {
+  const unblockUser = useMutation(api.blocks.unblock);
+  return {
+    mutateAsync: async (userId: string) => {
+      return await unblockUser({ userId: userId as Id<"profiles"> });
+    },
+  };
+};
+
+export const useIsBlockedByMe = (userId?: string | null) => {
+  const result = useQuery(
+    api.blocks.isBlockedByMe,
+    userId ? { userId: userId as Id<"profiles"> } : "skip"
+  );
+  return {
+    data: result ?? false,
+    isLoading: result === undefined && !!userId,
+  };
+};
+
+export const useBlockedUsers = () => {
+  const paginated = usePaginatedQuery(
+    api.blocks.listPaginated,
+    {},
+    { initialNumItems: 20 }
+  );
+  const flags = getPaginatedStatusFlags(paginated.status);
+
+  return {
+    data: paginated.results
+      .filter((profile): profile is NonNullable<typeof profile> => profile !== null)
+      .map(convertUser),
+    ...flags,
+    fetchNextPage: () => paginated.loadMore(20),
+  };
+};
