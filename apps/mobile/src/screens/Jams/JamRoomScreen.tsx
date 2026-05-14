@@ -1,38 +1,75 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React from "react";
+import React, { useState } from "react";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import JamStreamPlayer from "@/components/jams/JamStreamPlayer";
 import { useJamRoomPresence } from "@/hooks/useJamRoomPresence";
-import { useRoom, useRoomParticipants } from "@/hooks/useRooms";
+import {
+  useRoom,
+  useRoomMessages,
+  useRoomParticipants,
+  useSendRoomMessage,
+} from "@/hooks/useRooms";
+import { useMobileTheme } from "@/theme/MobileTheme";
 import type { RoomParticipant } from "@/types";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 
 type Props = NativeStackScreenProps<RootStackParamList, "JamRoom">;
 
 export default function JamRoomScreen({ navigation, route }: Props) {
+  const { colors } = useMobileTheme();
+  const insets = useSafeAreaInsets();
   const { handle } = route.params;
   const { room, isLoading } = useRoom(handle);
   const { participants, totalCount } = useRoomParticipants(room?.id);
-  const presence = useJamRoomPresence(room?.id, Boolean(room?.is_active));
+  const roomMessages = useRoomMessages(room?.id);
+  const sendRoomMessage = useSendRoomMessage();
+  const presence = useJamRoomPresence(
+    room?.id,
+    Boolean(room?.is_active && !room?.is_private),
+  );
+  const [message, setMessage] = useState("");
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const hostName = room?.host?.display_name || room?.host?.username || "Unknown host";
+  const canSendMessage =
+    Boolean(room?.is_active) && message.trim().length > 0 && !isSendingMessage;
+
+  const handleSendMessage = async () => {
+    if (!room || !canSendMessage) return;
+
+    try {
+      setMessageError(null);
+      setIsSendingMessage(true);
+      await sendRoomMessage({
+        roomId: room.id,
+        text: message.trim(),
+      });
+      setMessage("");
+    } catch (err) {
+      setMessageError(getRoomMessageError(err));
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <Header onBack={navigation.goBack} title="Jam room" />
         <View style={styles.centerState}>
-          <ActivityIndicator color="#D8A64A" />
-          <Text style={styles.stateText}>Room is loading...</Text>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={[styles.stateText, { color: colors.mutedForeground }]}>Room is loading...</Text>
         </View>
       </SafeAreaView>
     );
@@ -40,27 +77,27 @@ export default function JamRoomScreen({ navigation, route }: Props) {
 
   if (!room) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <Header onBack={navigation.goBack} title="Room not found" />
         <View style={styles.centerState}>
-          <Ionicons color="#4B5565" name="musical-notes-outline" size={38} />
-          <Text style={styles.emptyTitle}>Room not found</Text>
-          <Text style={styles.stateText}>This jam may have ended or moved.</Text>
+          <Ionicons color={colors.mutedForeground} name="musical-notes-outline" size={38} />
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Room not found</Text>
+          <Text style={[styles.stateText, { color: colors.mutedForeground }]}>This jam may have ended or moved.</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
         meta={`jam/${room.handle}`}
         onBack={navigation.goBack}
         title={room.name}
       />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
+        <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.heroTopLine}>
             <View style={styles.hostIdentity}>
               <Avatar
@@ -69,25 +106,42 @@ export default function JamRoomScreen({ navigation, route }: Props) {
                 size={48}
               />
               <View style={styles.hostText}>
-                <Text numberOfLines={1} style={styles.hostName}>
+                <Text numberOfLines={1} style={[styles.hostName, { color: colors.foreground }]}>
                   {hostName}
                 </Text>
-                <Text numberOfLines={1} style={styles.hostSubtext}>
+                <Text numberOfLines={1} style={[styles.hostSubtext, { color: colors.mutedForeground }]}>
                   Listener mode
                 </Text>
               </View>
             </View>
 
-            <View style={[styles.liveBadge, room.status === "live" ? styles.liveBadgeOn : null]}>
-              <View style={[styles.liveDot, room.status === "live" ? styles.liveDotOn : null]} />
-              <Text style={[styles.liveText, room.status === "live" ? styles.liveTextOn : null]}>
+            <View
+              style={[
+                styles.liveBadge,
+                {
+                  backgroundColor: room.status === "live" ? colors.destructiveMuted : colors.muted,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.liveDot,
+                  { backgroundColor: room.status === "live" ? colors.destructive : colors.mutedForeground },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.liveText,
+                  { color: room.status === "live" ? colors.destructive : colors.mutedForeground },
+                ]}
+              >
                 {room.status === "live" ? "Live" : "Idle"}
               </Text>
             </View>
           </View>
 
           {room.description ? (
-            <Text style={styles.description}>{room.description}</Text>
+            <Text style={[styles.description, { color: colors.secondaryForeground }]}>{room.description}</Text>
           ) : null}
 
           <View style={styles.detailRow}>
@@ -97,15 +151,36 @@ export default function JamRoomScreen({ navigation, route }: Props) {
             {room.is_private ? <DetailPill icon="lock-closed-outline" label="Private" /> : null}
           </View>
 
-          {presence.error ? (
-            <View style={styles.warningBox}>
-              <Ionicons color="#FCA5A5" name="alert-circle-outline" size={16} />
-              <Text style={styles.warningText}>{presence.error}</Text>
+          {room.is_private || presence.error ? (
+            <View
+              style={[
+                styles.warningBox,
+                {
+                  backgroundColor: colors.destructiveMuted,
+                  borderColor: colors.destructive,
+                },
+              ]}
+            >
+              <Ionicons
+                accessibilityElementsHidden
+                color={colors.destructive}
+                importantForAccessibility="no-hide-descendants"
+                name="alert-circle-outline"
+                size={16}
+              />
+              <Text style={[styles.warningText, { color: colors.destructive }]}>
+                {room.is_private ? "This room is private." : presence.error}
+              </Text>
             </View>
           ) : (
             <View style={styles.presenceLine}>
-              <View style={[styles.presenceDot, presence.isConnected ? styles.presenceDotOn : null]} />
-              <Text style={styles.presenceText}>
+              <View
+                style={[
+                  styles.presenceDot,
+                  { backgroundColor: presence.isConnected ? colors.success : colors.mutedForeground },
+                ]}
+              />
+              <Text style={[styles.presenceText, { color: colors.mutedForeground }]}>
                 {presence.isConnected ? "Joined as listener" : "Joining listener presence..."}
               </Text>
             </View>
@@ -114,15 +189,111 @@ export default function JamRoomScreen({ navigation, route }: Props) {
 
         <JamStreamPlayer roomName={room.name} streamUrl={room.stream_url} />
 
-        <View style={styles.infoBlock}>
-          <View style={styles.infoHeader}>
-            <Text style={styles.sectionTitle}>In This Room</Text>
-            <Text style={styles.sectionMeta}>{participants.length} shown</Text>
+        <View style={[styles.infoBlock, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.infoHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Chat</Text>
+            <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>
+              {roomMessages.data.length} latest
+            </Text>
+          </View>
+
+          <View style={styles.chatList}>
+            {roomMessages.isLoading ? (
+              <View style={styles.emptyParticipants}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : roomMessages.data.length === 0 ? (
+              <Text style={[styles.emptyParticipantsText, { color: colors.mutedForeground }]}>
+                No room messages yet.
+              </Text>
+            ) : (
+              roomMessages.data.map((item) => (
+                <View key={item.id} style={[styles.chatMessage, { borderBottomColor: colors.border }]}>
+                  <Text style={[styles.chatSender, { color: colors.foreground }]}>
+                    {item.sender?.username || "Unknown"}
+                  </Text>
+                  <Text style={[styles.chatText, { color: colors.secondaryForeground }]}>
+                    {item.text}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+
+          {messageError ? (
+            <Text
+              style={[
+                styles.messageError,
+                {
+                  backgroundColor: colors.destructiveMuted,
+                  borderColor: colors.destructive,
+                  color: colors.destructive,
+                },
+              ]}
+            >
+              {messageError}
+            </Text>
+          ) : null}
+
+          <View style={[styles.chatComposer, { borderTopColor: colors.border }]}>
+            <TextInput
+              editable={Boolean(room.is_active) && !isSendingMessage}
+              maxLength={500}
+              onChangeText={(value) => {
+                setMessage(value);
+                setMessageError(null);
+              }}
+              placeholder={room.is_active ? "Message this room" : "Room is idle"}
+              placeholderTextColor={colors.mutedForeground}
+              style={[
+                styles.chatInput,
+                {
+                  backgroundColor: colors.input,
+                  borderColor: colors.borderStrong,
+                  color: colors.foreground,
+                },
+              ]}
+              value={message}
+            />
+            <Pressable
+              accessibilityLabel="Send room message"
+              accessibilityRole="button"
+              disabled={!canSendMessage}
+              onPress={handleSendMessage}
+              style={[
+                styles.sendButton,
+                { backgroundColor: canSendMessage ? colors.primary : colors.muted },
+              ]}
+            >
+              {isSendingMessage ? (
+                <ActivityIndicator color={colors.primaryForeground} size="small" />
+              ) : (
+                <Text
+                  style={[
+                    styles.sendButtonText,
+                    {
+                      color: canSendMessage
+                        ? colors.primaryForeground
+                        : colors.mutedForeground,
+                    },
+                  ]}
+                >
+                  Send
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={[styles.infoBlock, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.infoHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>In This Room</Text>
+            <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>{participants.length} shown</Text>
           </View>
 
           {participants.length === 0 ? (
             <View style={styles.emptyParticipants}>
-              <Text style={styles.emptyParticipantsText}>No listeners visible yet.</Text>
+              <Text style={[styles.emptyParticipantsText, { color: colors.mutedForeground }]}>No listeners visible yet.</Text>
             </View>
           ) : (
             participants.map((participant) => (
@@ -148,17 +319,30 @@ function Header({
   onBack: () => void;
   title: string;
 }) {
+  const { colors } = useMobileTheme();
+
   return (
-    <View style={styles.header}>
-      <Pressable accessibilityLabel="Back to jams" onPress={onBack} style={styles.backButton}>
-        <Ionicons color="#AEB6C4" name="chevron-back" size={22} />
+    <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <Pressable
+        accessibilityLabel="Back to jams"
+        accessibilityRole="button"
+        onPress={onBack}
+        style={styles.backButton}
+      >
+        <Ionicons
+          accessibilityElementsHidden
+          color={colors.secondaryForeground}
+          importantForAccessibility="no-hide-descendants"
+          name="chevron-back"
+          size={22}
+        />
       </Pressable>
       <View style={styles.headerText}>
-        <Text numberOfLines={1} style={styles.headerTitle}>
+        <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.foreground }]}>
           {title}
         </Text>
         {meta ? (
-          <Text numberOfLines={1} style={styles.headerMeta}>
+          <Text numberOfLines={1} style={[styles.headerMeta, { color: colors.mutedForeground }]}>
             {meta}
           </Text>
         ) : null}
@@ -174,14 +358,46 @@ function DetailPill({
   icon?: keyof typeof Ionicons.glyphMap;
   label: string;
 }) {
+  const { colors } = useMobileTheme();
+
   return (
-    <View style={styles.detailPill}>
-      {icon ? <Ionicons color="#8F98A8" name={icon} size={13} /> : null}
-      <Text numberOfLines={1} style={styles.detailPillText}>
+    <View style={[styles.detailPill, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+      {icon ? (
+        <Ionicons
+          accessibilityElementsHidden
+          color={colors.mutedForeground}
+          importantForAccessibility="no-hide-descendants"
+          name={icon}
+          size={13}
+        />
+      ) : null}
+      <Text numberOfLines={1} style={[styles.detailPillText, { color: colors.mutedForeground }]}>
         {label}
       </Text>
     </View>
   );
+}
+
+function getRoomMessageError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes("NOT_IN_ROOM")) {
+    return "Join listener mode before sending messages.";
+  }
+  if (message.includes("PRIVATE_ROOM")) {
+    return "This room is friends only.";
+  }
+  if (message.includes("ROOM_NOT_ACTIVE")) {
+    return "This room is not accepting messages right now.";
+  }
+  if (message.includes("EMPTY_MESSAGE")) {
+    return "Write a message first.";
+  }
+  if (message.includes("Rate limit")) {
+    return "Slow down before sending another message.";
+  }
+
+  return message.replace(/^[A-Z_]+:\s*/, "") || "Message failed.";
 }
 
 function ParticipantRow({
@@ -191,25 +407,26 @@ function ParticipantRow({
   isHost: boolean;
   participant: RoomParticipant;
 }) {
+  const { colors } = useMobileTheme();
   const profile = participant.profile;
   const name = profile?.display_name || profile?.username || "Unknown";
   const username = profile?.username || "listener";
 
   return (
-    <View style={styles.participantRow}>
+    <View style={[styles.participantRow, { borderBottomColor: colors.border }]}>
       <Avatar image={profile?.avatar_url} label={username} size={38} />
       <View style={styles.participantText}>
         <View style={styles.participantNameLine}>
-          <Text numberOfLines={1} style={styles.participantName}>
+          <Text numberOfLines={1} style={[styles.participantName, { color: colors.foreground }]}>
             {name}
           </Text>
           {isHost ? (
-            <View style={styles.hostBadge}>
-              <Text style={styles.hostBadgeText}>Host</Text>
+            <View style={[styles.hostBadge, { backgroundColor: colors.accentMuted }]}>
+              <Text style={[styles.hostBadgeText, { color: colors.primary }]}>Host</Text>
             </View>
           ) : null}
         </View>
-        <Text numberOfLines={1} style={styles.participantRole}>
+        <Text numberOfLines={1} style={[styles.participantRole, { color: colors.mutedForeground }]}>
           {participant.role}
         </Text>
       </View>
@@ -226,6 +443,7 @@ function Avatar({
   label: string;
   size: number;
 }) {
+  const { colors } = useMobileTheme();
   const radius = size / 2;
 
   return (
@@ -234,6 +452,8 @@ function Avatar({
         styles.avatar,
         {
           borderRadius: radius,
+          backgroundColor: colors.muted,
+          borderColor: colors.border,
           height: size,
           width: size,
         },
@@ -249,7 +469,7 @@ function Avatar({
           }}
         />
       ) : (
-        <Text style={styles.avatarText}>{label.slice(0, 2).toUpperCase()}</Text>
+        <Text style={[styles.avatarText, { color: colors.secondaryForeground }]}>{label.slice(0, 2).toUpperCase()}</Text>
       )}
     </View>
   );
@@ -257,12 +477,10 @@ function Avatar({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#1A1E29",
     flex: 1,
   },
   header: {
     alignItems: "center",
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -281,12 +499,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   headerTitle: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
   },
   headerMeta: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 2,
@@ -303,20 +519,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   emptyTitle: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
     marginTop: 12,
     textAlign: "center",
   },
   stateText: {
-    color: "#8F98A8",
     marginTop: 8,
     textAlign: "center",
   },
   hero: {
-    backgroundColor: "#222733",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -337,14 +549,11 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
     justifyContent: "center",
     overflow: "hidden",
   },
   avatarText: {
-    color: "#C7CCD6",
     fontSize: 12,
     fontWeight: "900",
   },
@@ -353,47 +562,32 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   hostName: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
   },
   hostSubtext: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 3,
   },
   liveBadge: {
     alignItems: "center",
-    backgroundColor: "#303644",
     borderRadius: 8,
     flexDirection: "row",
     gap: 6,
     paddingHorizontal: 8,
     paddingVertical: 5,
   },
-  liveBadgeOn: {
-    backgroundColor: "rgba(239,68,68,0.13)",
-  },
   liveDot: {
-    backgroundColor: "#737D8C",
     borderRadius: 4,
     height: 8,
     width: 8,
   },
-  liveDotOn: {
-    backgroundColor: "#EF4444",
-  },
   liveText: {
-    color: "#AEB6C4",
     fontSize: 11,
     fontWeight: "900",
   },
-  liveTextOn: {
-    color: "#FCA5A5",
-  },
   description: {
-    color: "#C7CCD6",
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 20,
@@ -405,8 +599,6 @@ const styles = StyleSheet.create({
   },
   detailPill: {
     alignItems: "center",
-    backgroundColor: "#303644",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -416,14 +608,11 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   detailPillText: {
-    color: "#AEB6C4",
     fontSize: 11,
     fontWeight: "800",
   },
   warningBox: {
     alignItems: "center",
-    backgroundColor: "rgba(127,29,29,0.32)",
-    borderColor: "rgba(248,113,113,0.28)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -432,7 +621,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   warningText: {
-    color: "#FCA5A5",
     flex: 1,
     fontSize: 12,
     fontWeight: "700",
@@ -443,29 +631,21 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   presenceDot: {
-    backgroundColor: "#737D8C",
     borderRadius: 4,
     height: 8,
     width: 8,
   },
-  presenceDotOn: {
-    backgroundColor: "#22C55E",
-  },
   presenceText: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "800",
   },
   infoBlock: {
-    backgroundColor: "#222733",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     overflow: "hidden",
   },
   infoHeader: {
     alignItems: "center",
-    borderBottomColor: "rgba(255,255,255,0.07)",
     borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -473,12 +653,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   sectionTitle: {
-    color: "#EEF0F5",
     fontSize: 14,
     fontWeight: "900",
   },
   sectionMeta: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "800",
   },
@@ -487,14 +665,70 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   emptyParticipantsText: {
-    color: "#8F98A8",
     fontSize: 13,
     fontWeight: "700",
+    paddingHorizontal: 14,
+    paddingVertical: 18,
     textAlign: "center",
+  },
+  chatList: {
+    maxHeight: 280,
+  },
+  chatMessage: {
+    borderBottomWidth: 1,
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  chatSender: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  chatText: {
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  messageError: {
+    borderRadius: 8,
+    borderWidth: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 17,
+    marginHorizontal: 14,
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  chatComposer: {
+    alignItems: "center",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    padding: 12,
+  },
+  chatInput: {
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    fontSize: 14,
+    minHeight: 42,
+    paddingHorizontal: 12,
+  },
+  sendButton: {
+    alignItems: "center",
+    borderRadius: 8,
+    justifyContent: "center",
+    minHeight: 42,
+    minWidth: 70,
+    paddingHorizontal: 12,
+  },
+  sendButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
   },
   participantRow: {
     alignItems: "center",
-    borderBottomColor: "rgba(255,255,255,0.06)",
     borderBottomWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -511,26 +745,22 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   participantName: {
-    color: "#EEF0F5",
     flex: 1,
     fontSize: 14,
     fontWeight: "900",
   },
   participantRole: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 3,
     textTransform: "capitalize",
   },
   hostBadge: {
-    backgroundColor: "rgba(216,166,74,0.12)",
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 3,
   },
   hostBadgeText: {
-    color: "#D8A64A",
     fontSize: 10,
     fontWeight: "900",
   },

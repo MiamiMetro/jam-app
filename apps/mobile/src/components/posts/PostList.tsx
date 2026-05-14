@@ -86,7 +86,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   content: {
-    paddingBottom: 18,
   },
   emptyContent: {
     flexGrow: 1,

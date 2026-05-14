@@ -4,20 +4,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
-import { useMutation } from "convex/react";
-import { api } from "@jam-app/convex";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useCreateProfile } from "@/hooks/useMyProfile";
 import { authClient } from "../../lib/auth-client";
 import { useMobileTheme } from "@/theme/MobileTheme";
+import FormField from "@/components/ui/FormField";
 
 export default function ProfileSetupScreen() {
   const { colors } = useMobileTheme();
-  const createProfile = useMutation(api.profiles.createProfile);
+  const createProfile = useCreateProfile();
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +35,7 @@ export default function ProfileSetupScreen() {
     try {
       setError(null);
       setIsSubmitting(true);
-      await createProfile({
+      await createProfile.mutateAsync({
         username: trimmedUsername,
         displayName: trimmedDisplayName || trimmedUsername,
       });
@@ -57,7 +57,11 @@ export default function ProfileSetupScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardView}
       >
-        <View style={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.header}>
             <Text style={[styles.kicker, { color: colors.success }]}>Almost there</Text>
             <Text style={[styles.title, { color: colors.foreground }]}>
@@ -69,63 +73,37 @@ export default function ProfileSetupScreen() {
           </View>
 
           <View style={styles.form}>
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.secondaryForeground }]}>
-                Username
-              </Text>
-              <TextInput
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!isSubmitting}
-                maxLength={15}
-                onChangeText={(value) => {
-                  setUsername(value);
-                  setError(null);
-                }}
-                placeholder="johndoe"
-                placeholderTextColor={colors.mutedForeground}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.input,
-                    borderColor: colors.border,
-                    color: colors.foreground,
-                  },
-                ]}
-                value={username}
-              />
-              <Text style={[styles.hint, { color: colors.mutedForeground }]}>
-                3-15 characters. Letters, numbers, and underscores.
-              </Text>
-            </View>
+            <FormField
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isSubmitting}
+              hint="3-15 characters. Letters, numbers, and underscores."
+              label="Username"
+              maxLength={15}
+              onChangeText={(value) => {
+                setUsername(value);
+                setError(null);
+              }}
+              placeholder="johndoe"
+              textContentType="username"
+              value={username}
+            />
 
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.secondaryForeground }]}>
-                Display name
-              </Text>
-              <TextInput
-                editable={!isSubmitting}
-                maxLength={50}
-                onChangeText={(value) => {
-                  setDisplayName(value);
-                  setError(null);
-                }}
-                placeholder="John Doe"
-                placeholderTextColor={colors.mutedForeground}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.input,
-                    borderColor: colors.border,
-                    color: colors.foreground,
-                  },
-                ]}
-                value={displayName}
-              />
-            </View>
+            <FormField
+              editable={!isSubmitting}
+              label="Display name"
+              maxLength={50}
+              onChangeText={(value) => {
+                setDisplayName(value);
+                setError(null);
+              }}
+              placeholder="John Doe"
+              value={displayName}
+            />
 
             {error ? (
               <Text
+                selectable
                 style={[
                   styles.error,
                   {
@@ -140,6 +118,8 @@ export default function ProfileSetupScreen() {
             ) : null}
 
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Create profile"
               disabled={isSubmitting}
               onPress={handleSubmit}
               style={({ pressed }) => [
@@ -158,13 +138,19 @@ export default function ProfileSetupScreen() {
               )}
             </Pressable>
 
-            <Pressable disabled={isSubmitting} onPress={handleSignOut} style={styles.secondaryButton}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sign out"
+              disabled={isSubmitting}
+              onPress={handleSignOut}
+              style={styles.secondaryButton}
+            >
               <Text style={[styles.secondaryButtonText, { color: colors.mutedForeground }]}>
                 Sign out
               </Text>
             </Pressable>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -203,9 +189,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
+    paddingVertical: 28,
   },
   header: {
     marginBottom: 28,
@@ -227,24 +214,6 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: 16,
-  },
-  field: {
-    gap: 8,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  input: {
-    borderRadius: 8,
-    borderWidth: 1,
-    fontSize: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  hint: {
-    fontSize: 12,
-    lineHeight: 18,
   },
   error: {
     borderRadius: 8,

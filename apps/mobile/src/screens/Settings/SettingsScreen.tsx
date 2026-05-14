@@ -1,9 +1,9 @@
 import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -44,19 +44,27 @@ const themeOptions: Array<{
 export default function SettingsScreen() {
   const navigation = useNavigation();
   const { colors, resolvedTheme, setTheme, theme } = useMobileTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Pressable
           accessibilityLabel="Back"
+          accessibilityRole="button"
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [
             styles.backButton,
             { backgroundColor: pressed ? colors.cardPressed : "transparent" },
           ]}
         >
-          <Ionicons color={colors.foreground} name="chevron-back" size={22} />
+          <Ionicons
+            accessibilityElementsHidden
+            color={colors.foreground}
+            importantForAccessibility="no-hide-descendants"
+            name="chevron-back"
+            size={22}
+          />
         </Pressable>
         <View>
           <Text style={[styles.headerEyebrow, { color: colors.mutedForeground }]}>
@@ -69,7 +77,7 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
         style={{ backgroundColor: colors.background }}
       >
         <View
@@ -97,6 +105,9 @@ export default function SettingsScreen() {
 
               return (
                 <Pressable
+                  accessibilityLabel={`Set theme to ${option.label}. ${option.description}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
                   key={option.value}
                   onPress={() => setTheme(option.value)}
                   style={({ pressed }) => [
@@ -122,11 +133,13 @@ export default function SettingsScreen() {
                     ]}
                   >
                     <Ionicons
+                      accessibilityElementsHidden
                       color={
                         selected
                           ? colors.primaryForeground
                           : colors.secondaryForeground
                       }
+                      importantForAccessibility="no-hide-descendants"
                       name={option.icon}
                       size={18}
                     />
@@ -145,7 +158,9 @@ export default function SettingsScreen() {
                     </Text>
                   </View>
                   <Ionicons
+                    accessibilityElementsHidden
                     color={selected ? colors.primary : colors.mutedForeground}
+                    importantForAccessibility="no-hide-descendants"
                     name={selected ? "checkmark-circle" : "ellipse-outline"}
                     size={22}
                   />

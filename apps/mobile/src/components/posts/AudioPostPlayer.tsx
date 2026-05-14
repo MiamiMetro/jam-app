@@ -185,6 +185,7 @@ export default function AudioPostPlayer({
       <View style={styles.topRow}>
         <Pressable
           accessibilityLabel={status.playing ? "Pause audio" : "Play audio"}
+          accessibilityRole="button"
           disabled={!!unsupportedReason}
           onPress={handleTogglePlayback}
           style={({ pressed }) => [
@@ -199,12 +200,20 @@ export default function AudioPostPlayer({
           ]}
         >
           {unsupportedReason ? (
-            <Ionicons color={colors.mutedForeground} name="alert" size={18} />
+            <Ionicons
+              accessibilityElementsHidden
+              color={colors.mutedForeground}
+              importantForAccessibility="no-hide-descendants"
+              name="alert"
+              size={18}
+            />
           ) : isPreparingPlayback ? (
             <ActivityIndicator color={colors.primaryForeground} size="small" />
           ) : (
             <Ionicons
+              accessibilityElementsHidden
               color={colors.primaryForeground}
+              importantForAccessibility="no-hide-descendants"
               name={status.playing ? "pause" : "play"}
               size={18}
             />
@@ -225,6 +234,8 @@ export default function AudioPostPlayer({
       </View>
 
       <Pressable
+        accessibilityLabel={`Seek audio. ${formatDuration(currentTime)} of ${formatDuration(displayDuration)}`}
+        accessibilityRole="adjustable"
         disabled={!displayDuration}
         onLayout={handleProgressLayout}
         onPress={handleSeek}

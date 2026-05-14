@@ -39,8 +39,8 @@ const icons: Record<keyof MainTabParamList, { focused: IconName; idle: IconName 
     idle: "person-outline",
   },
   More: {
-    focused: "ellipsis-horizontal-circle",
-    idle: "ellipsis-horizontal-circle-outline",
+    focused: "compass",
+    idle: "compass-outline",
   },
 };
 
@@ -56,6 +56,7 @@ const MainTabs = () => {
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarHideOnKeyboard: true,
         tabBarLabelStyle: styles.label,
+        sceneStyle: { backgroundColor: colors.background },
         tabBarStyle: [
           styles.tabBar,
           {
@@ -68,7 +69,7 @@ const MainTabs = () => {
           <View
             style={[
               styles.iconWrap,
-              focused ? { backgroundColor: colors.accentMuted } : null,
+              focused ? { backgroundColor: colors.accentMuted, borderColor: colors.ring } : null,
             ]}
           >
             <Ionicons
@@ -84,7 +85,11 @@ const MainTabs = () => {
       <Tab.Screen name="Feed" component={HomeScreen} />
       <Tab.Screen name="Messages" component={MessagesScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
-      <Tab.Screen name="More" component={MoreScreen} />
+      <Tab.Screen
+        name="More"
+        component={MoreScreen}
+        options={{ tabBarLabel: "Explore" }}
+      />
     </Tab.Navigator>
   );
 };
@@ -95,9 +100,7 @@ const styles = StyleSheet.create({
   tabBar: {
     borderTopWidth: 1,
     elevation: 0,
-    height: 66,
-    paddingBottom: 8,
-    paddingTop: 7,
+    paddingTop: 6,
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: -1 },
     shadowOpacity: 0.18,
@@ -109,10 +112,12 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     alignItems: "center",
+    borderColor: "transparent",
+    borderWidth: 1,
     borderRadius: 8,
-    height: 30,
+    height: 28,
     justifyContent: "center",
-    minWidth: 42,
+    minWidth: 38,
   },
   label: {
     fontSize: 11,

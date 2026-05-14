@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigation } from "@react-navigation/native";
-import { SafeAreaView, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import JamList from "@/components/jams/JamList";
 import { useFriendsInRooms, useMyRoom, useRooms } from "@/hooks/useRooms";
 import { useMobileTheme } from "@/theme/MobileTheme";
@@ -21,7 +22,7 @@ const JamScreen = () => {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: colors.background }]}>
       <JamList
         friendsInRooms={friendsInRooms}
         isLoading={isLoading}

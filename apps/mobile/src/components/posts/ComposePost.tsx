@@ -11,12 +11,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useMutation } from "convex/react";
 import type { User } from "@/types";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
+import { useCreatePost } from "@/hooks/usePosts";
 import { useMobileTheme } from "@/theme/MobileTheme";
-import { api } from "@jam-app/convex";
-import type { Id } from "@jam-app/convex";
 
 type Props = {
   communityId?: string;
@@ -40,7 +38,7 @@ export default function ComposePost({
   profile,
 }: Props) {
   const { colors } = useMobileTheme();
-  const createPost = useMutation(api.posts.create);
+  const createPost = useCreatePost();
   const { isUploading, uploadFile } = useMediaUpload();
   const [content, setContent] = useState("");
   const [selectedAudio, setSelectedAudio] = useState<SelectedAudio | null>(null);
@@ -75,13 +73,11 @@ export default function ComposePost({
         audioUrl = uploaded.url;
       }
 
-      await createPost({
-        text: trimmedContent || undefined,
-        audio_url: audioUrl,
-        audio_title: selectedAudio ? stripExtension(selectedAudio.name) : undefined,
-        community_id: communityId
-          ? (communityId as Id<"communities">)
-          : undefined,
+      await createPost.mutateAsync({
+        content: trimmedContent,
+        audioUrl,
+        audioTitle: selectedAudio ? stripExtension(selectedAudio.name) : undefined,
+        communityId,
       });
       setContent("");
       setSelectedAudio(null);
@@ -186,7 +182,13 @@ export default function ComposePost({
               ]}
             >
               <View style={[styles.audioIcon, { backgroundColor: colors.accentMuted }]}>
-                <Ionicons color={colors.primary} name="musical-note" size={16} />
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.primary}
+                  importantForAccessibility="no-hide-descendants"
+                  name="musical-note"
+                  size={16}
+                />
               </View>
               <View style={styles.audioMeta}>
                 <Text
@@ -200,11 +202,19 @@ export default function ComposePost({
                 </Text>
               </View>
               <Pressable
+                accessibilityLabel="Remove selected audio"
+                accessibilityRole="button"
                 disabled={isBusy}
                 onPress={() => setSelectedAudio(null)}
                 style={styles.removeAudioButton}
               >
-                <Ionicons color={colors.mutedForeground} name="close" size={18} />
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.mutedForeground}
+                  importantForAccessibility="no-hide-descendants"
+                  name="close"
+                  size={18}
+                />
               </Pressable>
             </View>
           ) : null}
@@ -226,8 +236,20 @@ export default function ComposePost({
 
           <View style={styles.footer}>
             <View style={styles.footerActions}>
-              <Pressable disabled={isBusy} onPress={handlePickAudio} style={styles.audioButton}>
-                <Ionicons color={colors.mutedForeground} name="cloud-upload-outline" size={16} />
+              <Pressable
+                accessibilityLabel="Attach audio"
+                accessibilityRole="button"
+                disabled={isBusy}
+                onPress={handlePickAudio}
+                style={styles.audioButton}
+              >
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.mutedForeground}
+                  importantForAccessibility="no-hide-descendants"
+                  name="cloud-upload-outline"
+                  size={16}
+                />
                 <Text style={[styles.audioButtonText, { color: colors.mutedForeground }]}>
                   Audio
                 </Text>
@@ -237,6 +259,8 @@ export default function ComposePost({
               </Text>
             </View>
             <Pressable
+              accessibilityLabel="Post"
+              accessibilityRole="button"
               disabled={!canSubmit}
               onPress={handleSubmit}
               style={({ pressed }) => [
@@ -321,7 +345,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 14,
     marginTop: 12,
     padding: 14,
-    shadowColor: "#000000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.16,
     shadowRadius: 2,

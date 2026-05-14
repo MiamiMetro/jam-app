@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -19,6 +19,8 @@ import {
   useJoinCommunity,
   useLeaveCommunity,
 } from "@/hooks/useCommunities";
+import { communityThemeColors } from "@/theme/communityThemeColors";
+import { useMobileTheme } from "@/theme/MobileTheme";
 import type { CommunityListItem } from "@/types";
 
 const COMMUNITY_TAGS = [
@@ -55,21 +57,10 @@ const THEME_COLORS = [
   "orange",
 ];
 
-const THEME_COLOR_VALUES: Record<string, string> = {
-  amber: "#D8A64A",
-  blue: "#5D9CEC",
-  green: "#4FB477",
-  teal: "#35B7A5",
-  cyan: "#41BBD9",
-  red: "#EF6F6C",
-  pink: "#E879B9",
-  indigo: "#7C8CF8",
-  purple: "#A97CF8",
-  orange: "#E89A55",
-};
-
 export default function CommunityScreen() {
   const navigation = useNavigation<any>();
+  const { colors } = useMobileTheme();
+  const insets = useSafeAreaInsets();
   const createCommunity = useCreateCommunity();
   const joinCommunity = useJoinCommunity();
   const leaveCommunity = useLeaveCommunity();
@@ -165,10 +156,11 @@ export default function CommunityScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         contentContainerStyle={[
           styles.content,
+          { paddingBottom: insets.bottom + 32 },
           communities.length === 0 ? styles.emptyContent : null,
         ]}
         data={communities}
@@ -177,48 +169,70 @@ export default function CommunityScreen() {
           <View style={styles.emptyState}>
             {isLoading ? (
               <>
-                <ActivityIndicator color="#D8A64A" />
-                <Text style={styles.stateText}>Loading communities...</Text>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={[styles.stateText, { color: colors.mutedForeground }]}>Loading communities...</Text>
               </>
             ) : (
               <>
-                <Ionicons color="#8F98A8" name="people-outline" size={32} />
-                <Text style={styles.emptyTitle}>No communities found</Text>
-                <Text style={styles.stateText}>Try another search or create one.</Text>
+                <Ionicons color={colors.mutedForeground} name="people-outline" size={32} />
+                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No communities found</Text>
+                <Text style={[styles.stateText, { color: colors.mutedForeground }]}>Try another search or create one.</Text>
               </>
             )}
           </View>
         }
         ListFooterComponent={
           isFetchingNextPage ? (
-            <ActivityIndicator color="#D8A64A" style={styles.footerLoader} />
+            <ActivityIndicator color={colors.primary} style={styles.footerLoader} />
           ) : null
         }
         ListHeaderComponent={
           <>
-            <View style={styles.header}>
-              <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-                <Ionicons color="#EEF0F5" name="chevron-back" size={22} />
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+              <Pressable
+                accessibilityLabel="Back"
+                accessibilityRole="button"
+                onPress={() => navigation.goBack()}
+                style={styles.backButton}
+              >
+                <Ionicons color={colors.secondaryForeground} name="chevron-back" size={22} />
               </Pressable>
               <View style={styles.headerText}>
-                <Text style={styles.headerEyebrow}>Spaces</Text>
-                <Text style={styles.headerTitle}>Communities</Text>
+                <Text style={[styles.headerEyebrow, { color: colors.mutedForeground }]}>Spaces</Text>
+                <Text style={[styles.headerTitle, { color: colors.foreground }]}>Communities</Text>
               </View>
             </View>
 
             <View style={styles.searchPanel}>
-              <View style={styles.searchBox}>
-                <Ionicons color="#8F98A8" name="search" size={17} />
+              <View style={[styles.searchBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.mutedForeground}
+                  importantForAccessibility="no-hide-descendants"
+                  name="search"
+                  size={17}
+                />
                 <TextInput
                   onChangeText={setSearch}
                   placeholder="Search communities"
-                  placeholderTextColor="#7E8796"
-                  style={styles.searchInput}
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[styles.searchInput, { color: colors.foreground }]}
                   value={search}
                 />
                 {search ? (
-                  <Pressable onPress={() => setSearch("")} style={styles.clearButton}>
-                    <Ionicons color="#8F98A8" name="close" size={16} />
+                  <Pressable
+                    accessibilityLabel="Clear community search"
+                    accessibilityRole="button"
+                    onPress={() => setSearch("")}
+                    style={styles.clearButton}
+                  >
+                    <Ionicons
+                      accessibilityElementsHidden
+                      color={colors.mutedForeground}
+                      importantForAccessibility="no-hide-descendants"
+                      name="close"
+                      size={16}
+                    />
                   </Pressable>
                 ) : null}
               </View>
@@ -233,16 +247,21 @@ export default function CommunityScreen() {
                   const isSelected = isAll ? !selectedTag : selectedTag === item;
                   return (
                     <Pressable
+                      accessibilityLabel={`Filter communities by ${item}`}
+                      accessibilityRole="button"
                       onPress={() => setSelectedTag(isAll ? undefined : item)}
                       style={[
                         styles.filterChip,
-                        isSelected ? styles.filterChipActive : null,
+                        {
+                          backgroundColor: isSelected ? colors.accentMuted : colors.card,
+                          borderColor: isSelected ? colors.ring : colors.border,
+                        },
                       ]}
                     >
                       <Text
                         style={[
                           styles.filterChipText,
-                          isSelected ? styles.filterChipTextActive : null,
+                          { color: isSelected ? colors.primary : colors.mutedForeground },
                         ]}
                       >
                         {item}
@@ -254,23 +273,25 @@ export default function CommunityScreen() {
               />
             </View>
 
-            <View style={styles.createPanel}>
+            <View style={[styles.createPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Pressable
+                accessibilityLabel={`${isCreateOpen ? "Hide" : "Show"} create community form`}
+                accessibilityRole="button"
                 onPress={() => {
                   setError(null);
                   setIsCreateOpen((value) => !value);
                 }}
                 style={styles.createPanelHeader}
               >
-                <View style={styles.createIcon}>
-                  <Ionicons color="#D8A64A" name="add" size={20} />
+                <View style={[styles.createIcon, { backgroundColor: colors.accentMuted }]}>
+                  <Ionicons color={colors.primary} name="add" size={20} />
                 </View>
                 <View style={styles.createHeaderText}>
-                  <Text style={styles.createTitle}>Create community</Text>
-                  <Text style={styles.createSubtitle}>{createdCount}/3 owned communities</Text>
+                  <Text style={[styles.createTitle, { color: colors.foreground }]}>Create community</Text>
+                  <Text style={[styles.createSubtitle, { color: colors.mutedForeground }]}>{createdCount}/3 owned communities</Text>
                 </View>
                 <Ionicons
-                  color="#8F98A8"
+                  color={colors.mutedForeground}
                   name={isCreateOpen ? "chevron-up" : "chevron-down"}
                   size={20}
                 />
@@ -285,8 +306,8 @@ export default function CommunityScreen() {
                       setError(null);
                     }}
                     placeholder="Community name"
-                    placeholderTextColor="#7E8796"
-                    style={styles.input}
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[styles.input, { backgroundColor: colors.input, borderColor: colors.borderStrong, color: colors.foreground }]}
                     value={name}
                   />
                   <TextInput
@@ -297,11 +318,11 @@ export default function CommunityScreen() {
                       setError(null);
                     }}
                     placeholder="community-handle"
-                    placeholderTextColor="#7E8796"
-                    style={styles.input}
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[styles.input, { backgroundColor: colors.input, borderColor: colors.borderStrong, color: colors.foreground }]}
                     value={handle}
                   />
-                  <Text style={styles.handlePreview}>#{normalizedHandle || "handle"}</Text>
+                  <Text style={[styles.handlePreview, { color: colors.mutedForeground }]}>#{normalizedHandle || "handle"}</Text>
                   <TextInput
                     maxLength={500}
                     multiline
@@ -310,59 +331,67 @@ export default function CommunityScreen() {
                       setError(null);
                     }}
                     placeholder="What is this community about?"
-                    placeholderTextColor="#7E8796"
-                    style={[styles.input, styles.descriptionInput]}
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[styles.input, styles.descriptionInput, { backgroundColor: colors.input, borderColor: colors.borderStrong, color: colors.foreground }]}
                     textAlignVertical="top"
                     value={description}
                   />
 
-                  <Text style={styles.formLabel}>Theme</Text>
+                  <Text style={[styles.formLabel, { color: colors.secondaryForeground }]}>Theme</Text>
                   <View style={styles.themeGrid}>
                     {THEME_COLORS.map((color) => {
                       const isSelected = themeColor === color;
                       return (
                         <Pressable
+                          accessibilityLabel={`Select ${color} theme`}
+                          accessibilityRole="button"
                           key={color}
                           onPress={() => setThemeColor(color)}
                           style={[
                             styles.themeButton,
                             {
                               borderColor: isSelected
-                                ? THEME_COLOR_VALUES[color]
-                                : "rgba(255,255,255,0.1)",
+                                ? communityThemeColors[color]
+                                : colors.border,
+                              backgroundColor: colors.input,
                             },
                           ]}
                         >
                           <View
                             style={[
                               styles.themeSwatch,
-                              { backgroundColor: THEME_COLOR_VALUES[color] },
+                              { backgroundColor: communityThemeColors[color] },
                             ]}
                           />
-                          <Text style={styles.themeText}>{color}</Text>
+                          <Text style={[styles.themeText, { color: colors.secondaryForeground }]}>{color}</Text>
                         </Pressable>
                       );
                     })}
                   </View>
 
-                  <Text style={styles.formLabel}>Tags</Text>
+                  <Text style={[styles.formLabel, { color: colors.secondaryForeground }]}>Tags</Text>
                   <View style={styles.tagGrid}>
                     {COMMUNITY_TAGS.map((tag) => {
                       const isSelected = selectedTags.includes(tag);
                       return (
                         <Pressable
+                          accessibilityLabel={`${isSelected ? "Remove" : "Add"} ${tag} tag`}
+                          accessibilityRole="button"
                           key={tag}
                           onPress={() => toggleCreateTag(tag)}
                           style={[
                             styles.tagChip,
-                            isSelected ? styles.tagChipActive : null,
+                            {
+                              backgroundColor: isSelected ? colors.accentMuted : colors.input,
+                              borderColor: isSelected ? colors.ring : colors.border,
+                            },
                           ]}
                         >
                           <Text
                             style={[
-                              styles.tagChipText,
-                              isSelected ? styles.tagChipTextActive : null,
-                            ]}
+                            styles.tagChipText,
+                            { color: isSelected ? colors.primary : colors.mutedForeground },
+                          ]}
                           >
                             {tag}
                           </Text>
@@ -371,32 +400,40 @@ export default function CommunityScreen() {
                     })}
                   </View>
 
-                  {error ? <Text style={styles.error}>{error}</Text> : null}
+                  {error ? (
+                    <Text style={[styles.error, { backgroundColor: colors.destructiveMuted, borderColor: colors.destructive, color: colors.destructive }]}>
+                      {error}
+                    </Text>
+                  ) : null}
 
                   <Pressable
+                    accessibilityLabel="Create community"
+                    accessibilityRole="button"
                     disabled={!canCreate}
                     onPress={handleCreate}
                     style={({ pressed }) => [
                       styles.createButton,
-                      !canCreate ? styles.createButtonDisabled : null,
+                      { backgroundColor: canCreate ? colors.primary : colors.muted },
                       pressed && canCreate ? styles.createButtonPressed : null,
                     ]}
                   >
                     {isSubmitting ? (
-                      <ActivityIndicator color="#251B0A" />
+                      <ActivityIndicator color={colors.primaryForeground} />
                     ) : (
-                      <Text style={styles.createButtonText}>Create Community</Text>
+                      <Text style={[styles.createButtonText, { color: colors.primaryForeground }]}>Create Community</Text>
                     )}
                   </Pressable>
                 </View>
               ) : error ? (
-                <Text style={styles.error}>{error}</Text>
+                <Text style={[styles.error, { backgroundColor: colors.destructiveMuted, borderColor: colors.destructive, color: colors.destructive }]}>
+                  {error}
+                </Text>
               ) : null}
             </View>
 
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Discover</Text>
-              <Text style={styles.sectionMeta}>{communities.length} shown</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Discover</Text>
+              <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>{communities.length} shown</Text>
             </View>
           </>
         }
@@ -430,7 +467,8 @@ function CommunityRow({
   onMembershipPress: () => void;
   onOpen: () => void;
 }) {
-  const accent = THEME_COLOR_VALUES[community.theme_color] ?? THEME_COLOR_VALUES.amber;
+  const { colors } = useMobileTheme();
+  const accent = communityThemeColors[community.theme_color] ?? communityThemeColors.amber;
   const membershipLabel =
     community.member_role === "owner"
       ? "Owner"
@@ -441,33 +479,36 @@ function CommunityRow({
 
   return (
     <Pressable
+      accessibilityLabel={`Open ${community.name}`}
+      accessibilityRole="button"
       onPress={onOpen}
       style={({ pressed }) => [
         styles.communityRow,
-        pressed ? styles.communityRowPressed : null,
+        { borderBottomColor: colors.border },
+        pressed ? { backgroundColor: colors.cardPressed } : null,
       ]}
     >
       <View style={styles.communityTop}>
-        <View style={[styles.communityAvatar, { backgroundColor: `${accent}22` }]}>
+        <View style={[styles.communityAvatar, { backgroundColor: `${accent}22`, borderColor: colors.border }]}>
           <Text style={[styles.communityAvatarText, { color: accent }]}>
             {community.name.slice(0, 2).toUpperCase()}
           </Text>
         </View>
         <View style={styles.communityBody}>
           <View style={styles.communityNameRow}>
-            <Text numberOfLines={1} style={styles.communityName}>
+            <Text numberOfLines={1} style={[styles.communityName, { color: colors.foreground }]}>
               {community.name}
             </Text>
-            <Text style={styles.communityHandle}>#{community.handle}</Text>
+            <Text style={[styles.communityHandle, { color: colors.mutedForeground }]}>#{community.handle}</Text>
           </View>
-          <Text style={styles.communityStats}>
+          <Text style={[styles.communityStats, { color: colors.mutedForeground }]}>
             {community.members_count} members - {community.posts_count} posts
           </Text>
         </View>
       </View>
 
       {community.description ? (
-        <Text numberOfLines={3} style={styles.communityDescription}>
+        <Text numberOfLines={3} style={[styles.communityDescription, { color: colors.secondaryForeground }]}>
           {community.description}
         </Text>
       ) : null}
@@ -475,12 +516,14 @@ function CommunityRow({
       <View style={styles.communityFooter}>
         <View style={styles.communityTags}>
           {community.tags.slice(0, 3).map((tag) => (
-            <View key={tag} style={styles.communityTag}>
-              <Text style={styles.communityTagText}>{tag}</Text>
+            <View key={tag} style={[styles.communityTag, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.communityTagText, { color: colors.mutedForeground }]}>{tag}</Text>
             </View>
           ))}
         </View>
         <Pressable
+          accessibilityLabel={`${canLeave ? "Leave" : membershipLabel} ${community.name}`}
+          accessibilityRole="button"
           disabled={isPending || community.member_role === "owner"}
           onPress={(event) => {
             event.stopPropagation();
@@ -488,21 +531,24 @@ function CommunityRow({
           }}
           style={[
             styles.membershipButton,
-            community.member_role ? styles.membershipButtonJoined : null,
+            {
+              backgroundColor: community.member_role ? colors.muted : colors.primary,
+              borderColor: canLeave ? colors.destructive : "transparent",
+            },
             canLeave ? styles.membershipButtonLeave : null,
             community.member_role === "owner" ? styles.membershipButtonLocked : null,
           ]}
         >
           {isPending ? (
             <ActivityIndicator
-              color={community.member_role ? "#D5D9E2" : "#251B0A"}
+              color={community.member_role ? colors.secondaryForeground : colors.primaryForeground}
               size="small"
             />
           ) : (
             <Text
               style={[
                 styles.membershipButtonText,
-                community.member_role ? styles.membershipButtonTextJoined : null,
+                { color: community.member_role ? colors.secondaryForeground : colors.primaryForeground },
               ]}
             >
               {canLeave ? "Leave" : membershipLabel}
@@ -563,7 +609,6 @@ function getCommunityErrorMessage(error: unknown) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#1A1E29",
     flex: 1,
   },
   content: {
@@ -574,7 +619,6 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -593,14 +637,12 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   headerEyebrow: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0,
     textTransform: "uppercase",
   },
   headerTitle: {
-    color: "#EEF0F5",
     fontSize: 22,
     fontWeight: "900",
     letterSpacing: 0,
@@ -612,8 +654,6 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     alignItems: "center",
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -622,7 +662,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   searchInput: {
-    color: "#EEF0F5",
     flex: 1,
     fontSize: 15,
     minWidth: 0,
@@ -639,28 +678,16 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   filterChip: {
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  filterChipActive: {
-    backgroundColor: "rgba(216,166,74,0.14)",
-    borderColor: "rgba(216,166,74,0.42)",
-  },
   filterChipText: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "800",
   },
-  filterChipTextActive: {
-    color: "#D8A64A",
-  },
   createPanel: {
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     marginHorizontal: 14,
@@ -674,7 +701,6 @@ const styles = StyleSheet.create({
   },
   createIcon: {
     alignItems: "center",
-    backgroundColor: "rgba(216,166,74,0.12)",
     borderRadius: 8,
     height: 40,
     justifyContent: "center",
@@ -685,12 +711,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   createTitle: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
   },
   createSubtitle: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 3,
@@ -699,11 +723,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   input: {
-    backgroundColor: "#1E2330",
-    borderColor: "rgba(255,255,255,0.1)",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#EEF0F5",
     fontSize: 15,
     minHeight: 44,
     marginTop: 10,
@@ -715,13 +736,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   handlePreview: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "800",
     marginTop: 7,
   },
   formLabel: {
-    color: "#D5D9E2",
     fontSize: 13,
     fontWeight: "900",
     marginTop: 14,
@@ -734,7 +753,6 @@ const styles = StyleSheet.create({
   },
   themeButton: {
     alignItems: "center",
-    backgroundColor: "#1E2330",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -748,7 +766,6 @@ const styles = StyleSheet.create({
     width: 14,
   },
   themeText: {
-    color: "#C7CCD6",
     fontSize: 12,
     fontWeight: "800",
     textTransform: "capitalize",
@@ -760,31 +777,18 @@ const styles = StyleSheet.create({
     marginTop: 9,
   },
   tagChip: {
-    backgroundColor: "#1E2330",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
-  tagChipActive: {
-    backgroundColor: "rgba(216,166,74,0.14)",
-    borderColor: "rgba(216,166,74,0.42)",
-  },
   tagChipText: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "800",
   },
-  tagChipTextActive: {
-    color: "#D8A64A",
-  },
   error: {
-    backgroundColor: "rgba(127,29,29,0.5)",
-    borderColor: "rgba(248,113,113,0.35)",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#FECACA",
     fontSize: 12,
     lineHeight: 17,
     marginTop: 10,
@@ -793,20 +797,15 @@ const styles = StyleSheet.create({
   },
   createButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
     justifyContent: "center",
     minHeight: 44,
     marginTop: 12,
   },
-  createButtonDisabled: {
-    backgroundColor: "#4B4F5D",
-  },
   createButtonPressed: {
     opacity: 0.82,
   },
   createButtonText: {
-    color: "#251B0A",
     fontSize: 14,
     fontWeight: "900",
   },
@@ -819,23 +818,17 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
   sectionTitle: {
-    color: "#EEF0F5",
     fontSize: 16,
     fontWeight: "900",
   },
   sectionMeta: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "800",
   },
   communityRow: {
-    borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     paddingHorizontal: 18,
     paddingVertical: 15,
-  },
-  communityRowPressed: {
-    backgroundColor: "rgba(255,255,255,0.03)",
   },
   communityTop: {
     alignItems: "center",
@@ -844,7 +837,6 @@ const styles = StyleSheet.create({
   },
   communityAvatar: {
     alignItems: "center",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     height: 46,
@@ -866,24 +858,20 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   communityName: {
-    color: "#EEF0F5",
     flexShrink: 1,
     fontSize: 15,
     fontWeight: "900",
   },
   communityHandle: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "800",
   },
   communityStats: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 4,
   },
   communityDescription: {
-    color: "#C7CCD6",
     fontSize: 14,
     lineHeight: 20,
     marginTop: 10,
@@ -903,44 +891,33 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   communityTag: {
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 5,
   },
   communityTagText: {
-    color: "#8F98A8",
     fontSize: 11,
     fontWeight: "800",
   },
   membershipButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
+    borderWidth: 1,
     justifyContent: "center",
     minHeight: 34,
     minWidth: 76,
     paddingHorizontal: 12,
   },
-  membershipButtonJoined: {
-    backgroundColor: "#353B49",
-  },
   membershipButtonLeave: {
-    borderColor: "rgba(248,113,113,0.35)",
     borderWidth: 1,
   },
   membershipButtonLocked: {
     opacity: 0.72,
   },
   membershipButtonText: {
-    color: "#251B0A",
     fontSize: 12,
     fontWeight: "900",
-  },
-  membershipButtonTextJoined: {
-    color: "#D5D9E2",
   },
   emptyState: {
     alignItems: "center",
@@ -949,14 +926,12 @@ const styles = StyleSheet.create({
     paddingVertical: 42,
   },
   emptyTitle: {
-    color: "#EEF0F5",
     fontSize: 17,
     fontWeight: "900",
     marginTop: 10,
     textAlign: "center",
   },
   stateText: {
-    color: "#8F98A8",
     marginTop: 10,
     textAlign: "center",
   },

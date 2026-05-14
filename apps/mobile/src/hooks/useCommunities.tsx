@@ -98,6 +98,20 @@ export function useCommunityJamAvailability(communityId: string) {
   };
 }
 
+export function useCommunityJamServerSettings(communityId: string, enabled = true) {
+  const result = useQuery(
+    api.communities.getJamServerSettings,
+    enabled && communityId
+      ? { communityId: communityId as Id<"communities"> }
+      : "skip",
+  );
+
+  return {
+    data: result ?? null,
+    isLoading: result === undefined && enabled && !!communityId,
+  };
+}
+
 export function useCommunityMembers(communityId: string) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.communities.getMembersPaginated,
@@ -230,6 +244,48 @@ export function useUpdateCommunity() {
       variables: Parameters<typeof run>[0],
       options?: MutationOptions,
     ) => {
+      run(variables)
+        .then(() => options?.onSuccess?.())
+        .catch((error) => options?.onError?.(error as Error));
+    },
+    mutateAsync: run,
+  };
+}
+
+export function useUpdateCommunityJamServerSettings() {
+  const updateMutation = useMutation(api.communities.updateJamServerSettings);
+  const [isPending, setIsPending] = useState(false);
+
+  const run = async (variables: {
+    communityId: string;
+    enabled: boolean;
+    host: string;
+    joinSecret?: string;
+    name: string;
+    port: number;
+    region?: string;
+    serverId: string;
+  }) => {
+    setIsPending(true);
+    try {
+      return await updateMutation({
+        communityId: variables.communityId as Id<"communities">,
+        enabled: variables.enabled,
+        host: variables.host,
+        joinSecret: variables.joinSecret,
+        name: variables.name,
+        port: variables.port,
+        region: variables.region,
+        serverId: variables.serverId,
+      });
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return {
+    isPending,
+    mutate: (variables: Parameters<typeof run>[0], options?: MutationOptions) => {
       run(variables)
         .then(() => options?.onSuccess?.())
         .catch((error) => options?.onError?.(error as Error));

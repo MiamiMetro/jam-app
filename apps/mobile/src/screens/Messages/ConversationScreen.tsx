@@ -1,7 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useConvex, useMutation, useQuery } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -10,92 +8,69 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AudioPostPlayer from "@/components/posts/AudioPostPlayer";
 import { useMyProfile } from "@/hooks/useMyProfile";
+import {
+  useConversationParticipants,
+  useDeleteMessage,
+  useMarkAsRead,
+  useMessages,
+  useSendMessage,
+  type UIMessage,
+} from "@/hooks/useUsers";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 import { useMobileTheme } from "@/theme/MobileTheme";
-import { api } from "@jam-app/convex";
-import type { Id } from "@jam-app/convex";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Conversation">;
-type MessagesReturn = FunctionReturnType<typeof api.messages.getByConversationPaginated>;
-type MessageItem = MessagesReturn["data"][number];
-
-const PAGE_SIZE = 40;
 const MAX_MESSAGE_LENGTH = 300;
 
 export default function ConversationScreen({ navigation, route }: Props) {
   const { colors } = useMobileTheme();
   const { conversationId } = route.params;
-  const convex = useConvex();
   const { profile } = useMyProfile();
-  const listRef = useRef<FlatList<MessageItem>>(null);
+  const listRef = useRef<FlatList<UIMessage>>(null);
   const skipNextAutoScrollRef = useRef(false);
   const didInitialScrollRef = useRef(false);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [olderMessages, setOlderMessages] = useState<MessageItem[]>([]);
-  const [nextCursor, setNextCursor] = useState<number | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  const firstPage = useQuery(api.messages.getByConversationPaginated, {
-    conversationId: conversationId as Id<"conversations">,
-    limit: PAGE_SIZE,
-  });
-  const participants = useQuery(api.messages.getParticipants, {
-    conversationId: conversationId as Id<"conversations">,
-  });
-  const sendMessage = useMutation(api.messages.send);
-  const markAsRead = useMutation(api.messages.markAsRead);
-  const deleteMessage = useMutation(api.messages.remove);
+  const messagesQuery = useMessages(profile?.id, conversationId);
+  const participantsQuery = useConversationParticipants(conversationId);
+  const sendMessage = useSendMessage();
+  const markAsRead = useMarkAsRead();
+  const deleteMessage = useDeleteMessage();
 
   useEffect(() => {
     didInitialScrollRef.current = false;
     skipNextAutoScrollRef.current = false;
-    setOlderMessages([]);
-    setNextCursor(null);
-    setHasMore(false);
-    setIsLoadingOlder(false);
     setError(null);
   }, [conversationId]);
 
   useEffect(() => {
-    if (!firstPage) return;
-    if (olderMessages.length === 0) {
-      setNextCursor(firstPage.nextCursor ?? null);
-      setHasMore(firstPage.hasMore ?? false);
-    }
-  }, [firstPage, olderMessages.length]);
-
-  useEffect(() => {
-    if (!firstPage) return;
+    if (messagesQuery.isLoading) return;
     const timer = setTimeout(() => {
-      markAsRead({ conversationId: conversationId as Id<"conversations"> }).catch(() => {});
+      markAsRead.mutate(conversationId);
     }, 700);
     return () => clearTimeout(timer);
-  }, [conversationId, firstPage?.data.length, markAsRead, firstPage]);
+  }, [conversationId, markAsRead, messagesQuery.data.length, messagesQuery.isLoading]);
 
-  const messages = useMemo(() => {
-    const latestMessages = firstPage?.data ?? [];
-    return mergeMessages(olderMessages, latestMessages);
-  }, [firstPage?.data, olderMessages]);
+  const messages = messagesQuery.data;
 
   const otherParticipant = useMemo(
-    () => participants?.find((participant) => participant.id !== profile?.id) ?? null,
-    [participants, profile?.id]
+    () => participantsQuery.data.find((participant) => participant.id !== profile?.id) ?? null,
+    [participantsQuery.data, profile?.id]
   );
   const title = route.params.title || otherParticipant?.username || "Conversation";
 
   useEffect(() => {
-    if (messages.length === 0 || isLoadingOlder) return;
+    if (messages.length === 0 || messagesQuery.isFetchingNextPage) return;
     if (skipNextAutoScrollRef.current) {
       skipNextAutoScrollRef.current = false;
       return;
@@ -106,27 +81,17 @@ export default function ConversationScreen({ navigation, route }: Props) {
       didInitialScrollRef.current = true;
     }, 60);
     return () => clearTimeout(timer);
-  }, [messages.length, isLoadingOlder]);
+  }, [messages.length, messagesQuery.isFetchingNextPage]);
 
   const loadOlderMessages = async () => {
-    if (!nextCursor || isLoadingOlder || !hasMore) return;
+    if (!messagesQuery.hasNextPage || messagesQuery.isFetchingNextPage) return;
 
     try {
-      setIsLoadingOlder(true);
       setError(null);
-      const result = await convex.query(api.messages.getByConversationPaginated, {
-        conversationId: conversationId as Id<"conversations">,
-        limit: PAGE_SIZE,
-        cursor: nextCursor,
-      });
       skipNextAutoScrollRef.current = true;
-      setOlderMessages((previous) => mergeMessages(result.data, previous));
-      setNextCursor(result.nextCursor ?? null);
-      setHasMore(result.hasMore ?? false);
+      await messagesQuery.fetchNextPage();
     } catch (err) {
       setError(getFriendlyMessageError(err));
-    } finally {
-      setIsLoadingOlder(false);
     }
   };
 
@@ -138,10 +103,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
       setIsSending(true);
       setError(null);
       setInput("");
-      await sendMessage({
-        conversationId: conversationId as Id<"conversations">,
-        text,
-      });
+      await sendMessage.mutateAsync({ conversationId, content: text });
       setTimeout(() => {
         listRef.current?.scrollToEnd({ animated: true });
       }, 80);
@@ -156,13 +118,13 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const handleDelete = async (messageId: string) => {
     try {
       setError(null);
-      await deleteMessage({ messageId: messageId as Id<"messages"> });
+      await deleteMessage.mutateAsync(messageId);
     } catch (err) {
       setError(getFriendlyMessageError(err));
     }
   };
 
-  const isInitialLoading = firstPage === undefined;
+  const isInitialLoading = messagesQuery.isLoading;
   const canSend = input.trim().length > 0 && input.length <= MAX_MESSAGE_LENGTH && !isSending;
 
   return (
@@ -172,8 +134,19 @@ export default function ConversationScreen({ navigation, route }: Props) {
         style={styles.keyboardAvoid}
       >
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.headerButton}>
-            <Ionicons color={colors.secondaryForeground} name="arrow-back" size={20} />
+          <Pressable
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+            onPress={() => navigation.goBack()}
+            style={styles.headerButton}
+          >
+            <Ionicons
+              accessibilityElementsHidden
+              color={colors.secondaryForeground}
+              importantForAccessibility="no-hide-descendants"
+              name="arrow-back"
+              size={20}
+            />
           </Pressable>
           <Avatar user={otherParticipant} />
           <View style={styles.headerTitleWrap}>
@@ -221,7 +194,13 @@ export default function ConversationScreen({ navigation, route }: Props) {
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.emptyConversation}>
-                <Ionicons color={colors.mutedForeground} name="chatbubble-outline" size={36} />
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.mutedForeground}
+                  importantForAccessibility="no-hide-descendants"
+                  name="chatbubble-outline"
+                  size={36}
+                />
                 <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
                   No messages yet
                 </Text>
@@ -231,13 +210,13 @@ export default function ConversationScreen({ navigation, route }: Props) {
               </View>
             }
             ListHeaderComponent={
-              hasMore ? (
+              messagesQuery.hasNextPage ? (
                 <Pressable
-                  disabled={isLoadingOlder}
+                  disabled={messagesQuery.isFetchingNextPage}
                   onPress={loadOlderMessages}
                   style={styles.loadOlderButton}
                 >
-                  {isLoadingOlder ? (
+                  {messagesQuery.isFetchingNextPage ? (
                     <ActivityIndicator color={colors.primary} size="small" />
                   ) : (
                     <Text style={[styles.loadOlderText, { color: colors.primary }]}>
@@ -250,11 +229,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
             maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             renderItem={({ item, index }) => (
               <MessageBubble
-                isOwn={item.sender_id === profile?.id}
+                isOwn={item.senderId === profile?.id}
                 message={item}
                 nextMessage={messages[index + 1]}
                 onDelete={() => handleDelete(String(item.id))}
-                otherParticipantLastRead={firstPage?.otherParticipantLastRead ?? null}
+                otherParticipantLastRead={messagesQuery.otherParticipantLastRead ?? null}
               />
             )}
           />
@@ -284,6 +263,8 @@ export default function ConversationScreen({ navigation, route }: Props) {
             ) : null}
           </View>
           <Pressable
+            accessibilityLabel="Send message"
+            accessibilityRole="button"
             disabled={!canSend}
             onPress={handleSend}
             style={[
@@ -294,7 +275,13 @@ export default function ConversationScreen({ navigation, route }: Props) {
             {isSending ? (
               <ActivityIndicator color={colors.primaryForeground} size="small" />
             ) : (
-              <Ionicons color={colors.primaryForeground} name="send" size={18} />
+              <Ionicons
+                accessibilityElementsHidden
+                color={colors.primaryForeground}
+                importantForAccessibility="no-hide-descendants"
+                name="send"
+                size={18}
+              />
             )}
           </Pressable>
         </View>
@@ -311,23 +298,23 @@ function MessageBubble({
   otherParticipantLastRead,
 }: {
   isOwn: boolean;
-  message: MessageItem;
-  nextMessage?: MessageItem;
+  message: UIMessage;
+  nextMessage?: UIMessage;
   onDelete: () => void;
   otherParticipantLastRead: number | null;
 }) {
   const { colors } = useMobileTheme();
   const shouldShowTime =
     !nextMessage ||
-    nextMessage.sender_id !== message.sender_id ||
-    getTimeGapMinutes(message.created_at, nextMessage.created_at) > 8;
+    nextMessage.senderId !== message.senderId ||
+    getTimeGapMinutes(message.timestamp, nextMessage.timestamp) > 8;
   const isRead =
     isOwn &&
     otherParticipantLastRead != null &&
     message._creationTime != null &&
     message._creationTime <= otherParticipantLastRead;
 
-  if (message.deleted_at) {
+  if (message.isDeleted) {
     return (
       <View style={[styles.messageRow, isOwn ? styles.messageRowOwn : null]}>
         <Text style={[styles.deletedMessage, { color: colors.mutedForeground }]}>
@@ -340,8 +327,19 @@ function MessageBubble({
   return (
     <View style={[styles.messageRow, isOwn ? styles.messageRowOwn : null]}>
       {isOwn ? (
-        <Pressable onPress={onDelete} style={styles.messageDeleteButton}>
-          <Ionicons color={colors.mutedForeground} name="trash-outline" size={14} />
+        <Pressable
+          accessibilityLabel="Delete message"
+          accessibilityRole="button"
+          onPress={onDelete}
+          style={styles.messageDeleteButton}
+        >
+          <Ionicons
+            accessibilityElementsHidden
+            color={colors.mutedForeground}
+            importantForAccessibility="no-hide-descendants"
+            name="trash-outline"
+            size={14}
+          />
         </Pressable>
       ) : null}
       <View
@@ -356,7 +354,7 @@ function MessageBubble({
               },
         ]}
       >
-        {message.text ? (
+        {message.content ? (
           <Text
             style={[
               styles.messageText,
@@ -364,13 +362,19 @@ function MessageBubble({
               isOwn ? styles.ownMessageText : null,
             ]}
           >
-            {message.text}
+            {message.content}
           </Text>
         ) : null}
         {message.audio_url ? (
           <AudioPostPlayer
             audioUrl={message.audio_url}
-            style={styles.audioMessage}
+            style={[
+              styles.audioMessage,
+              {
+                backgroundColor: isOwn ? colors.accentMuted : colors.input,
+                borderColor: isOwn ? colors.ring : colors.border,
+              },
+            ]}
             title="Audio message"
           />
         ) : null}
@@ -386,7 +390,7 @@ function MessageBubble({
                 },
               ]}
             >
-              {formatRelativeTime(message.created_at)}
+              {formatRelativeTime(message.timestamp)}
             </Text>
             {isOwn ? (
               <View
@@ -434,32 +438,16 @@ function Avatar({
   );
 }
 
-function mergeMessages(...messageGroups: MessageItem[][]) {
-  const seen = new Set<string>();
-  const merged: MessageItem[] = [];
-
-  for (const message of messageGroups.flat()) {
-    const id = String(message.id);
-    if (seen.has(id)) continue;
-    seen.add(id);
-    merged.push(message);
-  }
-
-  return merged.sort(
-    (a, b) =>
-      (a._creationTime ?? new Date(a.created_at).getTime()) -
-      (b._creationTime ?? new Date(b.created_at).getTime())
-  );
-}
-
-function getTimeGapMinutes(current: string, next: string) {
+function getTimeGapMinutes(current?: string, next?: string) {
+  if (!current || !next) return 0;
   const currentTime = new Date(current).getTime();
   const nextTime = new Date(next).getTime();
   if (Number.isNaN(currentTime) || Number.isNaN(nextTime)) return 0;
   return Math.abs(nextTime - currentTime) / 60000;
 }
 
-function formatRelativeTime(value: string) {
+function formatRelativeTime(value?: string) {
+  if (!value) return "now";
   const date = new Date(value).getTime();
   if (Number.isNaN(date)) return "now";
 
@@ -608,8 +596,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   audioMessage: {
-    backgroundColor: "rgba(0,0,0,0.14)",
-    borderColor: "rgba(0,0,0,0.09)",
     minWidth: 230,
   },
   messageMeta: {

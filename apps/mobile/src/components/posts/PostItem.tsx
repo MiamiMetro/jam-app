@@ -2,13 +2,11 @@ import React, { useMemo, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useMutation } from "convex/react";
 import AudioPostPlayer from "@/components/posts/AudioPostPlayer";
 import type { PostFeedItem } from "@/types";
 import { useMyProfile } from "@/hooks/useMyProfile";
+import { useDeletePost, useToggleLike } from "@/hooks/usePosts";
 import { useMobileTheme } from "@/theme/MobileTheme";
-import { api } from "@jam-app/convex";
-import type { Id } from "@jam-app/convex";
 
 type Props = {
   post: PostFeedItem;
@@ -17,8 +15,8 @@ type Props = {
 export default function PostItem({ post }: Props) {
   const navigation = useNavigation<any>();
   const { colors } = useMobileTheme();
-  const removePost = useMutation(api.posts.remove);
-  const toggleLike = useMutation(api.posts.toggleLike);
+  const removePost = useDeletePost();
+  const toggleLike = useToggleLike();
   const { profile } = useMyProfile();
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -30,6 +28,17 @@ export default function PostItem({ post }: Props) {
     [authorName]
   );
   const createdAt = useMemo(() => formatRelativeTime(post.created_at), [post.created_at]);
+  const postLabel = [
+    `Post by ${authorName}`,
+    post.community_handle ? `in ${post.community_handle}` : null,
+    createdAt,
+    post.text,
+    post.audio_url ? "Audio attached" : null,
+    `${post.likes_count} likes`,
+    `${post.comments_count} comments`,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   if (post.deleted_at) {
     return null;
@@ -40,7 +49,7 @@ export default function PostItem({ post }: Props) {
 
     try {
       setIsDeleting(true);
-      await removePost({ postId: post.id as Id<"posts"> });
+      await removePost.mutateAsync(post.id);
     } finally {
       setIsDeleting(false);
     }
@@ -51,25 +60,37 @@ export default function PostItem({ post }: Props) {
 
     try {
       setIsLiking(true);
-      await toggleLike({ postId: post.id as Id<"posts"> });
+      await toggleLike.mutateAsync(post.id);
     } finally {
       setIsLiking(false);
     }
   };
 
+  const openAuthorProfile = () => {
+    if (post.author?.username) {
+      navigation.navigate("UserProfile", { username: post.author.username });
+    }
+  };
+
+  const openPostDetail = () => {
+    navigation.navigate("PostDetail", { postId: post.id });
+  };
+
   return (
-    <Pressable
-      onPress={() => navigation.navigate("PostDetail", { postId: post.id })}
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.container,
         {
-          backgroundColor: pressed ? colors.cardPressed : colors.background,
+          backgroundColor: colors.background,
           borderBottomColor: colors.border,
-          borderLeftColor: pressed ? colors.primary : "transparent",
+          borderLeftColor: "transparent",
         },
       ]}
     >
-      <View
+      <Pressable
+        accessibilityLabel={`Open ${authorName}'s profile`}
+        accessibilityRole="button"
+        onPress={openAuthorProfile}
         style={[
           styles.avatar,
           { backgroundColor: colors.muted, borderColor: colors.border },
@@ -86,13 +107,32 @@ export default function PostItem({ post }: Props) {
             {fallbackLetters}
           </Text>
         )}
-      </View>
+      </Pressable>
 
       <View style={styles.body}>
         <View style={styles.metaRow}>
-          <Text style={[styles.author, { color: colors.foreground }]}>{authorName}</Text>
+          <Pressable
+            accessibilityLabel={`Open ${authorName}'s profile`}
+            accessibilityRole="button"
+            onPress={openAuthorProfile}
+            style={styles.authorButton}
+          >
+            <Text style={[styles.author, { color: colors.foreground }]}>{authorName}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityLabel={`View ${authorName}'s profile`}
+            accessibilityRole="button"
+            onPress={openAuthorProfile}
+            style={[styles.viewProfileButton, { backgroundColor: colors.muted }]}
+          >
+            <Text style={[styles.viewProfileText, { color: colors.secondaryForeground }]}>
+              View profile
+            </Text>
+          </Pressable>
           {isOwnPost ? (
             <Pressable
+              accessibilityLabel="Delete post"
+              accessibilityRole="button"
               disabled={isDeleting}
               onPress={(event) => {
                 event.stopPropagation();
@@ -101,7 +141,9 @@ export default function PostItem({ post }: Props) {
               style={styles.deleteButton}
             >
               <Ionicons
+                accessibilityElementsHidden
                 color={isDeleting ? colors.muted : colors.mutedForeground}
+                importantForAccessibility="no-hide-descendants"
                 name="trash-outline"
                 size={14}
               />
@@ -120,7 +162,13 @@ export default function PostItem({ post }: Props) {
         </View>
 
         {post.text ? (
-          <Text style={[styles.content, { color: colors.foreground }]}>{post.text}</Text>
+          <Pressable
+            accessibilityLabel={postLabel}
+            accessibilityRole="button"
+            onPress={openPostDetail}
+          >
+            <Text style={[styles.content, { color: colors.foreground }]}>{post.text}</Text>
+          </Pressable>
         ) : null}
 
         {post.audio_url ? (
@@ -134,6 +182,8 @@ export default function PostItem({ post }: Props) {
 
         <View style={[styles.actionsRow, { borderTopColor: colors.border }]}>
           <Pressable
+            accessibilityLabel={post.is_liked ? "Unlike post" : "Like post"}
+            accessibilityRole="button"
             disabled={isLiking}
             onPress={(event) => {
               event.stopPropagation();
@@ -142,7 +192,9 @@ export default function PostItem({ post }: Props) {
             style={styles.actionButton}
           >
             <Ionicons
-              color={post.is_liked ? "#EF6F6C" : colors.mutedForeground}
+              accessibilityElementsHidden
+              color={post.is_liked ? colors.destructive : colors.mutedForeground}
+              importantForAccessibility="no-hide-descendants"
               name={post.is_liked ? "heart" : "heart-outline"}
               size={15}
             />
@@ -150,20 +202,25 @@ export default function PostItem({ post }: Props) {
               style={[
                 styles.actionText,
                 { color: colors.mutedForeground },
-                post.is_liked ? styles.likedText : null,
+                post.is_liked ? { color: colors.destructive } : null,
               ]}
             >
               {post.likes_count}
             </Text>
           </Pressable>
           <Pressable
-            onPress={(event) => {
-              event.stopPropagation();
-              navigation.navigate("PostDetail", { postId: post.id });
-            }}
+            accessibilityLabel={`Open comments, ${post.comments_count} comments`}
+            accessibilityRole="button"
+            onPress={openPostDetail}
             style={styles.actionButton}
           >
-            <Ionicons color={colors.mutedForeground} name="chatbubble-outline" size={14} />
+            <Ionicons
+              accessibilityElementsHidden
+              color={colors.mutedForeground}
+              importantForAccessibility="no-hide-descendants"
+              name="chatbubble-outline"
+              size={14}
+            />
             <Text style={[styles.actionText, { color: colors.mutedForeground }]}>
               Comments {post.comments_count}
             </Text>
@@ -173,7 +230,7 @@ export default function PostItem({ post }: Props) {
           </Text>
         </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -222,6 +279,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
   },
+  authorButton: {
+    borderRadius: 6,
+    marginLeft: -2,
+    paddingHorizontal: 2,
+    paddingVertical: 1,
+  },
   body: {
     flex: 1,
     minWidth: 0,
@@ -236,6 +299,15 @@ const styles = StyleSheet.create({
   author: {
     flexShrink: 1,
     fontSize: 14,
+    fontWeight: "800",
+  },
+  viewProfileButton: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  viewProfileText: {
+    fontSize: 11,
     fontWeight: "800",
   },
   deleteButton: {
@@ -281,8 +353,5 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 13,
     fontWeight: "700",
-  },
-  likedText: {
-    color: "#EF6F6C",
   },
 });

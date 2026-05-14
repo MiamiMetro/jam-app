@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   Alert,
@@ -8,7 +9,6 @@ import {
   Image,
   Modal,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -40,6 +40,8 @@ import {
   useMyCommunityRoom,
   useUpdateRoom,
 } from "@/hooks/useRooms";
+import { communityThemeColors } from "@/theme/communityThemeColors";
+import { useMobileTheme } from "@/theme/MobileTheme";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 import type { CommunityMemberItem, PostFeedItem, RoomFeedItem } from "@/types";
 import type { Id } from "@jam-app/convex";
@@ -48,20 +50,9 @@ type Props = NativeStackScreenProps<RootStackParamList, "CommunityDetail">;
 type DetailTab = "feed" | "jam" | "moderation";
 type ListItem = PostFeedItem | CommunityMemberItem | RoomFeedItem;
 
-const THEME_COLOR_VALUES: Record<string, string> = {
-  amber: "#D8A64A",
-  blue: "#5D9CEC",
-  green: "#4FB477",
-  teal: "#35B7A5",
-  cyan: "#41BBD9",
-  red: "#EF6F6C",
-  pink: "#E879B9",
-  indigo: "#7C8CF8",
-  purple: "#A97CF8",
-  orange: "#E89A55",
-};
-
 export default function CommunityDetailScreen({ navigation, route }: Props) {
+  const { colors } = useMobileTheme();
+  const insets = useSafeAreaInsets();
   const { handle } = route.params;
   const { data: community, isLoading } = useCommunity(handle);
   const { profile } = useMyProfile();
@@ -344,11 +335,11 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <Header onBack={() => navigation.goBack()} title="Community" />
         <View style={styles.centerState}>
-          <ActivityIndicator color="#D8A64A" />
-          <Text style={styles.stateText}>Loading community...</Text>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={[styles.stateText, { color: colors.mutedForeground }]}>Loading community...</Text>
         </View>
       </SafeAreaView>
     );
@@ -356,27 +347,28 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
 
   if (!community) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <Header onBack={() => navigation.goBack()} title="Community" />
         <View style={styles.centerState}>
-          <Ionicons color="#4B5565" name="people-outline" size={34} />
-          <Text style={styles.emptyTitle}>Community not found</Text>
-          <Text style={styles.stateText}>It may have been deleted.</Text>
+          <Ionicons color={colors.mutedForeground} name="people-outline" size={34} />
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Community not found</Text>
+          <Text style={[styles.stateText, { color: colors.mutedForeground }]}>It may have been deleted.</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   const accent =
-    THEME_COLOR_VALUES[community.theme_color] ?? THEME_COLOR_VALUES.amber;
+    communityThemeColors[community.theme_color] ?? communityThemeColors.amber;
   const isJoiningOrLeaving =
     joinCommunity.isPending || leaveCommunity.isPending;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         contentContainerStyle={[
           styles.content,
+          { paddingBottom: insets.bottom + 32 },
           listData.length === 0 ? styles.emptyContent : null,
         ]}
         data={listData}
@@ -391,8 +383,8 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
           <View style={styles.emptyState}>
             {contentIsLoading ? (
               <>
-                <ActivityIndicator color="#D8A64A" />
-                <Text style={styles.stateText}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={[styles.stateText, { color: colors.mutedForeground }]}>
                   {activeTab === "feed"
                     ? "Loading posts..."
                     : activeTab === "jam"
@@ -403,7 +395,7 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
             ) : (
               <>
                 <Ionicons
-                  color="#4B5565"
+                  color={colors.mutedForeground}
                   name={
                     activeTab === "feed"
                       ? "chatbubbles-outline"
@@ -413,14 +405,14 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                   }
                   size={34}
                 />
-                <Text style={styles.emptyTitle}>
+                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
                   {activeTab === "feed"
                     ? "No posts yet"
                     : activeTab === "jam"
                       ? "No active rooms"
                       : "No members found"}
                 </Text>
-                <Text style={styles.stateText}>
+                <Text style={[styles.stateText, { color: colors.mutedForeground }]}>
                   {activeTab === "feed"
                     ? isMember
                       ? "Be the first to post here."
@@ -437,14 +429,14 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
         }
         ListFooterComponent={
           contentIsLoadingMore ? (
-            <ActivityIndicator color="#D8A64A" style={styles.footerLoader} />
+            <ActivityIndicator color={colors.primary} style={styles.footerLoader} />
           ) : null
         }
         ListHeaderComponent={
           <>
             <Header onBack={() => navigation.goBack()} title={community.name} />
 
-            <View style={[styles.banner, { backgroundColor: `${accent}22` }]}>
+            <View style={[styles.banner, { backgroundColor: `${accent}22`, borderBottomColor: colors.border }]}>
               {community.banner_url && !bannerFailed ? (
                 <Image
                   onError={() => setBannerFailed(true)}
@@ -454,7 +446,7 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
               ) : null}
             </View>
 
-            <View style={styles.detailPanel}>
+            <View style={[styles.detailPanel, { borderBottomColor: colors.border }]}>
               <View style={styles.identityRow}>
                 <View
                   style={[
@@ -480,7 +472,7 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                   )}
                 </View>
                 <View style={styles.identityText}>
-                  <Text numberOfLines={1} style={styles.communityName}>
+                  <Text numberOfLines={1} style={[styles.communityName, { color: colors.foreground }]}>
                     {community.name}
                   </Text>
                   <Text style={[styles.communityHandle, { color: accent }]}>
@@ -490,11 +482,11 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
               </View>
 
               <View style={styles.statsRow}>
-                <Text style={styles.statText}>
+                <Text style={[styles.statText, { color: colors.mutedForeground }]}>
                   {community.members_count} member
                   {community.members_count === 1 ? "" : "s"}
                 </Text>
-                <Text style={styles.statText}>
+                <Text style={[styles.statText, { color: colors.mutedForeground }]}>
                   {community.posts_count} post
                   {community.posts_count === 1 ? "" : "s"}
                 </Text>
@@ -513,7 +505,7 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
               </View>
 
               {community.description ? (
-                <Text style={styles.description}>{community.description}</Text>
+                <Text style={[styles.description, { color: colors.secondaryForeground }]}>{community.description}</Text>
               ) : null}
 
               {community.tags.length > 0 ? (
@@ -536,22 +528,26 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
 
               {!isOwner ? (
                 <Pressable
+                  accessibilityLabel={isMember ? "Leave community" : "Join community"}
+                  accessibilityRole="button"
                   disabled={isJoiningOrLeaving}
                   onPress={isMember ? handleLeave : handleJoin}
                   style={[
                     styles.membershipButton,
+                    {
+                      backgroundColor: isMember ? colors.muted : colors.primary,
+                      borderColor: isMember ? colors.destructive : "transparent",
+                    },
                     isMember ? styles.membershipButtonJoined : null,
                   ]}
                 >
                   {isJoiningOrLeaving ? (
-                    <ActivityIndicator
-                      color={isMember ? "#D5D9E2" : "#251B0A"}
-                    />
+                    <ActivityIndicator color={isMember ? colors.secondaryForeground : colors.primaryForeground} />
                   ) : (
                     <Text
                       style={[
                         styles.membershipButtonText,
-                        isMember ? styles.membershipButtonTextJoined : null,
+                        { color: isMember ? colors.secondaryForeground : colors.primaryForeground },
                       ]}
                     >
                       {isMember ? "Leave community" : "Join community"}
@@ -560,21 +556,23 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                 </Pressable>
               ) : null}
 
-              {error ? <Text style={styles.error}>{error}</Text> : null}
+              {error ? <Text style={[styles.error, { backgroundColor: colors.destructiveMuted, borderColor: colors.destructive, color: colors.destructive }]}>{error}</Text> : null}
             </View>
 
-            <View style={styles.tabs}>
+            <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
               <Pressable
+                accessibilityLabel="Show community feed"
+                accessibilityRole="button"
                 onPress={() => setActiveTab("feed")}
                 style={[
                   styles.tabButton,
-                  activeTab === "feed" ? styles.tabButtonActive : null,
+                  activeTab === "feed" ? { backgroundColor: colors.accentMuted } : null,
                 ]}
               >
                 <Text
                   style={[
                     styles.tabButtonText,
-                    activeTab === "feed" ? styles.tabButtonTextActive : null,
+                    { color: activeTab === "feed" ? colors.primary : colors.mutedForeground },
                   ]}
                 >
                   Feed
@@ -582,6 +580,8 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
               </Pressable>
               {showJamTab ? (
                 <Pressable
+                  accessibilityLabel="Show community jam rooms"
+                  accessibilityRole="button"
                   onPress={() => setActiveTab("jam")}
                   style={[
                     styles.tabButton,
@@ -589,14 +589,14 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                   ]}
                 >
                   <Ionicons
-                    color={activeTab === "jam" ? "#D8A64A" : "#8F98A8"}
+                    color={activeTab === "jam" ? colors.primary : colors.mutedForeground}
                     name="musical-notes-outline"
                     size={15}
                   />
                   <Text
                     style={[
                       styles.tabButtonText,
-                      activeTab === "jam" ? styles.tabButtonTextActive : null,
+                    { color: activeTab === "jam" ? colors.primary : colors.mutedForeground },
                     ]}
                   >
                     Jam
@@ -605,6 +605,8 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
               ) : null}
               {canModerate ? (
                 <Pressable
+                  accessibilityLabel="Show community moderation"
+                  accessibilityRole="button"
                   onPress={() => setActiveTab("moderation")}
                   style={[
                     styles.tabButton,
@@ -612,7 +614,7 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                   ]}
                 >
                   <Ionicons
-                    color={activeTab === "moderation" ? "#D8A64A" : "#8F98A8"}
+                    color={activeTab === "moderation" ? colors.primary : colors.mutedForeground}
                     name="shield-checkmark-outline"
                     size={15}
                   />
@@ -620,8 +622,8 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                     style={[
                       styles.tabButtonText,
                       activeTab === "moderation"
-                        ? styles.tabButtonTextActive
-                        : null,
+                        ? { color: colors.primary }
+                        : { color: colors.mutedForeground },
                     ]}
                   >
                     Moderation
@@ -638,8 +640,8 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                   profile={profile}
                 />
               ) : (
-                <View style={styles.joinHint}>
-                  <Text style={styles.joinHintText}>
+                <View style={[styles.joinHint, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+                  <Text style={[styles.joinHintText, { color: colors.mutedForeground }]}>
                     Join this community to post.
                   </Text>
                 </View>
@@ -659,23 +661,37 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                 roomActionError={roomActionError}
               />
             ) : (
-              <View style={styles.searchPanel}>
-                <View style={styles.searchBox}>
-                  <Ionicons color="#8F98A8" name="search" size={17} />
+              <View style={[styles.searchPanel, { borderBottomColor: colors.border }]}>
+                <View style={[styles.searchBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Ionicons
+                    accessibilityElementsHidden
+                    color={colors.mutedForeground}
+                    importantForAccessibility="no-hide-descendants"
+                    name="search"
+                    size={17}
+                  />
                   <TextInput
                     autoCapitalize="none"
                     onChangeText={setMemberSearch}
                     placeholder="Search members"
-                    placeholderTextColor="#7E8796"
-                    style={styles.searchInput}
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[styles.searchInput, { color: colors.foreground }]}
                     value={memberSearch}
                   />
                   {memberSearch ? (
                     <Pressable
+                      accessibilityLabel="Clear member search"
+                      accessibilityRole="button"
                       onPress={() => setMemberSearch("")}
                       style={styles.clearButton}
                     >
-                      <Ionicons color="#8F98A8" name="close" size={16} />
+                      <Ionicons
+                        accessibilityElementsHidden
+                        color={colors.mutedForeground}
+                        importantForAccessibility="no-hide-descendants"
+                        name="close"
+                        size={16}
+                      />
                     </Pressable>
                   ) : null}
                 </View>
@@ -748,12 +764,19 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
 }
 
 function Header({ onBack, title }: { onBack: () => void; title: string }) {
+  const { colors } = useMobileTheme();
+
   return (
-    <View style={styles.header}>
-      <Pressable onPress={onBack} style={styles.backButton}>
-        <Ionicons color="#EEF0F5" name="chevron-back" size={22} />
+    <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <Pressable
+        accessibilityLabel="Back"
+        accessibilityRole="button"
+        onPress={onBack}
+        style={styles.backButton}
+      >
+        <Ionicons color={colors.secondaryForeground} name="chevron-back" size={22} />
       </Pressable>
-      <Text numberOfLines={1} style={styles.headerTitle}>
+      <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.secondaryForeground }]}>
         {title}
       </Text>
     </View>
@@ -785,11 +808,13 @@ function CommunityJamPanel({
   pendingAction: string | null;
   roomActionError: string | null;
 }) {
+  const { colors } = useMobileTheme();
+
   if (!isMember) {
     return (
-      <View style={styles.jamPanel}>
-        <Text style={styles.jamPanelTitle}>Community jam rooms</Text>
-        <Text style={styles.jamPanelText}>
+      <View style={[styles.jamPanel, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.jamPanelTitle, { color: colors.foreground }]}>Community jam rooms</Text>
+        <Text style={[styles.jamPanelText, { color: colors.mutedForeground }]}>
           Join this community to enter or host rooms.
         </Text>
       </View>
@@ -798,7 +823,7 @@ function CommunityJamPanel({
 
   if (isMyRoomLoading) {
     return (
-      <View style={styles.jamPanel}>
+      <View style={[styles.jamPanel, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <ActivityIndicator color={accent} />
       </View>
     );
@@ -806,9 +831,9 @@ function CommunityJamPanel({
 
   if (!canCreateRoom && !myRoom) {
     return (
-      <View style={styles.jamPanel}>
-        <Text style={styles.jamPanelTitle}>Jam is not enabled</Text>
-        <Text style={styles.jamPanelText}>
+      <View style={[styles.jamPanel, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.jamPanelTitle, { color: colors.foreground }]}>Jam is not enabled</Text>
+        <Text style={[styles.jamPanelText, { color: colors.mutedForeground }]}>
           A moderator needs to configure a jam server before rooms can be
           hosted.
         </Text>
@@ -817,47 +842,49 @@ function CommunityJamPanel({
   }
 
   return (
-    <View style={styles.jamPanel}>
+    <View style={[styles.jamPanel, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
       <View style={styles.jamPanelHeader}>
         <View style={styles.jamPanelHeaderText}>
-          <Text style={styles.jamPanelTitle}>Community jam rooms</Text>
-          <Text style={styles.jamPanelText}>
+          <Text style={[styles.jamPanelTitle, { color: colors.foreground }]}>Community jam rooms</Text>
+          <Text style={[styles.jamPanelText, { color: colors.mutedForeground }]}>
             Enter active rooms or host one room for this community.
           </Text>
         </View>
         {!myRoom ? (
           <Pressable
+            accessibilityLabel="Create community room"
+            accessibilityRole="button"
             onPress={onCreateRoom}
             style={[styles.primarySmallButton, { backgroundColor: accent }]}
           >
-            <Text style={styles.primarySmallButtonText}>Create</Text>
+            <Text style={[styles.primarySmallButtonText, { color: colors.primaryForeground }]}>Create</Text>
           </Pressable>
         ) : null}
       </View>
 
       {myRoom ? (
-        <View style={styles.myRoomCard}>
+        <View style={[styles.myRoomCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <View style={styles.myRoomHeader}>
             <View style={styles.myRoomTitleBlock}>
-              <Text numberOfLines={1} style={styles.myRoomTitle}>
+              <Text numberOfLines={1} style={[styles.myRoomTitle, { color: colors.foreground }]}>
                 {myRoom.name}
               </Text>
-              <Text style={styles.myRoomHandle}>jam/{myRoom.handle}</Text>
+              <Text style={[styles.myRoomHandle, { color: colors.mutedForeground }]}>jam/{myRoom.handle}</Text>
             </View>
             <View
               style={[
                 styles.roomStatusBadge,
                 {
                   backgroundColor: myRoom.is_active
-                    ? "rgba(34,197,94,0.12)"
-                    : "#353B49",
+                    ? colors.successMuted
+                    : colors.muted,
                 },
               ]}
             >
               <Text
                 style={[
                   styles.roomStatusText,
-                  { color: myRoom.is_active ? "#22C55E" : "#D5D9E2" },
+                  { color: myRoom.is_active ? colors.success : colors.secondaryForeground },
                 ]}
               >
                 {myRoom.is_active ? "Active" : "Disabled"}
@@ -867,23 +894,32 @@ function CommunityJamPanel({
 
           <View style={styles.myRoomActions}>
             <Pressable
+              accessibilityLabel={`Enter ${myRoom.name}`}
+              accessibilityRole="button"
               onPress={() => onOpenRoom(myRoom)}
-              style={styles.secondarySmallButton}
+              style={[styles.secondarySmallButton, { backgroundColor: colors.muted, borderColor: colors.border }]}
             >
-              <Text style={styles.secondarySmallButtonText}>Enter</Text>
-            </Pressable>
-            <Pressable onPress={onEditRoom} style={styles.secondarySmallButton}>
-              <Text style={styles.secondarySmallButtonText}>Settings</Text>
+              <Text style={[styles.secondarySmallButtonText, { color: colors.secondaryForeground }]}>Enter</Text>
             </Pressable>
             <Pressable
+              accessibilityLabel={`Open settings for ${myRoom.name}`}
+              accessibilityRole="button"
+              onPress={onEditRoom}
+              style={[styles.secondarySmallButton, { backgroundColor: colors.muted, borderColor: colors.border }]}
+            >
+              <Text style={[styles.secondarySmallButtonText, { color: colors.secondaryForeground }]}>Settings</Text>
+            </Pressable>
+            <Pressable
+              accessibilityLabel={`${myRoom.is_active ? "Disable" : "Activate"} ${myRoom.name}`}
+              accessibilityRole="button"
               disabled={pendingAction === "toggle"}
               onPress={onToggleRoom}
-              style={styles.secondarySmallButton}
+              style={[styles.secondarySmallButton, { backgroundColor: colors.muted, borderColor: colors.border }]}
             >
               {pendingAction === "toggle" ? (
-                <ActivityIndicator color="#D8A64A" size="small" />
+                <ActivityIndicator color={colors.primary} size="small" />
               ) : (
-                <Text style={styles.secondarySmallButtonText}>
+                <Text style={[styles.secondarySmallButtonText, { color: colors.secondaryForeground }]}>
                   {myRoom.is_active ? "Disable" : "Activate"}
                 </Text>
               )}
@@ -893,7 +929,7 @@ function CommunityJamPanel({
       ) : null}
 
       {roomActionError ? (
-        <Text style={styles.error}>{roomActionError}</Text>
+        <Text style={[styles.error, { backgroundColor: colors.destructiveMuted, borderColor: colors.destructive, color: colors.destructive }]}>{roomActionError}</Text>
       ) : null}
     </View>
   );
@@ -926,6 +962,8 @@ function RoomFormModal({
   onSubmit: () => void;
   visible: boolean;
 }) {
+  const { colors } = useMobileTheme();
+
   return (
     <Modal
       animationType="fade"
@@ -934,67 +972,75 @@ function RoomFormModal({
       visible={visible}
     >
       <View style={styles.modalBackdrop}>
-        <View style={styles.modalPanel}>
+        <View style={[styles.modalPanel, { backgroundColor: colors.card, borderColor: colors.borderStrong }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>
               {mode === "create" ? "Create community room" : "Room settings"}
             </Text>
-            <Pressable onPress={onClose} style={styles.iconButton}>
-              <Ionicons color="#8F98A8" name="close" size={18} />
+            <Pressable
+              accessibilityLabel="Close room form"
+              accessibilityRole="button"
+              onPress={onClose}
+              style={styles.iconButton}
+            >
+              <Ionicons color={colors.mutedForeground} name="close" size={18} />
             </Pressable>
           </View>
 
-          <Text style={styles.fieldLabel}>Name</Text>
+          <Text style={[styles.fieldLabel, { color: colors.secondaryForeground }]}>Name</Text>
           <TextInput
             editable={!isSubmitting}
             onChangeText={onChangeName}
             placeholder="Room name"
-            placeholderTextColor="#7E8796"
-            style={styles.modalInput}
+            placeholderTextColor={colors.mutedForeground}
+            style={[styles.modalInput, { backgroundColor: colors.background, borderColor: colors.borderStrong, color: colors.foreground }]}
             value={name}
           />
 
           {mode === "create" ? (
             <>
-              <Text style={styles.fieldLabel}>Handle</Text>
+              <Text style={[styles.fieldLabel, { color: colors.secondaryForeground }]}>Handle</Text>
               <TextInput
                 autoCapitalize="none"
                 editable={!isSubmitting}
                 onChangeText={onChangeHandle}
                 placeholder="room-handle"
-                placeholderTextColor="#7E8796"
-                style={styles.modalInput}
+                placeholderTextColor={colors.mutedForeground}
+                style={[styles.modalInput, { backgroundColor: colors.background, borderColor: colors.borderStrong, color: colors.foreground }]}
                 value={handle}
               />
             </>
           ) : null}
 
-          <Text style={styles.fieldLabel}>Description</Text>
+          <Text style={[styles.fieldLabel, { color: colors.secondaryForeground }]}>Description</Text>
           <TextInput
             editable={!isSubmitting}
             multiline
             onChangeText={onChangeDescription}
             placeholder="Describe the room"
-            placeholderTextColor="#7E8796"
-            style={[styles.modalInput, styles.modalTextArea]}
+            placeholderTextColor={colors.mutedForeground}
+            style={[styles.modalInput, styles.modalTextArea, { backgroundColor: colors.background, borderColor: colors.borderStrong, color: colors.foreground }]}
             textAlignVertical="top"
             value={description}
           />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={[styles.error, { backgroundColor: colors.destructiveMuted, borderColor: colors.destructive, color: colors.destructive }]}>{error}</Text> : null}
 
           <Pressable
+            accessibilityLabel={mode === "create" ? "Create community room" : "Save room settings"}
+            accessibilityRole="button"
             disabled={isSubmitting}
             onPress={onSubmit}
             style={[
               styles.modalSubmitButton,
+              { backgroundColor: colors.primary },
               isSubmitting ? styles.modalSubmitButtonDisabled : null,
             ]}
           >
             {isSubmitting ? (
-              <ActivityIndicator color="#251B0A" />
+              <ActivityIndicator color={colors.primaryForeground} />
             ) : (
-              <Text style={styles.modalSubmitText}>
+              <Text style={[styles.modalSubmitText, { color: colors.primaryForeground }]}>
                 {mode === "create" ? "Create room" : "Save changes"}
               </Text>
             )}
@@ -1026,6 +1072,7 @@ function MemberRow({
   selfProfileId?: string;
   themeColor: string;
 }) {
+  const { colors } = useMobileTheme();
   const [avatarFailed, setAvatarFailed] = useState(false);
   const isSelf = selfProfileId === member.id;
   const isOwnerRow = member.role === "owner";
@@ -1040,8 +1087,8 @@ function MemberRow({
   const isBusy = pendingAction?.endsWith(`:${member.id}`) ?? false;
 
   return (
-    <View style={styles.memberRow}>
-      <View style={styles.memberAvatar}>
+    <View style={[styles.memberRow, { borderBottomColor: colors.border }]}>
+      <View style={[styles.memberAvatar, { backgroundColor: colors.muted, borderColor: colors.border }]}>
         {member.avatar_url && !avatarFailed ? (
           <Image
             onError={() => setAvatarFailed(true)}
@@ -1049,17 +1096,17 @@ function MemberRow({
             style={styles.memberAvatarImage}
           />
         ) : (
-          <Text style={styles.memberAvatarFallback}>
+          <Text style={[styles.memberAvatarFallback, { color: colors.secondaryForeground }]}>
             {member.username.slice(0, 2).toUpperCase()}
           </Text>
         )}
       </View>
       <View style={styles.memberBody}>
-        <Text numberOfLines={1} style={styles.memberUsername}>
+        <Text numberOfLines={1} style={[styles.memberUsername, { color: colors.foreground }]}>
           @{member.username}
         </Text>
         {member.display_name ? (
-          <Text numberOfLines={1} style={styles.memberDisplayName}>
+          <Text numberOfLines={1} style={[styles.memberDisplayName, { color: colors.mutedForeground }]}>
             {member.display_name}
           </Text>
         ) : null}
@@ -1070,36 +1117,51 @@ function MemberRow({
             styles.memberRoleBadge,
             isOwnerRow || isModRow
               ? { backgroundColor: `${themeColor}22` }
-              : null,
+              : { backgroundColor: colors.muted },
           ]}
         >
           <Text
             style={[
               styles.memberRoleText,
-              isOwnerRow || isModRow ? { color: themeColor } : null,
+              isOwnerRow || isModRow ? { color: themeColor } : { color: colors.secondaryForeground },
             ]}
           >
             {formatRole(member.role)}
           </Text>
         </View>
         {isBusy ? (
-          <ActivityIndicator color="#D8A64A" size="small" />
+          <ActivityIndicator color={colors.primary} size="small" />
         ) : (
           <>
             {canPromote ? (
-              <Pressable onPress={onPromote} style={styles.iconButton}>
-                <Ionicons color="#8F98A8" name="chevron-up" size={17} />
+              <Pressable
+                accessibilityLabel={`Promote ${member.username}`}
+                accessibilityRole="button"
+                onPress={onPromote}
+                style={styles.iconButton}
+              >
+                <Ionicons color={colors.mutedForeground} name="chevron-up" size={17} />
               </Pressable>
             ) : null}
             {canDemote ? (
-              <Pressable onPress={onDemote} style={styles.iconButton}>
-                <Ionicons color="#8F98A8" name="chevron-down" size={17} />
+              <Pressable
+                accessibilityLabel={`Demote ${member.username}`}
+                accessibilityRole="button"
+                onPress={onDemote}
+                style={styles.iconButton}
+              >
+                <Ionicons color={colors.mutedForeground} name="chevron-down" size={17} />
               </Pressable>
             ) : null}
             {canRemove ? (
-              <Pressable onPress={onRemove} style={styles.iconButton}>
+              <Pressable
+                accessibilityLabel={`Remove ${member.username}`}
+                accessibilityRole="button"
+                onPress={onRemove}
+                style={styles.iconButton}
+              >
                 <Ionicons
-                  color="#FECACA"
+                  color={colors.destructive}
                   name="person-remove-outline"
                   size={16}
                 />
@@ -1245,20 +1307,17 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   communityName: {
-    color: "#EEF0F5",
     fontSize: 22,
     fontWeight: "900",
     letterSpacing: 0,
   },
   container: {
-    backgroundColor: "#1A1E29",
     flex: 1,
   },
   content: {
     paddingBottom: 22,
   },
   description: {
-    color: "#C7CCD6",
     fontSize: 14,
     lineHeight: 21,
     marginTop: 12,
@@ -1279,7 +1338,6 @@ const styles = StyleSheet.create({
     paddingVertical: 42,
   },
   emptyTitle: {
-    color: "#EEF0F5",
     fontSize: 17,
     fontWeight: "900",
     marginTop: 10,
@@ -1290,7 +1348,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(248,113,113,0.35)",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#FECACA",
     fontSize: 12,
     lineHeight: 17,
     marginTop: 12,
@@ -1310,7 +1367,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerTitle: {
-    color: "#B0B7C4",
     flex: 1,
     fontSize: 14,
     fontWeight: "900",
@@ -1332,20 +1388,17 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   joinHint: {
-    backgroundColor: "#262B37",
     borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     paddingHorizontal: 18,
     paddingVertical: 14,
   },
   joinHintText: {
-    color: "#8F98A8",
     fontSize: 13,
     fontWeight: "800",
     textAlign: "center",
   },
   jamPanel: {
-    backgroundColor: "#262B37",
     borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,
     gap: 12,
@@ -1362,14 +1415,12 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   jamPanelText: {
-    color: "#8F98A8",
     fontSize: 13,
     fontWeight: "700",
     lineHeight: 18,
     marginTop: 4,
   },
   jamPanelTitle: {
-    color: "#EEF0F5",
     fontSize: 15,
     fontWeight: "900",
   },
@@ -1381,7 +1432,6 @@ const styles = StyleSheet.create({
   },
   memberAvatar: {
     alignItems: "center",
-    backgroundColor: "#353B49",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
@@ -1391,7 +1441,6 @@ const styles = StyleSheet.create({
     width: 40,
   },
   memberAvatarFallback: {
-    color: "#C7CCD6",
     fontSize: 12,
     fontWeight: "900",
   },
@@ -1404,19 +1453,16 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   memberDisplayName: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 3,
   },
   memberRoleBadge: {
-    backgroundColor: "#353B49",
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   memberRoleText: {
-    color: "#D5D9E2",
     fontSize: 11,
     fontWeight: "900",
   },
@@ -1430,7 +1476,6 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   memberUsername: {
-    color: "#EEF0F5",
     fontSize: 14,
     fontWeight: "900",
   },
@@ -1448,11 +1493,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   modalInput: {
-    backgroundColor: "#1A1E29",
     borderColor: "rgba(255,255,255,0.1)",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#EEF0F5",
     fontSize: 15,
     marginTop: 7,
     minHeight: 42,
@@ -1460,7 +1503,6 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   modalPanel: {
-    backgroundColor: "#262B37",
     borderColor: "rgba(255,255,255,0.1)",
     borderRadius: 8,
     borderWidth: 1,
@@ -1469,7 +1511,6 @@ const styles = StyleSheet.create({
   },
   modalSubmitButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
     justifyContent: "center",
     marginTop: 14,
@@ -1479,7 +1520,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   modalSubmitText: {
-    color: "#251B0A",
     fontSize: 14,
     fontWeight: "900",
   },
@@ -1487,32 +1527,26 @@ const styles = StyleSheet.create({
     minHeight: 82,
   },
   modalTitle: {
-    color: "#EEF0F5",
     flex: 1,
     fontSize: 16,
     fontWeight: "900",
   },
   membershipButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
     borderRadius: 8,
     justifyContent: "center",
     minHeight: 42,
     marginTop: 14,
   },
   membershipButtonJoined: {
-    backgroundColor: "#353B49",
     borderColor: "rgba(248,113,113,0.35)",
     borderWidth: 1,
   },
   membershipButtonText: {
-    color: "#251B0A",
     fontSize: 14,
     fontWeight: "900",
   },
-  membershipButtonTextJoined: {
-    color: "#D5D9E2",
-  },
+  membershipButtonTextJoined: {},
   roleBadge: {
     borderRadius: 8,
     paddingHorizontal: 8,
@@ -1523,7 +1557,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   fieldLabel: {
-    color: "#B0B7C4",
     fontSize: 12,
     fontWeight: "900",
     marginTop: 13,
@@ -1534,7 +1567,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   myRoomCard: {
-    backgroundColor: "#1A1E29",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
@@ -1542,7 +1574,6 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   myRoomHandle: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "800",
     marginTop: 3,
@@ -1553,7 +1584,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   myRoomTitle: {
-    color: "#EEF0F5",
     fontSize: 15,
     fontWeight: "900",
   },
@@ -1569,13 +1599,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   primarySmallButtonText: {
-    color: "#251B0A",
     fontSize: 13,
     fontWeight: "900",
   },
   searchBox: {
     alignItems: "center",
-    backgroundColor: "#262B37",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
@@ -1585,7 +1613,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   searchInput: {
-    color: "#EEF0F5",
     flex: 1,
     fontSize: 15,
     minWidth: 0,
@@ -1607,7 +1634,6 @@ const styles = StyleSheet.create({
   },
   secondarySmallButton: {
     alignItems: "center",
-    backgroundColor: "#353B49",
     borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 8,
     borderWidth: 1,
@@ -1617,12 +1643,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   secondarySmallButtonText: {
-    color: "#D5D9E2",
     fontSize: 12,
     fontWeight: "900",
   },
   stateText: {
-    color: "#8F98A8",
     marginTop: 10,
     textAlign: "center",
   },
@@ -1634,7 +1658,6 @@ const styles = StyleSheet.create({
     marginTop: 13,
   },
   statText: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "800",
   },
@@ -1650,13 +1673,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(216,166,74,0.14)",
   },
   tabButtonText: {
-    color: "#8F98A8",
     fontSize: 12,
     fontWeight: "900",
   },
-  tabButtonTextActive: {
-    color: "#D8A64A",
-  },
+  tabButtonTextActive: {},
   tabs: {
     borderBottomColor: "rgba(255,255,255,0.08)",
     borderBottomWidth: 1,

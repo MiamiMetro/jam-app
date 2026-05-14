@@ -4,16 +4,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../../navigation/AuthStack";
 import { authClient } from "../../lib/auth-client";
 import { useMobileTheme } from "@/theme/MobileTheme";
+import FormField from "@/components/ui/FormField";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
@@ -50,7 +51,11 @@ const LoginScreen = ({ navigation }: Props) => {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardView}
       >
-        <View style={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.header}>
             <Text style={[styles.kicker, { color: colors.success }]}>Jam</Text>
             <Text style={[styles.title, { color: colors.foreground }]}>Welcome back</Text>
@@ -60,62 +65,39 @@ const LoginScreen = ({ navigation }: Props) => {
           </View>
 
           <View style={styles.form}>
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.secondaryForeground }]}>
-                Email
-              </Text>
-              <TextInput
-                autoCapitalize="none"
-                autoComplete="email"
-                autoCorrect={false}
-                editable={!isSubmitting}
-                keyboardType="email-address"
-                onChangeText={(value) => {
-                  setEmail(value);
-                  setError(null);
-                }}
-                placeholder="your@email.com"
-                placeholderTextColor={colors.mutedForeground}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.input,
-                    borderColor: colors.border,
-                    color: colors.foreground,
-                  },
-                ]}
-                value={email}
-              />
-            </View>
+            <FormField
+              autoCapitalize="none"
+              autoComplete="email"
+              autoCorrect={false}
+              editable={!isSubmitting}
+              keyboardType="email-address"
+              label="Email"
+              onChangeText={(value) => {
+                setEmail(value);
+                setError(null);
+              }}
+              placeholder="your@email.com"
+              textContentType="emailAddress"
+              value={email}
+            />
 
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.secondaryForeground }]}>
-                Password
-              </Text>
-              <TextInput
-                autoComplete="password"
-                editable={!isSubmitting}
-                onChangeText={(value) => {
-                  setPassword(value);
-                  setError(null);
-                }}
-                placeholder="Password"
-                placeholderTextColor={colors.mutedForeground}
-                secureTextEntry
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.input,
-                    borderColor: colors.border,
-                    color: colors.foreground,
-                  },
-                ]}
-                value={password}
-              />
-            </View>
+            <FormField
+              autoComplete="password"
+              editable={!isSubmitting}
+              label="Password"
+              onChangeText={(value) => {
+                setPassword(value);
+                setError(null);
+              }}
+              placeholder="Password"
+              secureTextEntry
+              textContentType="password"
+              value={password}
+            />
 
             {error ? (
               <Text
+                selectable
                 style={[
                   styles.error,
                   {
@@ -130,6 +112,8 @@ const LoginScreen = ({ navigation }: Props) => {
             ) : null}
 
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Log in"
               disabled={isSubmitting}
               onPress={handleLogin}
               style={({ pressed }) => [
@@ -149,6 +133,8 @@ const LoginScreen = ({ navigation }: Props) => {
             </Pressable>
 
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Create a new account"
               disabled={isSubmitting}
               onPress={() => navigation.navigate("Register")}
               style={styles.secondaryButton}
@@ -158,7 +144,7 @@ const LoginScreen = ({ navigation }: Props) => {
               </Text>
             </Pressable>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -181,9 +167,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
+    paddingVertical: 28,
   },
   header: {
     marginBottom: 32,
@@ -205,20 +192,6 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: 16,
-  },
-  field: {
-    gap: 8,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  input: {
-    borderRadius: 8,
-    borderWidth: 1,
-    fontSize: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
   },
   error: {
     borderRadius: 8,

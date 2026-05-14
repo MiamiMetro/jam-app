@@ -1,13 +1,13 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,6 +28,7 @@ import {
   useMyBandListings,
   useRejectBandApplication,
 } from "@/hooks/useBands";
+import { useMobileTheme, type MobileThemeColors } from "@/theme/MobileTheme";
 import type { BandApplicationItem, BandListingItem, MyBandItem } from "@/types";
 
 const SEEKING_ROLES = [
@@ -78,6 +79,8 @@ const INSTRUMENTS = [
 type BandsView = "all" | "myListings" | "joined";
 
 export default function BandsScreen() {
+  const { colors, styles } = useBandsStyles();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [search, setSearch] = useState("");
   const [selectedRole, setSelectedRole] = useState<string | undefined>();
@@ -135,6 +138,7 @@ export default function BandsScreen() {
       <FlatList
         contentContainerStyle={[
           styles.content,
+          { paddingBottom: insets.bottom + 32 },
           visibleItems.length === 0 ? styles.emptyContent : null,
         ]}
         data={visibleItems}
@@ -145,7 +149,7 @@ export default function BandsScreen() {
           <View style={styles.emptyState}>
             {visibleLoading ? (
               <>
-                <ActivityIndicator color="#D8A64A" />
+                <ActivityIndicator color={colors.accent} />
                 <Text style={styles.stateText}>
                   {activeView === "joined"
                     ? "Loading your bands..."
@@ -156,7 +160,7 @@ export default function BandsScreen() {
               </>
             ) : (
               <>
-                <Ionicons color="#8F98A8" name="people-circle-outline" size={34} />
+                <Ionicons color={colors.mutedForeground} name="people-circle-outline" size={34} />
                 <Text style={styles.emptyTitle}>
                   {activeView === "joined"
                     ? "No bands yet"
@@ -177,14 +181,19 @@ export default function BandsScreen() {
         }
         ListFooterComponent={
           visibleLoadingMore ? (
-            <ActivityIndicator color="#D8A64A" style={styles.footerLoader} />
+            <ActivityIndicator color={colors.accent} style={styles.footerLoader} />
           ) : null
         }
         ListHeaderComponent={
           <>
             <View style={styles.header}>
-              <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-                <Ionicons color="#EEF0F5" name="chevron-back" size={22} />
+              <Pressable
+                accessibilityLabel="Back"
+                accessibilityRole="button"
+                onPress={() => navigation.goBack()}
+                style={styles.backButton}
+              >
+                <Ionicons color={colors.foreground} name="chevron-back" size={22} />
               </Pressable>
               <View style={styles.headerText}>
                 <Text style={styles.headerEyebrow}>Find musicians</Text>
@@ -194,6 +203,8 @@ export default function BandsScreen() {
 
             <View style={styles.tabs}>
               <Pressable
+                accessibilityLabel="Show all band listings"
+                accessibilityRole="button"
                 onPress={() => setActiveView("all")}
                 style={[styles.tabButton, activeView === "all" ? styles.tabButtonActive : null]}
               >
@@ -207,6 +218,8 @@ export default function BandsScreen() {
                 </Text>
               </Pressable>
               <Pressable
+                accessibilityLabel="Show my band listings"
+                accessibilityRole="button"
                 onPress={() => setActiveView("myListings")}
                 style={[
                   styles.tabButton,
@@ -223,6 +236,8 @@ export default function BandsScreen() {
                 </Text>
               </Pressable>
               <Pressable
+                accessibilityLabel="Show my bands"
+                accessibilityRole="button"
                 onPress={() => setActiveView("joined")}
                 style={[
                   styles.tabButton,
@@ -243,17 +258,34 @@ export default function BandsScreen() {
             {activeView === "all" ? (
               <View style={styles.searchPanel}>
                 <View style={styles.searchBox}>
-                  <Ionicons color="#8F98A8" name="search" size={17} />
+                  <Ionicons
+                    accessibilityElementsHidden
+                    color={colors.mutedForeground}
+                    importantForAccessibility="no-hide-descendants"
+                    name="search"
+                    size={17}
+                  />
                   <TextInput
                     onChangeText={setSearch}
                     placeholder="Search bands"
-                    placeholderTextColor="#7E8796"
+                    placeholderTextColor={colors.mutedForeground}
                     style={styles.searchInput}
                     value={search}
                   />
                   {search ? (
-                    <Pressable onPress={() => setSearch("")} style={styles.clearButton}>
-                      <Ionicons color="#8F98A8" name="close" size={16} />
+                    <Pressable
+                      accessibilityLabel="Clear band search"
+                      accessibilityRole="button"
+                      onPress={() => setSearch("")}
+                      style={styles.clearButton}
+                    >
+                      <Ionicons
+                        accessibilityElementsHidden
+                        color={colors.mutedForeground}
+                        importantForAccessibility="no-hide-descendants"
+                        name="close"
+                        size={16}
+                      />
                     </Pressable>
                   ) : null}
                 </View>
@@ -268,6 +300,8 @@ export default function BandsScreen() {
                     const isSelected = isAll ? !selectedRole : selectedRole === item;
                     return (
                       <Pressable
+                        accessibilityLabel={`Filter bands by ${item}`}
+                        accessibilityRole="button"
                         onPress={() => setSelectedRole(isAll ? undefined : item)}
                         style={[
                           styles.filterChip,
@@ -292,6 +326,8 @@ export default function BandsScreen() {
 
             {activeView !== "joined" ? (
               <Pressable
+                accessibilityLabel="Create band listing"
+                accessibilityRole="button"
                 onPress={() => {
                   setError(null);
                   setIsCreateOpen(true);
@@ -299,13 +335,13 @@ export default function BandsScreen() {
                 style={styles.createShortcut}
               >
                 <View style={styles.createIcon}>
-                  <Ionicons color="#D8A64A" name="add" size={20} />
+                  <Ionicons color={colors.accent} name="add" size={20} />
                 </View>
                 <View style={styles.createText}>
                   <Text style={styles.createTitle}>Create band listing</Text>
                   <Text style={styles.createSubtitle}>Open a call for the musician you need.</Text>
                 </View>
-                <Ionicons color="#8F98A8" name="chevron-forward" size={20} />
+                <Ionicons color={colors.mutedForeground} name="chevron-forward" size={20} />
               </Pressable>
             ) : null}
 
@@ -374,6 +410,8 @@ function BandListingRow({
   listing: BandListingItem;
   onApply: () => void;
 }) {
+  const { styles } = useBandsStyles();
+
   return (
     <View style={styles.listingRow}>
       <View style={styles.listingTop}>
@@ -408,7 +446,12 @@ function BandListingRow({
           {listing.applications_count} application
           {listing.applications_count === 1 ? "" : "s"}
         </Text>
-        <Pressable onPress={onApply} style={styles.primarySmallButton}>
+        <Pressable
+          accessibilityLabel={`Apply to ${listing.band_name}`}
+          accessibilityRole="button"
+          onPress={onApply}
+          style={styles.primarySmallButton}
+        >
           <Text style={styles.primarySmallButtonText}>Apply</Text>
         </Pressable>
       </View>
@@ -433,6 +476,7 @@ function formatShortDate(value: string | null) {
 }
 
 function MyBandCard({ band }: { band: MyBandItem }) {
+  const { styles } = useBandsStyles();
   const isOwner = band.membership_role === "owner";
   const activityDate = formatShortDate(band.joined_at);
   const activityLabel = isOwner ? "created" : "joined";
@@ -498,6 +542,7 @@ function MyBandListingCard({
   listing: BandListingItem;
   onError: (message: string | null) => void;
 }) {
+  const { colors, styles } = useBandsStyles();
   const [expanded, setExpanded] = useState(false);
   const closeListing = useCloseBandListing();
   const deleteListing = useDeleteBandListing();
@@ -565,6 +610,8 @@ function MyBandListingCard({
 
       <View style={styles.myActions}>
         <Pressable
+          accessibilityLabel={`Close listing for ${listing.band_name}`}
+          accessibilityRole="button"
           disabled={isClosed || closeListing.isPending}
           onPress={handleClose}
           style={[
@@ -575,6 +622,8 @@ function MyBandListingCard({
           <Text style={styles.secondaryButtonText}>Close</Text>
         </Pressable>
         <Pressable
+          accessibilityLabel={`Delete listing for ${listing.band_name}`}
+          accessibilityRole="button"
           disabled={deleteListing.isPending}
           onPress={handleDelete}
           style={styles.dangerButton}
@@ -582,6 +631,8 @@ function MyBandListingCard({
           <Text style={styles.dangerButtonText}>Delete</Text>
         </Pressable>
         <Pressable
+          accessibilityLabel={`${expanded ? "Hide" : "Show"} applications for ${listing.band_name}`}
+          accessibilityRole="button"
           onPress={() => setExpanded((value) => !value)}
           style={styles.expandButton}
         >
@@ -589,7 +640,7 @@ function MyBandListingCard({
             {listing.applications_count} Applications
           </Text>
           <Ionicons
-            color="#D8A64A"
+            color={colors.accent}
             name={expanded ? "chevron-up" : "chevron-down"}
             size={16}
           />
@@ -610,6 +661,7 @@ function ApplicationsPanel({
   listingId: string;
   onError: (message: string | null) => void;
 }) {
+  const { colors, styles } = useBandsStyles();
   const {
     data: applications,
     fetchNextPage,
@@ -622,7 +674,7 @@ function ApplicationsPanel({
     <View style={styles.applicationsPanel}>
       {isLoading ? (
         <View style={styles.inlineLoading}>
-          <ActivityIndicator color="#D8A64A" />
+          <ActivityIndicator color={colors.accent} />
           <Text style={styles.stateText}>Loading applications...</Text>
         </View>
       ) : applications.length === 0 ? (
@@ -638,12 +690,14 @@ function ApplicationsPanel({
           ))}
           {hasNextPage ? (
             <Pressable
+              accessibilityLabel="Load more applications"
+              accessibilityRole="button"
               disabled={isFetchingNextPage}
               onPress={fetchNextPage}
               style={styles.loadMoreButton}
             >
               {isFetchingNextPage ? (
-                <ActivityIndicator color="#D8A64A" />
+                <ActivityIndicator color={colors.accent} />
               ) : (
                 <Text style={styles.loadMoreText}>Load more</Text>
               )}
@@ -662,6 +716,7 @@ function ApplicationRow({
   application: BandApplicationItem;
   onError: (message: string | null) => void;
 }) {
+  const { styles } = useBandsStyles();
   const acceptApplication = useAcceptBandApplication();
   const rejectApplication = useRejectBandApplication();
   const isPending = application.status === "pending";
@@ -730,6 +785,8 @@ function ApplicationRow({
       {isPending ? (
         <View style={styles.reviewActions}>
           <Pressable
+            accessibilityLabel={`Accept application from ${application.applicant?.username || "unknown"}`}
+            accessibilityRole="button"
             disabled={isBusy}
             onPress={handleAccept}
             style={[styles.acceptButton, isBusy ? styles.disabledButton : null]}
@@ -737,6 +794,8 @@ function ApplicationRow({
             <Text style={styles.acceptButtonText}>Accept</Text>
           </Pressable>
           <Pressable
+            accessibilityLabel={`Reject application from ${application.applicant?.username || "unknown"}`}
+            accessibilityRole="button"
             disabled={isBusy}
             onPress={handleReject}
             style={[styles.rejectButton, isBusy ? styles.disabledButton : null]}
@@ -758,6 +817,7 @@ function CreateBandListingModal({
   onError: (message: string | null) => void;
   open: boolean;
 }) {
+  const { colors, styles } = useBandsStyles();
   const createListing = useCreateBandListing();
   const activeCount = useActiveListingCount();
   const [bandName, setBandName] = useState("");
@@ -810,8 +870,13 @@ function CreateBandListingModal({
         <View style={styles.modalSheet}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Create Band Listing</Text>
-            <Pressable onPress={handleClose} style={styles.modalCloseButton}>
-              <Ionicons color="#8F98A8" name="close" size={20} />
+            <Pressable
+              accessibilityLabel="Close create listing form"
+              accessibilityRole="button"
+              onPress={handleClose}
+              style={styles.modalCloseButton}
+            >
+              <Ionicons color={colors.mutedForeground} name="close" size={20} />
             </Pressable>
           </View>
 
@@ -826,7 +891,7 @@ function CreateBandListingModal({
               maxLength={50}
               onChangeText={setBandName}
               placeholder="Band name"
-              placeholderTextColor="#7E8796"
+              placeholderTextColor={colors.mutedForeground}
               style={styles.input}
               value={bandName}
             />
@@ -867,7 +932,7 @@ function CreateBandListingModal({
               maxLength={100}
               onChangeText={setRegion}
               placeholder="Region"
-              placeholderTextColor="#7E8796"
+              placeholderTextColor={colors.mutedForeground}
               style={styles.input}
               value={region}
             />
@@ -889,7 +954,7 @@ function CreateBandListingModal({
               multiline
               onChangeText={setDescription}
               placeholder="Tell people about your band"
-              placeholderTextColor="#7E8796"
+              placeholderTextColor={colors.mutedForeground}
               style={[styles.input, styles.textArea]}
               textAlignVertical="top"
               value={description}
@@ -898,12 +963,14 @@ function CreateBandListingModal({
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <Pressable
+              accessibilityLabel="Create listing"
+              accessibilityRole="button"
               disabled={!canCreate}
               onPress={handleSubmit}
               style={[styles.fullButton, !canCreate ? styles.disabledButton : null]}
             >
               {createListing.isPending ? (
-                <ActivityIndicator color="#251B0A" />
+                <ActivityIndicator color={colors.primaryForeground} />
               ) : (
                 <Text style={styles.fullButtonText}>Create Listing</Text>
               )}
@@ -924,6 +991,7 @@ function BandApplicationModal({
   onClose: () => void;
   onError: (message: string | null) => void;
 }) {
+  const { colors, styles } = useBandsStyles();
   const applyToBand = useApplyToBand();
   const [instrument, setInstrument] = useState("Guitar");
   const [experience, setExperience] = useState("");
@@ -971,8 +1039,13 @@ function BandApplicationModal({
         <View style={styles.modalSheet}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Apply to {listing?.band_name || "Band"}</Text>
-            <Pressable onPress={handleClose} style={styles.modalCloseButton}>
-              <Ionicons color="#8F98A8" name="close" size={20} />
+            <Pressable
+              accessibilityLabel="Close application form"
+              accessibilityRole="button"
+              onPress={handleClose}
+              style={styles.modalCloseButton}
+            >
+              <Ionicons color={colors.mutedForeground} name="close" size={20} />
             </Pressable>
           </View>
 
@@ -1003,7 +1076,7 @@ function BandApplicationModal({
               multiline
               onChangeText={setExperience}
               placeholder="Tell them about your musical experience"
-              placeholderTextColor="#7E8796"
+              placeholderTextColor={colors.mutedForeground}
               style={[styles.input, styles.textArea]}
               textAlignVertical="top"
               value={experience}
@@ -1015,7 +1088,7 @@ function BandApplicationModal({
               multiline
               onChangeText={setMessage}
               placeholder="Message (optional)"
-              placeholderTextColor="#7E8796"
+              placeholderTextColor={colors.mutedForeground}
               style={[styles.input, styles.messageArea]}
               textAlignVertical="top"
               value={message}
@@ -1024,12 +1097,14 @@ function BandApplicationModal({
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <Pressable
+              accessibilityLabel={`Send application to ${listing?.band_name || "band"}`}
+              accessibilityRole="button"
               disabled={!canApply}
               onPress={handleSubmit}
               style={[styles.fullButton, !canApply ? styles.disabledButton : null]}
             >
               {applyToBand.isPending ? (
-                <ActivityIndicator color="#251B0A" />
+                <ActivityIndicator color={colors.primaryForeground} />
               ) : (
                 <Text style={styles.fullButtonText}>Send Application</Text>
               )}
@@ -1054,11 +1129,15 @@ function NumberStepper({
   onChange: (value: number) => void;
   value: number;
 }) {
+  const { styles } = useBandsStyles();
+
   return (
     <View style={styles.stepper}>
       <Text style={styles.stepperLabel}>{label}</Text>
       <View style={styles.stepperControls}>
         <Pressable
+          accessibilityLabel={`Decrease ${label}`}
+          accessibilityRole="button"
           disabled={value <= min}
           onPress={() => onChange(Math.max(min, value - 1))}
           style={[styles.stepperButton, value <= min ? styles.disabledButton : null]}
@@ -1067,6 +1146,8 @@ function NumberStepper({
         </Pressable>
         <Text style={styles.stepperValue}>{value}</Text>
         <Pressable
+          accessibilityLabel={`Increase ${label}`}
+          accessibilityRole="button"
           disabled={value >= max}
           onPress={() => onChange(Math.min(max, value + 1))}
           style={[styles.stepperButton, value >= max ? styles.disabledButton : null]}
@@ -1087,8 +1168,12 @@ function ChoiceChip({
   label: string;
   onPress: () => void;
 }) {
+  const { styles } = useBandsStyles();
+
   return (
     <Pressable
+      accessibilityLabel={`${active ? "Selected" : "Select"} ${label}`}
+      accessibilityRole="button"
       onPress={onPress}
       style={[styles.choiceChip, active ? styles.choiceChipActive : null]}
     >
@@ -1131,7 +1216,15 @@ function getBandErrorMessage(error: unknown) {
   return stripped || "Something went wrong. Please try again.";
 }
 
-const styles = StyleSheet.create({
+function useBandsStyles() {
+  const { colors } = useMobileTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  return { colors, styles };
+}
+
+function createStyles(colors: MobileThemeColors) {
+  return StyleSheet.create({
   acceptButton: {
     alignItems: "center",
     backgroundColor: "rgba(79,180,119,0.16)",
@@ -1143,7 +1236,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   acceptButtonText: {
-    color: "#8BE0AD",
+    color: colors.success,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -1152,7 +1245,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   applicationCount: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 12,
     fontWeight: "800",
   },
@@ -1162,7 +1255,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   applicationMessage: {
-    color: "#AEB6C4",
+    color: colors.mutedForeground,
     fontSize: 12,
     fontStyle: "italic",
     lineHeight: 18,
@@ -1189,28 +1282,28 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(79,180,119,0.16)",
   },
   applicationStatusAcceptedText: {
-    color: "#8BE0AD",
+    color: colors.success,
   },
   applicationStatusRejected: {
     backgroundColor: "rgba(248,113,113,0.16)",
   },
   applicationStatusRejectedText: {
-    color: "#FECACA",
+    color: colors.destructive,
   },
   applicationStatusText: {
-    color: "#D8A64A",
+    color: colors.accent,
     fontSize: 10,
     fontWeight: "900",
     textTransform: "capitalize",
   },
   applicationText: {
-    color: "#C7CCD6",
+    color: colors.secondaryForeground,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 8,
   },
   applicantName: {
-    color: "#EEF0F5",
+    color: colors.foreground,
     flexShrink: 1,
     fontSize: 13,
     fontWeight: "900",
@@ -1226,7 +1319,7 @@ const styles = StyleSheet.create({
     width: 46,
   },
   avatarText: {
-    color: "#D8A64A",
+    color: colors.accent,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -1244,8 +1337,8 @@ const styles = StyleSheet.create({
     marginTop: 9,
   },
   choiceChip: {
-    backgroundColor: "#1E2330",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: colors.input,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 10,
@@ -1256,12 +1349,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(216,166,74,0.42)",
   },
   choiceChipText: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 12,
     fontWeight: "800",
   },
   choiceChipTextActive: {
-    color: "#D8A64A",
+    color: colors.accent,
   },
   clearButton: {
     alignItems: "center",
@@ -1274,7 +1367,7 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   container: {
-    backgroundColor: "#1A1E29",
+    backgroundColor: colors.background,
     flex: 1,
   },
   content: {
@@ -1290,8 +1383,8 @@ const styles = StyleSheet.create({
   },
   createShortcut: {
     alignItems: "center",
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -1301,7 +1394,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   createSubtitle: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 17,
@@ -1312,7 +1405,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   createTitle: {
-    color: "#EEF0F5",
+    color: colors.foreground,
     fontSize: 16,
     fontWeight: "900",
   },
@@ -1327,12 +1420,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   dangerButtonText: {
-    color: "#FECACA",
+    color: colors.destructive,
     fontSize: 12,
     fontWeight: "900",
   },
   description: {
-    color: "#C7CCD6",
+    color: colors.secondaryForeground,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 10,
@@ -1350,7 +1443,7 @@ const styles = StyleSheet.create({
     paddingVertical: 42,
   },
   emptyTitle: {
-    color: "#EEF0F5",
+    color: colors.foreground,
     fontSize: 17,
     fontWeight: "900",
     marginTop: 10,
@@ -1361,7 +1454,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(248,113,113,0.35)",
     borderRadius: 8,
     borderWidth: 1,
-    color: "#FECACA",
+    color: colors.destructive,
     fontSize: 12,
     lineHeight: 17,
     marginTop: 10,
@@ -1376,13 +1469,13 @@ const styles = StyleSheet.create({
     minHeight: 34,
   },
   expandButtonText: {
-    color: "#D8A64A",
+    color: colors.accent,
     fontSize: 12,
     fontWeight: "900",
   },
   filterChip: {
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 12,
@@ -1393,12 +1486,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(216,166,74,0.42)",
   },
   filterChipText: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 12,
     fontWeight: "800",
   },
   filterChipTextActive: {
-    color: "#D8A64A",
+    color: colors.accent,
   },
   filterList: {
     gap: 8,
@@ -1408,21 +1501,21 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   formLabel: {
-    color: "#D5D9E2",
+    color: colors.secondaryForeground,
     fontSize: 13,
     fontWeight: "900",
     marginTop: 14,
   },
   fullButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
+    backgroundColor: colors.primary,
     borderRadius: 8,
     justifyContent: "center",
     minHeight: 44,
     marginTop: 14,
   },
   fullButtonText: {
-    color: "#251B0A",
+    color: colors.primaryForeground,
     fontSize: 14,
     fontWeight: "900",
   },
@@ -1436,7 +1529,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerEyebrow: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0,
@@ -1447,14 +1540,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   headerTitle: {
-    color: "#EEF0F5",
+    color: colors.foreground,
     fontSize: 22,
     fontWeight: "900",
     letterSpacing: 0,
     marginTop: 2,
   },
   helpText: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 11,
     fontWeight: "700",
     marginTop: 6,
@@ -1464,18 +1557,18 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   input: {
-    backgroundColor: "#1E2330",
-    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: colors.input,
+    borderColor: colors.borderStrong,
     borderRadius: 8,
     borderWidth: 1,
-    color: "#EEF0F5",
+    color: colors.foreground,
     fontSize: 15,
     minHeight: 44,
     marginTop: 10,
     paddingHorizontal: 12,
   },
   instrumentText: {
-    color: "#D8A64A",
+    color: colors.accent,
     fontSize: 12,
     fontWeight: "800",
     marginTop: 2,
@@ -1485,7 +1578,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   listingMeta: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 12,
     fontWeight: "700",
     marginTop: 4,
@@ -1497,21 +1590,21 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   listingSummary: {
-    backgroundColor: "#1E2330",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: colors.input,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 9,
   },
   listingSummaryText: {
-    color: "#C7CCD6",
+    color: colors.secondaryForeground,
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 17,
   },
   listingTitle: {
-    color: "#EEF0F5",
+    color: colors.foreground,
     flexShrink: 1,
     fontSize: 15,
     fontWeight: "900",
@@ -1528,7 +1621,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   loadMoreText: {
-    color: "#D8A64A",
+    color: colors.accent,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -1541,7 +1634,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(79,180,119,0.16)",
   },
   memberMembershipText: {
-    color: "#8BE0AD",
+    color: colors.success,
   },
   membershipBadge: {
     borderRadius: 8,
@@ -1582,13 +1675,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   modalSheet: {
-    backgroundColor: "#1A1E29",
+    backgroundColor: colors.background,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
     maxHeight: "90%",
   },
   modalTitle: {
-    color: "#EEF0F5",
+    color: colors.foreground,
     fontSize: 18,
     fontWeight: "900",
   },
@@ -1600,8 +1693,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   myListingCard: {
-    backgroundColor: "#262B37",
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    backgroundColor: colors.card,
+    borderBottomColor: colors.border,
     borderBottomWidth: 1,
     paddingHorizontal: 18,
     paddingVertical: 15,
@@ -1615,7 +1708,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   noApplications: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 12,
     fontWeight: "800",
     paddingVertical: 14,
@@ -1628,24 +1721,24 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(216,166,74,0.14)",
   },
   ownerMembershipText: {
-    color: "#D8A64A",
+    color: colors.accent,
   },
   ownerText: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 11,
     fontWeight: "700",
     marginTop: 4,
   },
   primarySmallButton: {
     alignItems: "center",
-    backgroundColor: "#D8A64A",
+    backgroundColor: colors.primary,
     borderRadius: 8,
     justifyContent: "center",
     minHeight: 34,
     paddingHorizontal: 16,
   },
   primarySmallButtonText: {
-    color: "#251B0A",
+    color: colors.primaryForeground,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -1660,7 +1753,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rejectButtonText: {
-    color: "#FECACA",
+    color: colors.destructive,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -1676,7 +1769,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   roleBadgeText: {
-    color: "#D8A64A",
+    color: colors.accent,
     fontSize: 10,
     fontWeight: "900",
   },
@@ -1688,8 +1781,8 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     alignItems: "center",
-    backgroundColor: "#262B37",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -1698,7 +1791,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   searchInput: {
-    color: "#EEF0F5",
+    color: colors.foreground,
     flex: 1,
     fontSize: 15,
     minWidth: 0,
@@ -1709,14 +1802,14 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     alignItems: "center",
-    backgroundColor: "#353B49",
+    backgroundColor: colors.secondary,
     borderRadius: 8,
     minHeight: 34,
     justifyContent: "center",
     paddingHorizontal: 12,
   },
   secondaryButtonText: {
-    color: "#D5D9E2",
+    color: colors.secondaryForeground,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -1729,19 +1822,19 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
   sectionMeta: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 12,
     fontWeight: "800",
   },
   sectionTitle: {
-    color: "#EEF0F5",
+    color: colors.foreground,
     fontSize: 16,
     fontWeight: "900",
   },
   smallAvatar: {
     alignItems: "center",
-    backgroundColor: "#353B49",
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: colors.muted,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     height: 34,
@@ -1749,12 +1842,12 @@ const styles = StyleSheet.create({
     width: 34,
   },
   smallAvatarText: {
-    color: "#C7CCD6",
+    color: colors.secondaryForeground,
     fontSize: 11,
     fontWeight: "900",
   },
   stateText: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     marginTop: 10,
     textAlign: "center",
   },
@@ -1765,29 +1858,29 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   statusBadgeClosed: {
-    backgroundColor: "#353B49",
+    backgroundColor: colors.muted,
   },
   statusBadgeText: {
-    color: "#8BE0AD",
+    color: colors.success,
     fontSize: 10,
     fontWeight: "900",
   },
   statusBadgeTextClosed: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
   },
   stepper: {
     flex: 1,
   },
   stepperButton: {
     alignItems: "center",
-    backgroundColor: "#353B49",
+    backgroundColor: colors.secondary,
     borderRadius: 8,
     height: 36,
     justifyContent: "center",
     width: 36,
   },
   stepperButtonText: {
-    color: "#D5D9E2",
+    color: colors.secondaryForeground,
     fontSize: 18,
     fontWeight: "900",
   },
@@ -1798,12 +1891,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   stepperLabel: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 12,
     fontWeight: "800",
   },
   stepperValue: {
-    color: "#EEF0F5",
+    color: colors.foreground,
     fontSize: 15,
     fontWeight: "900",
     minWidth: 24,
@@ -1818,12 +1911,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(216,166,74,0.14)",
   },
   tabButtonText: {
-    color: "#8F98A8",
+    color: colors.mutedForeground,
     fontSize: 12,
     fontWeight: "900",
   },
   tabButtonTextActive: {
-    color: "#D8A64A",
+    color: colors.accent,
   },
   tabs: {
     flexDirection: "row",
@@ -1843,4 +1936,5 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 7,
   },
-});
+  });
+}
