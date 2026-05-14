@@ -17,6 +17,8 @@
     "dist:mac": "npm run transpile:electron && npm run build && electron-builder --mac --arm64",
     "dist:linux": "npm run transpile:electron && npm run build && electron-builder --linux --x64",
     "dist:win": "npm run transpile:electron && npm run build && electron-builder --win --x64",
+    "release:mac": "node scripts/release.mjs mac",
+    "release:win": "node scripts/release.mjs win",
     "convex:pull": "npm --prefix ../.. run convex:codegen"
   },
   "dependencies": {

@@ -11,6 +11,8 @@
     "desktop:dist:win": "npm run dist:win --workspace jam-desktop",
     "desktop:dist:mac": "npm run dist:mac --workspace jam-desktop",
     "desktop:dist:linux": "npm run dist:linux --workspace jam-desktop",
+    "desktop:release:win": "npm run release:win --workspace jam-desktop",
+    "desktop:release:mac": "npm run release:mac --workspace jam-desktop",
     "mobile:dev": "npm run start --workspace jam-mobile",
     "mobile:ios": "npm run ios --workspace jam-mobile",
     "mobile:android": "npm run android --workspace jam-mobile",
