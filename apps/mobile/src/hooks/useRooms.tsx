@@ -7,7 +7,7 @@ export function useRooms(search?: string) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.rooms.listActivePaginated,
     trimmedSearch ? { search: trimmedSearch } : {},
-    { initialNumItems: 10 }
+    { initialNumItems: 10 },
   );
 
   return {
@@ -37,6 +37,43 @@ export function useMyRoom() {
   };
 }
 
+export function useMyCommunityRoom(communityId: string | undefined) {
+  const room = useQuery(
+    api.rooms.getMyCommunityRoom,
+    communityId ? { communityId: communityId as Id<"communities"> } : "skip",
+  );
+
+  return {
+    room: room ?? null,
+    isLoading: room === undefined && !!communityId,
+  };
+}
+
+export function useCommunityRooms(
+  communityId: string | undefined,
+  search?: string,
+) {
+  const trimmedSearch = search?.trim();
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.rooms.listCommunityRoomsPaginated,
+    communityId
+      ? {
+          communityId: communityId as Id<"communities">,
+          ...(trimmedSearch ? { search: trimmedSearch } : {}),
+        }
+      : "skip",
+    { initialNumItems: 10 },
+  );
+
+  return {
+    rooms: results,
+    isLoading: status === "LoadingFirstPage",
+    isLoadingMore: status === "LoadingMore",
+    canLoadMore: status === "CanLoadMore",
+    loadMore,
+  };
+}
+
 export function useFriendsInRooms() {
   const friendsInRooms = useQuery(api.rooms.getFriendsInRooms, {});
 
@@ -49,7 +86,7 @@ export function useFriendsInRooms() {
 export function useRoomParticipants(roomId: string | undefined) {
   const data = useQuery(
     api.rooms.getParticipants,
-    roomId ? { roomId: roomId as Id<"rooms"> } : "skip"
+    roomId ? { roomId: roomId as Id<"rooms"> } : "skip",
   );
 
   return {
@@ -65,4 +102,20 @@ export function useRoomHeartbeat() {
 
 export function useDisconnectPresence() {
   return useMutation(api.presence.disconnect);
+}
+
+export function useCreateRoom() {
+  return useMutation(api.rooms.create);
+}
+
+export function useUpdateRoom() {
+  return useMutation(api.rooms.update);
+}
+
+export function useActivateRoom() {
+  return useMutation(api.rooms.activate);
+}
+
+export function useDeactivateRoom() {
+  return useMutation(api.rooms.deactivate);
 }

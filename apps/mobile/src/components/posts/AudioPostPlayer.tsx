@@ -1,9 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
-import {
-  cacheDirectory,
-  downloadAsync,
-} from "expo-file-system/legacy";
+import { cacheDirectory, downloadAsync } from "expo-file-system/legacy";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -40,14 +37,19 @@ export default function AudioPostPlayer({
     updateInterval: 250,
   });
   const status = useAudioPlayerStatus(player);
-  const unsupportedReason = getUnsupportedAudioReason(audioUrl);
+  const staticUnsupportedReason = getUnsupportedAudioReason(audioUrl);
   const [progressWidth, setProgressWidth] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [hasRequestedPlayback, setHasRequestedPlayback] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadedUri, setDownloadedUri] = useState<string | null>(null);
+  const [remoteUnsupportedReason, setRemoteUnsupportedReason] = useState<
+    string | null
+  >(null);
+  const unsupportedReason = staticUnsupportedReason ?? remoteUnsupportedReason;
 
-  const displayDuration = status.duration > 0 ? status.duration : duration ?? 0;
+  const displayDuration =
+    status.duration > 0 ? status.duration : (duration ?? 0);
   const currentTime = displayDuration
     ? Math.min(status.currentTime, displayDuration)
     : status.currentTime;
@@ -63,6 +65,7 @@ export default function AudioPostPlayer({
     setError(null);
     setHasRequestedPlayback(false);
     setIsDownloading(false);
+    setRemoteUnsupportedReason(null);
   }, [audioUrl, player]);
 
   useEffect(() => {
@@ -124,6 +127,12 @@ export default function AudioPostPlayer({
       let playableUri = downloadedUri;
       if (!playableUri) {
         setIsDownloading(true);
+        const remoteReason = await getRemoteUnsupportedAudioReason(audioUrl);
+        if (remoteReason) {
+          setRemoteUnsupportedReason(remoteReason);
+          setHasRequestedPlayback(false);
+          return;
+        }
         playableUri = await downloadAudioToCache(audioUrl, title);
         setDownloadedUri(playableUri);
         player.replace({
@@ -203,7 +212,10 @@ export default function AudioPostPlayer({
         </Pressable>
 
         <View style={styles.meta}>
-          <Text numberOfLines={1} style={[styles.title, { color: colors.foreground }]}>
+          <Text
+            numberOfLines={1}
+            style={[styles.title, { color: colors.foreground }]}
+          >
             {title ?? "Audio post"}
           </Text>
           <Text style={[styles.time, { color: colors.mutedForeground }]}>
@@ -230,7 +242,9 @@ export default function AudioPostPlayer({
       </Pressable>
 
       {error ? (
-        <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text>
+        <Text style={[styles.error, { color: colors.destructive }]}>
+          {error}
+        </Text>
       ) : null}
       {unsupportedReason ? (
         <Text style={[styles.unsupported, { color: colors.primary }]}>
@@ -265,7 +279,7 @@ async function downloadAudioToCache(audioUrl: string, title?: string | null) {
   const result = await withTimeout(
     downloadAsync(audioUrl, fileUri),
     AUDIO_DOWNLOAD_TIMEOUT_MS,
-    "Audio download timed out."
+    "Audio download timed out.",
   );
 
   if (result.status < 200 || result.status >= 300) {
@@ -300,7 +314,32 @@ function getUnsupportedAudioReason(audioUrl: string) {
   return null;
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+async function getRemoteUnsupportedAudioReason(audioUrl: string) {
+  if (Platform.OS !== "ios") return null;
+
+  try {
+    const response = await withTimeout(
+      fetch(audioUrl, { method: "HEAD" }),
+      5000,
+      "Audio metadata check timed out.",
+    );
+    const contentType =
+      response.headers.get("content-type")?.toLowerCase() ?? "";
+    if (contentType.includes("webm") || contentType.includes("ogg")) {
+      return "This audio was recorded as WebM/Opus, which iOS cannot play yet.";
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+) {
   return new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
     promise.then(
@@ -311,7 +350,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
       (error) => {
         clearTimeout(timeout);
         reject(error);
-      }
+      },
     );
   });
 }

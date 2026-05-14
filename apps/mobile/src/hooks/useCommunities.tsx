@@ -22,7 +22,7 @@ export function useCommunities(filters?: CommunityFilters) {
       ...(trimmedSearch ? { search: trimmedSearch } : {}),
       ...(filters?.tag ? { tag: filters.tag } : {}),
     },
-    { initialNumItems: 20 }
+    { initialNumItems: 20 },
   );
 
   return {
@@ -41,7 +41,7 @@ export function useCommunities(filters?: CommunityFilters) {
 export function useCommunity(handle: string) {
   const result = useQuery(
     api.communities.getByHandle,
-    handle ? { handle } : "skip"
+    handle ? { handle } : "skip",
   );
 
   return {
@@ -53,7 +53,7 @@ export function useCommunity(handle: string) {
 export function useCommunityById(communityId: string) {
   const result = useQuery(
     api.communities.getById,
-    communityId ? { communityId: communityId as Id<"communities"> } : "skip"
+    communityId ? { communityId: communityId as Id<"communities"> } : "skip",
   );
 
   return {
@@ -66,7 +66,7 @@ export function useJoinedCommunities() {
   const { results, status, loadMore } = usePaginatedQuery(
     api.communities.getJoined,
     {},
-    { initialNumItems: 50 }
+    { initialNumItems: 50 },
   );
 
   return {
@@ -80,17 +80,29 @@ export function useJoinedCommunities() {
 export function useMemberRole(communityId: string) {
   const result = useQuery(
     api.communities.getMemberRole,
-    communityId ? { communityId: communityId as Id<"communities"> } : "skip"
+    communityId ? { communityId: communityId as Id<"communities"> } : "skip",
   );
 
   return result ?? null;
+}
+
+export function useCommunityJamAvailability(communityId: string) {
+  const result = useQuery(
+    api.communities.getJamAvailability,
+    communityId ? { communityId: communityId as Id<"communities"> } : "skip",
+  );
+
+  return {
+    data: result ?? { enabled: false },
+    isLoading: result === undefined && !!communityId,
+  };
 }
 
 export function useCommunityMembers(communityId: string) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.communities.getMembersPaginated,
     communityId ? { communityId: communityId as Id<"communities"> } : "skip",
-    { initialNumItems: 30 }
+    { initialNumItems: 30 },
   );
 
   return {
@@ -102,13 +114,16 @@ export function useCommunityMembers(communityId: string) {
   };
 }
 
-export function useSearchCommunityMembers(communityId: string, username: string) {
+export function useSearchCommunityMembers(
+  communityId: string,
+  username: string,
+) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.communities.searchMembersPaginated,
     communityId && username.length >= 2
       ? { communityId: communityId as Id<"communities">, username }
       : "skip",
-    { initialNumItems: 20 }
+    { initialNumItems: 20 },
   );
 
   return {
@@ -166,7 +181,10 @@ export function useCreateCommunity() {
 
   return {
     isPending,
-    mutate: (variables: Parameters<typeof run>[0], options?: MutationOptions) => {
+    mutate: (
+      variables: Parameters<typeof run>[0],
+      options?: MutationOptions,
+    ) => {
       run(variables)
         .then(() => options?.onSuccess?.())
         .catch((error) => options?.onError?.(error as Error));
@@ -208,7 +226,10 @@ export function useUpdateCommunity() {
 
   return {
     isPending,
-    mutate: (variables: Parameters<typeof run>[0], options?: MutationOptions) => {
+    mutate: (
+      variables: Parameters<typeof run>[0],
+      options?: MutationOptions,
+    ) => {
       run(variables)
         .then(() => options?.onSuccess?.())
         .catch((error) => options?.onError?.(error as Error));
@@ -224,7 +245,9 @@ export function useJoinCommunity() {
   const run = async (communityId: string) => {
     setIsPending(true);
     try {
-      return await joinMutation({ communityId: communityId as Id<"communities"> });
+      return await joinMutation({
+        communityId: communityId as Id<"communities">,
+      });
     } finally {
       setIsPending(false);
     }
@@ -248,7 +271,9 @@ export function useLeaveCommunity() {
   const run = async (communityId: string) => {
     setIsPending(true);
     try {
-      return await leaveMutation({ communityId: communityId as Id<"communities"> });
+      return await leaveMutation({
+        communityId: communityId as Id<"communities">,
+      });
     } finally {
       setIsPending(false);
     }
@@ -285,7 +310,7 @@ export function usePromoteMod() {
     isPending,
     mutate: (
       args: { communityId: string; profileId: string },
-      options?: MutationOptions
+      options?: MutationOptions,
     ) => {
       run(args.communityId, args.profileId)
         .then(() => options?.onSuccess?.())
@@ -316,7 +341,7 @@ export function useDemoteMod() {
     isPending,
     mutate: (
       args: { communityId: string; profileId: string },
-      options?: MutationOptions
+      options?: MutationOptions,
     ) => {
       run(args.communityId, args.profileId)
         .then(() => options?.onSuccess?.())
@@ -347,7 +372,7 @@ export function useRemoveMember() {
     isPending,
     mutate: (
       args: { communityId: string; profileId: string },
-      options?: MutationOptions
+      options?: MutationOptions,
     ) => {
       run(args.communityId, args.profileId)
         .then(() => options?.onSuccess?.())

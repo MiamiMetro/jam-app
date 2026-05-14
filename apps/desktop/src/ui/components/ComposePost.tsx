@@ -3,14 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Music,
-  Upload,
-  Mic,
-  Trash2,
-  Play,
-  Pause,
-} from "lucide-react";
+import { Music, Upload, Mic, Trash2, Play, Pause } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
@@ -63,7 +56,7 @@ export function ComposePost({
     deleteRecording,
     getAudioFile,
   } = useAudioRecorder();
-  
+
   // Audio player for recorded audio preview
   const recordedAudioPlayer = useAudioPlayer(recordedAudio?.url);
   const isBusy = isSubmitting || isSubmittingLocal;
@@ -74,10 +67,10 @@ export function ComposePost({
       onGuestAction?.();
       return;
     }
-    
+
     // Get recorded audio if available, otherwise use uploaded file
     const audioFile = recordedAudio ? getAudioFile() : newPost.audioFile;
-    
+
     if (!newPost.content.trim() && !audioFile) return;
 
     try {
@@ -105,6 +98,11 @@ export function ComposePost({
   };
 
   const handleUploadAudio = (file: File) => {
+    if (!isMobileCompatibleAudioFile(file)) {
+      setSubmitError("Please upload MP3, M4A, MP4, AAC, or WAV audio.");
+      return;
+    }
+
     // If recording exists, delete it first
     if (recordedAudio) {
       deleteRecording();
@@ -136,7 +134,6 @@ export function ComposePost({
     deleteRecording();
   };
 
-
   if (isGuest) return null;
 
   return (
@@ -149,7 +146,10 @@ export function ComposePost({
           aria-label="Go to profile"
         >
           <Avatar size="lg" className="pointer-events-none">
-            <AvatarImage src={user?.avatar_url || ""} alt={user?.username || "You"} />
+            <AvatarImage
+              src={user?.avatar_url || ""}
+              alt={user?.username || "You"}
+            />
             <AvatarFallback className="bg-primary text-primary-foreground">
               {user?.username?.substring(0, 2).toUpperCase() || "U"}
             </AvatarFallback>
@@ -192,10 +192,12 @@ export function ComposePost({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <Music className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium truncate">Voice Recording</span>
+                  <span className="text-sm font-medium truncate">
+                    Voice Recording
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div 
+                  <div
                     className="flex-1 h-1.5 bg-muted-foreground/20 rounded-full overflow-hidden cursor-pointer"
                     onClick={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();
@@ -204,7 +206,7 @@ export function ComposePost({
                       recordedAudioPlayer.seek(percentage);
                     }}
                   >
-                    <div 
+                    <div
                       className="h-full bg-primary transition-all"
                       style={{ width: `${recordedAudioPlayer.progress}%` }}
                     />
@@ -229,7 +231,9 @@ export function ComposePost({
           {newPost.audioFile && !recordedAudio && (
             <div className="flex items-center gap-2 p-3 glass-solid rounded-lg">
               <Music className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm flex-1 truncate">{newPost.audioFile.name}</span>
+              <span className="text-sm flex-1 truncate">
+                {newPost.audioFile.name}
+              </span>
               <Button
                 variant="ghost"
                 size="icon-xs"
@@ -251,7 +255,7 @@ export function ComposePost({
                     ref={audioInputRef}
                     id={inputId}
                     type="file"
-                    accept="audio/*"
+                    accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,.mp3,.m4a,.mp4,.aac,.wav"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -273,15 +277,21 @@ export function ComposePost({
                     <Upload className="h-4 w-4 mr-2" />
                     Upload Audio
                   </Button>
-                  
+
                   {/* Microphone Button */}
                   <Button
                     variant={isRecording ? "default" : "ghost"}
                     size="sm"
                     type="button"
-                    onClick={isRecording ? handleStopRecording : handleStartRecording}
+                    onClick={
+                      isRecording ? handleStopRecording : handleStartRecording
+                    }
                     disabled={isBusy}
-                    className={isRecording ? "bg-red-500 hover:bg-red-600 text-white" : "text-muted-foreground hover:text-foreground"}
+                    className={
+                      isRecording
+                        ? "bg-red-500 hover:bg-red-600 text-white"
+                        : "text-muted-foreground hover:text-foreground"
+                    }
                   >
                     <Mic className="h-4 w-4 mr-2" />
                     {isRecording ? "Stop" : "Record"}
@@ -298,9 +308,23 @@ export function ComposePost({
               onClick={() => {
                 void handleCreatePost();
               }}
-              disabled={(!newPost.content.trim() && !newPost.audioFile && !recordedAudio) || isRecording || isBusy}
+              disabled={
+                (!newPost.content.trim() &&
+                  !newPost.audioFile &&
+                  !recordedAudio) ||
+                isRecording ||
+                isBusy
+              }
               size="sm"
-              className={(newPost.content.trim() || newPost.audioFile || recordedAudio) && !isRecording && !isBusy ? "glow-primary" : ""}
+              className={
+                (newPost.content.trim() ||
+                  newPost.audioFile ||
+                  recordedAudio) &&
+                !isRecording &&
+                !isBusy
+                  ? "glow-primary"
+                  : ""
+              }
             >
               {isBusy ? "Uploading..." : submitButtonText}
             </Button>
@@ -311,3 +335,11 @@ export function ComposePost({
   );
 }
 
+function isMobileCompatibleAudioFile(file: File) {
+  const name = file.name.toLowerCase();
+  const type = file.type.toLowerCase();
+
+  if (name.endsWith(".webm") || name.endsWith(".ogg")) return false;
+  if (type.includes("webm") || type.includes("ogg")) return false;
+  return true;
+}

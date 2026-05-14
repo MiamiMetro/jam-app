@@ -6,6 +6,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Modal,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -14,10 +15,12 @@ import {
   View,
 } from "react-native";
 
+import JamItem from "@/components/jams/JamItem";
 import ComposePost from "@/components/posts/ComposePost";
 import PostItem from "@/components/posts/PostItem";
 import {
   useCommunity,
+  useCommunityJamAvailability,
   useCommunityMembers,
   useDemoteMod,
   useJoinCommunity,
@@ -29,11 +32,21 @@ import {
 } from "@/hooks/useCommunities";
 import { useMyProfile } from "@/hooks/useMyProfile";
 import { useCommunityPosts } from "@/hooks/usePosts";
+import {
+  useActivateRoom,
+  useCommunityRooms,
+  useCreateRoom,
+  useDeactivateRoom,
+  useMyCommunityRoom,
+  useUpdateRoom,
+} from "@/hooks/useRooms";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
-import type { CommunityMemberItem, PostFeedItem } from "@/types";
+import type { CommunityMemberItem, PostFeedItem, RoomFeedItem } from "@/types";
+import type { Id } from "@jam-app/convex";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CommunityDetail">;
-type DetailTab = "feed" | "moderation";
+type DetailTab = "feed" | "jam" | "moderation";
+type ListItem = PostFeedItem | CommunityMemberItem | RoomFeedItem;
 
 const THEME_COLOR_VALUES: Record<string, string> = {
   amber: "#D8A64A",
@@ -64,11 +77,26 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
   const promoteMod = usePromoteMod();
   const demoteMod = useDemoteMod();
   const removeMember = useRemoveMember();
+  const createRoom = useCreateRoom();
+  const updateRoom = useUpdateRoom();
+  const activateRoom = useActivateRoom();
+  const deactivateRoom = useDeactivateRoom();
 
   const [activeTab, setActiveTab] = useState<DetailTab>("feed");
   const [memberSearch, setMemberSearch] = useState("");
+  const [roomFormOpen, setRoomFormOpen] = useState(false);
+  const [roomFormMode, setRoomFormMode] = useState<"create" | "edit">("create");
+  const [roomName, setRoomName] = useState("");
+  const [roomHandle, setRoomHandle] = useState("");
+  const [roomDescription, setRoomDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pendingMemberAction, setPendingMemberAction] = useState<string | null>(null);
+  const [roomActionError, setRoomActionError] = useState<string | null>(null);
+  const [pendingRoomAction, setPendingRoomAction] = useState<string | null>(
+    null,
+  );
+  const [pendingMemberAction, setPendingMemberAction] = useState<string | null>(
+    null,
+  );
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [bannerFailed, setBannerFailed] = useState(false);
 
@@ -79,6 +107,17 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
     canLoadMore: canLoadMorePosts,
     loadMore: loadMorePosts,
   } = useCommunityPosts(community?.id);
+
+  const jamAvailability = useCommunityJamAvailability(community?.id ?? "");
+  const {
+    rooms: communityRooms,
+    isLoading: communityRoomsLoading,
+    isLoadingMore: communityRoomsLoadingMore,
+    canLoadMore: canLoadMoreCommunityRooms,
+    loadMore: loadMoreCommunityRooms,
+  } = useCommunityRooms(community?.id);
+  const { room: myCommunityRoom, isLoading: myCommunityRoomLoading } =
+    useMyCommunityRoom(community?.id);
 
   const {
     data: members,
@@ -101,26 +140,47 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
     }
   }, [activeTab, canModerate]);
 
+  const showJamTab =
+    jamAvailability.data.enabled ||
+    communityRooms.length > 0 ||
+    myCommunityRoom !== null;
+
+  useEffect(() => {
+    if (!showJamTab && activeTab === "jam") {
+      setActiveTab("feed");
+    }
+  }, [activeTab, showJamTab]);
+
   const visiblePosts = useMemo(
     () => posts.filter((post) => !post.deleted_at),
-    [posts]
+    [posts],
   );
   const displayedMembers =
     trimmedMemberSearch.length >= 2 ? searchedMembers : members;
-  const listData: Array<PostFeedItem | CommunityMemberItem> =
-    activeTab === "feed" ? visiblePosts : displayedMembers;
+  const listData: ListItem[] =
+    activeTab === "feed"
+      ? visiblePosts
+      : activeTab === "jam"
+        ? (communityRooms as RoomFeedItem[])
+        : displayedMembers;
   const contentIsLoading =
     activeTab === "feed"
       ? postsLoading
-      : trimmedMemberSearch.length >= 2
-        ? searchLoading
-        : membersLoading;
+      : activeTab === "jam"
+        ? communityRoomsLoading ||
+          myCommunityRoomLoading ||
+          jamAvailability.isLoading
+        : trimmedMemberSearch.length >= 2
+          ? searchLoading
+          : membersLoading;
   const contentIsLoadingMore =
     activeTab === "feed"
       ? postsLoadingMore
-      : trimmedMemberSearch.length >= 2
-        ? searchedMembersLoadingMore
-        : membersLoadingMore;
+      : activeTab === "jam"
+        ? communityRoomsLoadingMore
+        : trimmedMemberSearch.length >= 2
+          ? searchedMembersLoadingMore
+          : membersLoadingMore;
 
   const handleJoin = async () => {
     if (!community || joinCommunity.isPending) return;
@@ -146,7 +206,7 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
 
   const runMemberAction = async (
     action: "promote" | "demote" | "remove",
-    memberId: string
+    memberId: string,
   ) => {
     if (!community || pendingMemberAction) return;
 
@@ -154,11 +214,20 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
       setError(null);
       setPendingMemberAction(`${action}:${memberId}`);
       if (action === "promote") {
-        await promoteMod.mutateAsync({ communityId: community.id, profileId: memberId });
+        await promoteMod.mutateAsync({
+          communityId: community.id,
+          profileId: memberId,
+        });
       } else if (action === "demote") {
-        await demoteMod.mutateAsync({ communityId: community.id, profileId: memberId });
+        await demoteMod.mutateAsync({
+          communityId: community.id,
+          profileId: memberId,
+        });
       } else {
-        await removeMember.mutateAsync({ communityId: community.id, profileId: memberId });
+        await removeMember.mutateAsync({
+          communityId: community.id,
+          profileId: memberId,
+        });
       }
     } catch (err) {
       setError(getCommunityErrorMessage(err));
@@ -178,8 +247,99 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
           style: "destructive",
           text: "Remove",
         },
-      ]
+      ],
     );
+  };
+
+  const openCreateRoomForm = () => {
+    if (!community) return;
+
+    setRoomFormMode("create");
+    setRoomName(`${community.name} Jam`);
+    setRoomHandle(suggestRoomHandle(community.handle, profile?.username));
+    setRoomDescription("");
+    setRoomActionError(null);
+    setRoomFormOpen(true);
+  };
+
+  const openEditRoomForm = () => {
+    if (!myCommunityRoom) return;
+
+    setRoomFormMode("edit");
+    setRoomName(myCommunityRoom.name);
+    setRoomHandle(myCommunityRoom.handle);
+    setRoomDescription(myCommunityRoom.description ?? "");
+    setRoomActionError(null);
+    setRoomFormOpen(true);
+  };
+
+  const submitRoomForm = async () => {
+    if (!community || pendingRoomAction) return;
+
+    const trimmedName = roomName.trim();
+    const trimmedHandle = roomHandle.trim().toLowerCase();
+    const trimmedDescription = roomDescription.trim();
+
+    if (trimmedName.length < 3) {
+      setRoomActionError("Room name must be at least 3 characters.");
+      return;
+    }
+    if (roomFormMode === "create" && !/^[a-z0-9-]{3,32}$/.test(trimmedHandle)) {
+      setRoomActionError(
+        "Handle must be 3-32 lowercase letters, numbers, or hyphens.",
+      );
+      return;
+    }
+
+    try {
+      setPendingRoomAction(roomFormMode);
+      setRoomActionError(null);
+
+      if (roomFormMode === "create") {
+        await createRoom({
+          communityId: community.id as Id<"communities">,
+          description: trimmedDescription || undefined,
+          handle: trimmedHandle,
+          isPrivate: false,
+          maxPerformers: 5,
+          name: trimmedName,
+        });
+      } else if (myCommunityRoom) {
+        await updateRoom({
+          description: trimmedDescription || undefined,
+          name: trimmedName,
+          roomId: myCommunityRoom.id as Id<"rooms">,
+        });
+      }
+
+      setRoomFormOpen(false);
+    } catch (err) {
+      setRoomActionError(getRoomErrorMessage(err));
+    } finally {
+      setPendingRoomAction(null);
+    }
+  };
+
+  const toggleMyCommunityRoom = async () => {
+    if (!myCommunityRoom || pendingRoomAction) return;
+
+    try {
+      setPendingRoomAction("toggle");
+      setRoomActionError(null);
+      if (myCommunityRoom.is_active) {
+        await deactivateRoom({ roomId: myCommunityRoom.id as Id<"rooms"> });
+      } else {
+        await activateRoom({ roomId: myCommunityRoom.id as Id<"rooms"> });
+      }
+    } catch (err) {
+      setRoomActionError(getRoomErrorMessage(err));
+    } finally {
+      setPendingRoomAction(null);
+    }
+  };
+
+  const openRoom = (room: Pick<RoomFeedItem, "handle">) => {
+    navigation.navigate("JamRoom", { handle: room.handle });
   };
 
   if (isLoading) {
@@ -207,8 +367,10 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
     );
   }
 
-  const accent = THEME_COLOR_VALUES[community.theme_color] ?? THEME_COLOR_VALUES.amber;
-  const isJoiningOrLeaving = joinCommunity.isPending || leaveCommunity.isPending;
+  const accent =
+    THEME_COLOR_VALUES[community.theme_color] ?? THEME_COLOR_VALUES.amber;
+  const isJoiningOrLeaving =
+    joinCommunity.isPending || leaveCommunity.isPending;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -219,7 +381,11 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
         ]}
         data={listData}
         keyExtractor={(item) =>
-          isPostItem(item) ? item.id : `member:${item.id}:${item.role}`
+          isPostItem(item)
+            ? item.id
+            : isRoomItem(item)
+              ? `room:${item.id}`
+              : `member:${item.id}:${item.role}`
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
@@ -227,25 +393,43 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
               <>
                 <ActivityIndicator color="#D8A64A" />
                 <Text style={styles.stateText}>
-                  {activeTab === "feed" ? "Loading posts..." : "Loading members..."}
+                  {activeTab === "feed"
+                    ? "Loading posts..."
+                    : activeTab === "jam"
+                      ? "Loading jam rooms..."
+                      : "Loading members..."}
                 </Text>
               </>
             ) : (
               <>
                 <Ionicons
                   color="#4B5565"
-                  name={activeTab === "feed" ? "chatbubbles-outline" : "people-outline"}
+                  name={
+                    activeTab === "feed"
+                      ? "chatbubbles-outline"
+                      : activeTab === "jam"
+                        ? "radio-outline"
+                        : "people-outline"
+                  }
                   size={34}
                 />
                 <Text style={styles.emptyTitle}>
-                  {activeTab === "feed" ? "No posts yet" : "No members found"}
+                  {activeTab === "feed"
+                    ? "No posts yet"
+                    : activeTab === "jam"
+                      ? "No active rooms"
+                      : "No members found"}
                 </Text>
                 <Text style={styles.stateText}>
                   {activeTab === "feed"
                     ? isMember
                       ? "Be the first to post here."
                       : "Join to start posting."
-                    : "Try another username."}
+                    : activeTab === "jam"
+                      ? isMember
+                        ? "Create or activate your room to start jamming."
+                        : "Join this community to see jam controls."
+                      : "Try another username."}
                 </Text>
               </>
             )}
@@ -275,7 +459,10 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                 <View
                   style={[
                     styles.communityAvatar,
-                    { backgroundColor: `${accent}22`, borderColor: `${accent}55` },
+                    {
+                      backgroundColor: `${accent}22`,
+                      borderColor: `${accent}55`,
+                    },
                   ]}
                 >
                   {community.avatar_url && !avatarFailed ? (
@@ -285,7 +472,9 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                       style={styles.avatarImage}
                     />
                   ) : (
-                    <Text style={[styles.communityAvatarText, { color: accent }]}>
+                    <Text
+                      style={[styles.communityAvatarText, { color: accent }]}
+                    >
                       {community.name.slice(0, 2).toUpperCase()}
                     </Text>
                   )}
@@ -310,7 +499,12 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                   {community.posts_count === 1 ? "" : "s"}
                 </Text>
                 {effectiveRole ? (
-                  <View style={[styles.roleBadge, { backgroundColor: `${accent}22` }]}>
+                  <View
+                    style={[
+                      styles.roleBadge,
+                      { backgroundColor: `${accent}22` },
+                    ]}
+                  >
                     <Text style={[styles.roleBadgeText, { color: accent }]}>
                       {formatRole(effectiveRole)}
                     </Text>
@@ -327,9 +521,14 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                   {community.tags.map((tag) => (
                     <View
                       key={tag}
-                      style={[styles.tagPill, { backgroundColor: `${accent}18` }]}
+                      style={[
+                        styles.tagPill,
+                        { backgroundColor: `${accent}18` },
+                      ]}
                     >
-                      <Text style={[styles.tagText, { color: accent }]}>{tag}</Text>
+                      <Text style={[styles.tagText, { color: accent }]}>
+                        {tag}
+                      </Text>
                     </View>
                   ))}
                 </View>
@@ -345,7 +544,9 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                   ]}
                 >
                   {isJoiningOrLeaving ? (
-                    <ActivityIndicator color={isMember ? "#D5D9E2" : "#251B0A"} />
+                    <ActivityIndicator
+                      color={isMember ? "#D5D9E2" : "#251B0A"}
+                    />
                   ) : (
                     <Text
                       style={[
@@ -365,7 +566,10 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
             <View style={styles.tabs}>
               <Pressable
                 onPress={() => setActiveTab("feed")}
-                style={[styles.tabButton, activeTab === "feed" ? styles.tabButtonActive : null]}
+                style={[
+                  styles.tabButton,
+                  activeTab === "feed" ? styles.tabButtonActive : null,
+                ]}
               >
                 <Text
                   style={[
@@ -376,6 +580,29 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                   Feed
                 </Text>
               </Pressable>
+              {showJamTab ? (
+                <Pressable
+                  onPress={() => setActiveTab("jam")}
+                  style={[
+                    styles.tabButton,
+                    activeTab === "jam" ? styles.tabButtonActive : null,
+                  ]}
+                >
+                  <Ionicons
+                    color={activeTab === "jam" ? "#D8A64A" : "#8F98A8"}
+                    name="musical-notes-outline"
+                    size={15}
+                  />
+                  <Text
+                    style={[
+                      styles.tabButtonText,
+                      activeTab === "jam" ? styles.tabButtonTextActive : null,
+                    ]}
+                  >
+                    Jam
+                  </Text>
+                </Pressable>
+              ) : null}
               {canModerate ? (
                 <Pressable
                   onPress={() => setActiveTab("moderation")}
@@ -392,7 +619,9 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                   <Text
                     style={[
                       styles.tabButtonText,
-                      activeTab === "moderation" ? styles.tabButtonTextActive : null,
+                      activeTab === "moderation"
+                        ? styles.tabButtonTextActive
+                        : null,
                     ]}
                   >
                     Moderation
@@ -410,9 +639,25 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                 />
               ) : (
                 <View style={styles.joinHint}>
-                  <Text style={styles.joinHintText}>Join this community to post.</Text>
+                  <Text style={styles.joinHintText}>
+                    Join this community to post.
+                  </Text>
                 </View>
               )
+            ) : activeTab === "jam" ? (
+              <CommunityJamPanel
+                accent={accent}
+                canCreateRoom={jamAvailability.data.enabled}
+                isMember={isMember}
+                isMyRoomLoading={myCommunityRoomLoading}
+                myRoom={myCommunityRoom as RoomFeedItem | null}
+                onCreateRoom={openCreateRoomForm}
+                onEditRoom={openEditRoomForm}
+                onOpenRoom={openRoom}
+                onToggleRoom={toggleMyCommunityRoom}
+                pendingAction={pendingRoomAction}
+                roomActionError={roomActionError}
+              />
             ) : (
               <View style={styles.searchPanel}>
                 <View style={styles.searchBox}>
@@ -426,7 +671,10 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                     value={memberSearch}
                   />
                   {memberSearch ? (
-                    <Pressable onPress={() => setMemberSearch("")} style={styles.clearButton}>
+                    <Pressable
+                      onPress={() => setMemberSearch("")}
+                      style={styles.clearButton}
+                    >
                       <Ionicons color="#8F98A8" name="close" size={16} />
                     </Pressable>
                   ) : null}
@@ -442,6 +690,12 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
             }
             return;
           }
+          if (activeTab === "jam") {
+            if (canLoadMoreCommunityRooms && !communityRoomsLoadingMore) {
+              loadMoreCommunityRooms(10);
+            }
+            return;
+          }
           if (
             trimmedMemberSearch.length < 2 &&
             hasMoreMembers &&
@@ -454,6 +708,8 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
         renderItem={({ item }) =>
           isPostItem(item) ? (
             <PostItem post={item} />
+          ) : isRoomItem(item) ? (
+            <JamItem onPress={() => openRoom(item)} room={item} />
           ) : (
             <MemberRow
               canModerateAsMod={isMod}
@@ -469,6 +725,24 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
           )
         }
       />
+      <RoomFormModal
+        description={roomDescription}
+        handle={roomHandle}
+        isSubmitting={
+          pendingRoomAction === "create" || pendingRoomAction === "edit"
+        }
+        mode={roomFormMode}
+        name={roomName}
+        onChangeDescription={setRoomDescription}
+        onChangeHandle={(value) => setRoomHandle(value.toLowerCase())}
+        onChangeName={setRoomName}
+        onClose={() => {
+          if (!pendingRoomAction) setRoomFormOpen(false);
+        }}
+        onSubmit={submitRoomForm}
+        error={roomActionError}
+        visible={roomFormOpen}
+      />
     </SafeAreaView>
   );
 }
@@ -483,6 +757,251 @@ function Header({ onBack, title }: { onBack: () => void; title: string }) {
         {title}
       </Text>
     </View>
+  );
+}
+
+function CommunityJamPanel({
+  accent,
+  canCreateRoom,
+  isMember,
+  isMyRoomLoading,
+  myRoom,
+  onCreateRoom,
+  onEditRoom,
+  onOpenRoom,
+  onToggleRoom,
+  pendingAction,
+  roomActionError,
+}: {
+  accent: string;
+  canCreateRoom: boolean;
+  isMember: boolean;
+  isMyRoomLoading: boolean;
+  myRoom: RoomFeedItem | null;
+  onCreateRoom: () => void;
+  onEditRoom: () => void;
+  onOpenRoom: (room: Pick<RoomFeedItem, "handle">) => void;
+  onToggleRoom: () => void;
+  pendingAction: string | null;
+  roomActionError: string | null;
+}) {
+  if (!isMember) {
+    return (
+      <View style={styles.jamPanel}>
+        <Text style={styles.jamPanelTitle}>Community jam rooms</Text>
+        <Text style={styles.jamPanelText}>
+          Join this community to enter or host rooms.
+        </Text>
+      </View>
+    );
+  }
+
+  if (isMyRoomLoading) {
+    return (
+      <View style={styles.jamPanel}>
+        <ActivityIndicator color={accent} />
+      </View>
+    );
+  }
+
+  if (!canCreateRoom && !myRoom) {
+    return (
+      <View style={styles.jamPanel}>
+        <Text style={styles.jamPanelTitle}>Jam is not enabled</Text>
+        <Text style={styles.jamPanelText}>
+          A moderator needs to configure a jam server before rooms can be
+          hosted.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.jamPanel}>
+      <View style={styles.jamPanelHeader}>
+        <View style={styles.jamPanelHeaderText}>
+          <Text style={styles.jamPanelTitle}>Community jam rooms</Text>
+          <Text style={styles.jamPanelText}>
+            Enter active rooms or host one room for this community.
+          </Text>
+        </View>
+        {!myRoom ? (
+          <Pressable
+            onPress={onCreateRoom}
+            style={[styles.primarySmallButton, { backgroundColor: accent }]}
+          >
+            <Text style={styles.primarySmallButtonText}>Create</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {myRoom ? (
+        <View style={styles.myRoomCard}>
+          <View style={styles.myRoomHeader}>
+            <View style={styles.myRoomTitleBlock}>
+              <Text numberOfLines={1} style={styles.myRoomTitle}>
+                {myRoom.name}
+              </Text>
+              <Text style={styles.myRoomHandle}>jam/{myRoom.handle}</Text>
+            </View>
+            <View
+              style={[
+                styles.roomStatusBadge,
+                {
+                  backgroundColor: myRoom.is_active
+                    ? "rgba(34,197,94,0.12)"
+                    : "#353B49",
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.roomStatusText,
+                  { color: myRoom.is_active ? "#22C55E" : "#D5D9E2" },
+                ]}
+              >
+                {myRoom.is_active ? "Active" : "Disabled"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.myRoomActions}>
+            <Pressable
+              onPress={() => onOpenRoom(myRoom)}
+              style={styles.secondarySmallButton}
+            >
+              <Text style={styles.secondarySmallButtonText}>Enter</Text>
+            </Pressable>
+            <Pressable onPress={onEditRoom} style={styles.secondarySmallButton}>
+              <Text style={styles.secondarySmallButtonText}>Settings</Text>
+            </Pressable>
+            <Pressable
+              disabled={pendingAction === "toggle"}
+              onPress={onToggleRoom}
+              style={styles.secondarySmallButton}
+            >
+              {pendingAction === "toggle" ? (
+                <ActivityIndicator color="#D8A64A" size="small" />
+              ) : (
+                <Text style={styles.secondarySmallButtonText}>
+                  {myRoom.is_active ? "Disable" : "Activate"}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      {roomActionError ? (
+        <Text style={styles.error}>{roomActionError}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function RoomFormModal({
+  description,
+  error,
+  handle,
+  isSubmitting,
+  mode,
+  name,
+  onChangeDescription,
+  onChangeHandle,
+  onChangeName,
+  onClose,
+  onSubmit,
+  visible,
+}: {
+  description: string;
+  error: string | null;
+  handle: string;
+  isSubmitting: boolean;
+  mode: "create" | "edit";
+  name: string;
+  onChangeDescription: (value: string) => void;
+  onChangeHandle: (value: string) => void;
+  onChangeName: (value: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  visible: boolean;
+}) {
+  return (
+    <Modal
+      animationType="fade"
+      onRequestClose={onClose}
+      transparent
+      visible={visible}
+    >
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalPanel}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {mode === "create" ? "Create community room" : "Room settings"}
+            </Text>
+            <Pressable onPress={onClose} style={styles.iconButton}>
+              <Ionicons color="#8F98A8" name="close" size={18} />
+            </Pressable>
+          </View>
+
+          <Text style={styles.fieldLabel}>Name</Text>
+          <TextInput
+            editable={!isSubmitting}
+            onChangeText={onChangeName}
+            placeholder="Room name"
+            placeholderTextColor="#7E8796"
+            style={styles.modalInput}
+            value={name}
+          />
+
+          {mode === "create" ? (
+            <>
+              <Text style={styles.fieldLabel}>Handle</Text>
+              <TextInput
+                autoCapitalize="none"
+                editable={!isSubmitting}
+                onChangeText={onChangeHandle}
+                placeholder="room-handle"
+                placeholderTextColor="#7E8796"
+                style={styles.modalInput}
+                value={handle}
+              />
+            </>
+          ) : null}
+
+          <Text style={styles.fieldLabel}>Description</Text>
+          <TextInput
+            editable={!isSubmitting}
+            multiline
+            onChangeText={onChangeDescription}
+            placeholder="Describe the room"
+            placeholderTextColor="#7E8796"
+            style={[styles.modalInput, styles.modalTextArea]}
+            textAlignVertical="top"
+            value={description}
+          />
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <Pressable
+            disabled={isSubmitting}
+            onPress={onSubmit}
+            style={[
+              styles.modalSubmitButton,
+              isSubmitting ? styles.modalSubmitButtonDisabled : null,
+            ]}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#251B0A" />
+            ) : (
+              <Text style={styles.modalSubmitText}>
+                {mode === "create" ? "Create room" : "Save changes"}
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -549,7 +1068,9 @@ function MemberRow({
         <View
           style={[
             styles.memberRoleBadge,
-            isOwnerRow || isModRow ? { backgroundColor: `${themeColor}22` } : null,
+            isOwnerRow || isModRow
+              ? { backgroundColor: `${themeColor}22` }
+              : null,
           ]}
         >
           <Text
@@ -577,7 +1098,11 @@ function MemberRow({
             ) : null}
             {canRemove ? (
               <Pressable onPress={onRemove} style={styles.iconButton}>
-                <Ionicons color="#FECACA" name="person-remove-outline" size={16} />
+                <Ionicons
+                  color="#FECACA"
+                  name="person-remove-outline"
+                  size={16}
+                />
               </Pressable>
             ) : null}
           </>
@@ -587,8 +1112,12 @@ function MemberRow({
   );
 }
 
-function isPostItem(item: PostFeedItem | CommunityMemberItem): item is PostFeedItem {
+function isPostItem(item: ListItem): item is PostFeedItem {
   return "author_id" in item;
+}
+
+function isRoomItem(item: ListItem): item is RoomFeedItem {
+  return "host_id" in item && "max_performers" in item;
 }
 
 function formatRole(role: string) {
@@ -624,6 +1153,42 @@ function getCommunityErrorMessage(error: unknown) {
   }
 
   return stripped || "Something went wrong. Please try again.";
+}
+
+function getRoomErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const stripped = message.replace(/^[A-Z_]+:\s*/, "");
+
+  if (message.includes("HANDLE_TAKEN")) {
+    return "That room handle is already in use.";
+  }
+  if (message.includes("ROOM_LIMIT_REACHED")) {
+    return "You can only host one room in this community.";
+  }
+  if (message.includes("COMMUNITY_MEMBER_REQUIRED")) {
+    return "Join this community before hosting a room.";
+  }
+  if (message.includes("JAM_SERVER_NOT_CONFIGURED")) {
+    return "A moderator needs to configure a jam server first.";
+  }
+  if (message.includes("UNAUTHORIZED")) {
+    return "You do not have permission to manage this room.";
+  }
+  if (message.includes("ROOM_NAME_TOO_SHORT")) {
+    return "Room name must be at least 3 characters.";
+  }
+
+  return stripped || "Room action failed. Please try again.";
+}
+
+function suggestRoomHandle(communityHandle: string, username?: string) {
+  const base = `${communityHandle}-${username ?? "room"}`
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32);
+
+  return base.length >= 3 ? base : `room-${Date.now().toString(36)}`;
 }
 
 const styles = StyleSheet.create({
@@ -779,6 +1344,35 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center",
   },
+  jamPanel: {
+    backgroundColor: "#262B37",
+    borderBottomColor: "rgba(255,255,255,0.08)",
+    borderBottomWidth: 1,
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  jamPanelHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  jamPanelHeaderText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  jamPanelText: {
+    color: "#8F98A8",
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  jamPanelTitle: {
+    color: "#EEF0F5",
+    fontSize: 15,
+    fontWeight: "900",
+  },
   memberActions: {
     alignItems: "center",
     flexDirection: "row",
@@ -840,6 +1434,64 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "900",
   },
+  modalBackdrop: {
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.62)",
+    flex: 1,
+    justifyContent: "center",
+    padding: 18,
+  },
+  modalHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  modalInput: {
+    backgroundColor: "#1A1E29",
+    borderColor: "rgba(255,255,255,0.1)",
+    borderRadius: 8,
+    borderWidth: 1,
+    color: "#EEF0F5",
+    fontSize: 15,
+    marginTop: 7,
+    minHeight: 42,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  modalPanel: {
+    backgroundColor: "#262B37",
+    borderColor: "rgba(255,255,255,0.1)",
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 16,
+    width: "100%",
+  },
+  modalSubmitButton: {
+    alignItems: "center",
+    backgroundColor: "#D8A64A",
+    borderRadius: 8,
+    justifyContent: "center",
+    marginTop: 14,
+    minHeight: 42,
+  },
+  modalSubmitButtonDisabled: {
+    opacity: 0.7,
+  },
+  modalSubmitText: {
+    color: "#251B0A",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  modalTextArea: {
+    minHeight: 82,
+  },
+  modalTitle: {
+    color: "#EEF0F5",
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "900",
+  },
   membershipButton: {
     alignItems: "center",
     backgroundColor: "#D8A64A",
@@ -870,6 +1522,57 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
   },
+  fieldLabel: {
+    color: "#B0B7C4",
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 13,
+  },
+  myRoomActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  myRoomCard: {
+    backgroundColor: "#1A1E29",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    padding: 12,
+  },
+  myRoomHandle: {
+    color: "#8F98A8",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  myRoomHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  myRoomTitle: {
+    color: "#EEF0F5",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  myRoomTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  primarySmallButton: {
+    alignItems: "center",
+    borderRadius: 8,
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: 14,
+  },
+  primarySmallButtonText: {
+    color: "#251B0A",
+    fontSize: 13,
+    fontWeight: "900",
+  },
   searchBox: {
     alignItems: "center",
     backgroundColor: "#262B37",
@@ -892,6 +1595,31 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  roomStatusBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  roomStatusText: {
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  secondarySmallButton: {
+    alignItems: "center",
+    backgroundColor: "#353B49",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 34,
+    minWidth: 78,
+    paddingHorizontal: 12,
+  },
+  secondarySmallButtonText: {
+    color: "#D5D9E2",
+    fontSize: 12,
+    fontWeight: "900",
   },
   stateText: {
     color: "#8F98A8",
