@@ -3,7 +3,7 @@ import { useNavigation } from "@react-navigation/native";
 import { StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import JamList from "@/components/jams/JamList";
-import { useFriendsInRooms, useMyRoom, useRooms } from "@/hooks/useRooms";
+import { useActiveCommunityRooms, useFriendsInRooms, useMyRoom, useRooms } from "@/hooks/useRooms";
 import { useMobileTheme } from "@/theme/MobileTheme";
 import type { RoomFeedItem } from "@/types";
 
@@ -12,6 +12,13 @@ const JamScreen = () => {
   const { colors } = useMobileTheme();
   const [search, setSearch] = React.useState("");
   const { rooms, isLoading, isLoadingMore, canLoadMore, loadMore } = useRooms(search);
+  const {
+    data: communityRooms,
+    isFetchingNextPage: isCommunityRoomsLoadingMore,
+    isLoading: isCommunityRoomsLoading,
+    fetchNextPage: loadMoreCommunityRooms,
+    hasNextPage: canLoadMoreCommunityRooms,
+  } = useActiveCommunityRooms(undefined, search);
   const { room: myRoom, isLoading: isMyRoomLoading } = useMyRoom();
   const { friendsInRooms } = useFriendsInRooms();
   const openRoom = React.useCallback(
@@ -25,13 +32,19 @@ const JamScreen = () => {
     <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: colors.background }]}>
       <JamList
         friendsInRooms={friendsInRooms}
-        isLoading={isLoading}
+        communityRooms={communityRooms}
+        isCommunityRoomsLoading={isCommunityRoomsLoading}
+        isCommunityRoomsLoadingMore={isCommunityRoomsLoadingMore}
+        isLoading={isLoading || isCommunityRoomsLoading}
         isLoadingMore={isLoadingMore}
         isMyRoomLoading={isMyRoomLoading}
         myRoom={myRoom}
         onEndReached={() => {
           if (canLoadMore && !isLoadingMore) {
             loadMore(10);
+          }
+          if (canLoadMoreCommunityRooms && !isCommunityRoomsLoadingMore) {
+            loadMoreCommunityRooms();
           }
         }}
         onOpenRoom={openRoom}

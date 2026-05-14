@@ -126,6 +126,28 @@ async function requireRoomAccess(
   if (!friends) throw new Error("PRIVATE_ROOM");
 }
 
+async function canViewRoom(
+  ctx: QueryCtx | MutationCtx,
+  room: Doc<"rooms">
+) {
+  if (!room.isPrivate) return true;
+  const profile = await getCurrentProfile(ctx);
+  if (!profile) return false;
+  if (room.hostId === profile._id) return true;
+  return await areFriends(ctx, profile._id, room.hostId);
+}
+
+async function filterVisibleRooms(
+  ctx: QueryCtx | MutationCtx,
+  rooms: Doc<"rooms">[]
+) {
+  const visibleRooms: Doc<"rooms">[] = [];
+  for (const room of rooms) {
+    if (await canViewRoom(ctx, room)) visibleRooms.push(room);
+  }
+  return visibleRooms;
+}
+
 async function getCommunityMembership(
   ctx: QueryCtx | MutationCtx,
   communityId: Id<"communities">,
@@ -264,6 +286,7 @@ export const getByHandle = query({
       .first();
 
     if (!room) return null;
+    if (!(await canViewRoom(ctx, room))) return null;
     return await formatRoom(ctx, room);
   },
 });
@@ -328,7 +351,49 @@ export const listActivePaginated = query({
       .order("desc")
       .paginate(args.paginationOpts);
 
-    let filtered = result.page.filter((r) => !r.communityId);
+    let filtered = await filterVisibleRooms(
+      ctx,
+      result.page.filter((r) => !r.communityId)
+    );
+
+    if (args.genre && args.genre.trim().length > 0) {
+      const genre = args.genre.trim();
+      filtered = filtered.filter((r) => r.genre === genre);
+    }
+
+    if (args.search && args.search.trim().length > 0) {
+      const searchLower = args.search.trim().toLowerCase();
+      filtered = filtered.filter(
+        (r) =>
+          r.name.toLowerCase().includes(searchLower) ||
+          (r.description ?? "").toLowerCase().includes(searchLower) ||
+          r.handle.toLowerCase().includes(searchLower)
+      );
+    }
+
+    const page = await Promise.all(filtered.map((room) => formatRoom(ctx, room)));
+    return { ...result, page };
+  },
+});
+
+/** List active rooms scoped to communities with optional genre/search filter (paginated) */
+export const listActiveCommunityPaginated = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    genre: v.optional(v.string()),
+    search: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query("rooms")
+      .withIndex("by_active", (q) => q.eq("isActive", true))
+      .order("desc")
+      .paginate(args.paginationOpts);
+
+    let filtered = await filterVisibleRooms(
+      ctx,
+      result.page.filter((r) => r.communityId)
+    );
 
     if (args.genre && args.genre.trim().length > 0) {
       const genre = args.genre.trim();
@@ -367,7 +432,7 @@ export const listCommunityRoomsPaginated = query({
       .order("desc")
       .paginate(args.paginationOpts);
 
-    let filtered = result.page;
+    let filtered = await filterVisibleRooms(ctx, result.page);
 
     if (args.genre && args.genre.trim().length > 0) {
       const genre = args.genre.trim();

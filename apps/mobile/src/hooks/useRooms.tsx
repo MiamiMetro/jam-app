@@ -39,6 +39,26 @@ export function useActiveRooms(genre?: string, search?: string) {
   };
 }
 
+export function useActiveCommunityRooms(genre?: string, search?: string) {
+  const trimmedSearch = search?.trim();
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.rooms.listActiveCommunityPaginated,
+    {
+      ...(genre ? { genre } : {}),
+      ...(trimmedSearch ? { search: trimmedSearch } : {}),
+    },
+    { initialNumItems: 20 },
+  );
+
+  return {
+    data: results,
+    isLoading: status === "LoadingFirstPage",
+    hasNextPage: status === "CanLoadMore",
+    isFetchingNextPage: status === "LoadingMore",
+    fetchNextPage: () => loadMore(20),
+  };
+}
+
 export function useRoom(handle: string | undefined) {
   const room = useQuery(api.rooms.getByHandle, handle ? { handle } : "skip");
 

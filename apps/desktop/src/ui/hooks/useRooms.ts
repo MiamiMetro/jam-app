@@ -69,6 +69,22 @@ export function useActiveRooms(genre?: string, search?: string) {
   };
 }
 
+export function useActiveCommunityRooms(genre?: string, search?: string) {
+  const result = usePaginatedQuery(
+    api.rooms.listActiveCommunityPaginated,
+    { genre, search },
+    { initialNumItems: 20 }
+  );
+
+  return {
+    data: result.results,
+    isLoading: result.status === "LoadingFirstPage",
+    hasNextPage: result.status === "CanLoadMore",
+    isFetchingNextPage: result.status === "LoadingMore",
+    fetchNextPage: () => result.loadMore(20),
+  };
+}
+
 export function useCommunityRooms(
   communityId: string | undefined,
   genre?: string,

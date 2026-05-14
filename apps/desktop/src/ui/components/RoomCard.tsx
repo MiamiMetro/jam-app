@@ -22,7 +22,7 @@ interface RoomCardProps {
 
 export function RoomCard({ room, onClick, variant = "grid" }: RoomCardProps) {
   const hasParticipants = room.participant_count > 0;
-  const isActive = room.is_active && hasParticipants;
+  const isLive = room.is_active && hasParticipants;
 
   const hostName = room.host?.username ?? "Unknown";
   const hostAvatar = room.host?.avatar_url ?? "";
@@ -32,7 +32,7 @@ export function RoomCard({ room, onClick, variant = "grid" }: RoomCardProps) {
       <div
         onClick={() => onClick?.(room.handle)}
         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 relative overflow-hidden ${
-          isActive
+          isLive
             ? "glass-strong ring-1 ring-primary/20 hover:ring-primary/40"
             : "glass-solid hover:glass-strong hover:ring-1 hover:ring-primary/20"
         }`}
@@ -60,7 +60,7 @@ export function RoomCard({ room, onClick, variant = "grid" }: RoomCardProps) {
               {hostName.substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          {room.is_active && (
+          {isLive && (
             <div className="h-2 w-2 rounded-full bg-green-400 animate-pulse shrink-0" />
           )}
         </div>
@@ -72,13 +72,13 @@ export function RoomCard({ room, onClick, variant = "grid" }: RoomCardProps) {
     <div
       onClick={() => onClick?.(room.handle)}
       className={`p-3 rounded-lg cursor-pointer transition-all duration-200 group relative overflow-hidden ${
-        isActive
+        isLive
           ? "glass-strong ring-1 ring-primary/20 hover:ring-primary/40"
           : "glass-solid hover:glass-strong hover:ring-1 hover:ring-primary/20"
       }`}
     >
       {/* Active pulse indicator */}
-      {room.is_active && (
+      {isLive && (
         <div className="absolute top-3 right-3 h-2 w-2 rounded-full bg-green-400 animate-pulse" />
       )}
       <div className="relative">

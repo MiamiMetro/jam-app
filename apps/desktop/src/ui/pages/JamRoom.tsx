@@ -37,6 +37,7 @@ import {
   useStartListenerMode,
   useStopListenerMode,
   useRefreshListenerMode,
+  useUpdateRoom,
 } from "@/hooks/useRooms";
 import type { Id } from "@jam-app/convex";
 import type { JamBroadcastState, JamClientState } from "../electron";
@@ -45,6 +46,7 @@ import { usePostAudio } from "@/contexts/PostAudioContext";
 import { Timestamp } from "@/components/Timestamp";
 import { LoadingState } from "@/components/LoadingState";
 import { EmptyState } from "@/components/EmptyState";
+import { RoomFormDialog, type RoomFormData } from "@/components/RoomFormDialog";
 import { censorText } from "@/lib/bannedWords";
 import { useReportContent } from "@/hooks/usePosts";
 
@@ -98,6 +100,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const startListenerMode = useStartListenerMode();
   const stopListenerMode = useStopListenerMode();
   const refreshListenerMode = useRefreshListenerMode();
+  const updateRoom = useUpdateRoom();
   const reportContent = useReportContent();
   const censorshipEnabled = useUIStore((s) => s.censorshipEnabled);
   const [message, setMessage] = useState("");
@@ -107,6 +110,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const [clientState, setClientState] = useState<JamClientState>("idle");
   const [broadcastState, setBroadcastState] = useState<JamBroadcastState>("idle");
   const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [isRoomSettingsOpen, setIsRoomSettingsOpen] = useState(false);
   const [publishSessionId, setPublishSessionId] = useState<Id<"listener_publish_sessions"> | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const jamSessionIdRef = useRef<Id<"jam_sessions"> | null>(null);
@@ -264,6 +268,24 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     setReportSubmitted(true);
     window.setTimeout(() => setReportSubmitted(false), 1000);
   }, [reportContent, room?.id]);
+
+  const handleUpdateRoomSettings = useCallback(async (data: RoomFormData) => {
+    if (!room?.id || !data.name.trim()) return;
+
+    try {
+      await updateRoom({
+        roomId: room.id as Id<"rooms">,
+        name: data.name.trim(),
+        description: data.description.trim() || undefined,
+        genre: data.genre.trim() || undefined,
+        maxPerformers: data.maxPerformers,
+        isPrivate: data.isPrivate,
+      });
+      setIsRoomSettingsOpen(false);
+    } catch (error) {
+      console.error("Failed to update room:", error);
+    }
+  }, [room?.id, updateRoom]);
 
   const handleJoinClient = useCallback(async () => {
     try {
@@ -538,8 +560,24 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     );
   }
 
+  const editInitialData: RoomFormData = {
+    handle: room.handle,
+    name: room.name,
+    description: room.description || "",
+    genre: room.genre || "",
+    maxPerformers: room.max_performers,
+    isPrivate: room.is_private,
+  };
+
   return (
     <div className="flex h-full min-h-0 bg-background">
+      <RoomFormDialog
+        open={isRoomSettingsOpen}
+        onOpenChange={setIsRoomSettingsOpen}
+        onSubmit={handleUpdateRoomSettings}
+        mode="edit"
+        initialData={editInitialData}
+      />
       {/* Main Room Content */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Room Header */}
@@ -634,10 +672,10 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
                   variant="outline"
                   size="sm"
                   className="glass-solid border-border/50"
-                  onClick={() => navigate("/jams")}
+                  onClick={() => setIsRoomSettingsOpen(true)}
                 >
                   <Settings className="h-3.5 w-3.5 mr-1.5" />
-                  Manage
+                  Settings
                 </Button>
               )}
               {!isGuest && !isHost && (

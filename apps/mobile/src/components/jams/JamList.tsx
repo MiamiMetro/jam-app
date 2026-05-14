@@ -15,7 +15,10 @@ import JamItem from "./JamItem";
 import { useMobileTheme } from "@/theme/MobileTheme";
 
 type Props = {
+  communityRooms?: RoomFeedItem[];
   friendsInRooms?: FriendInRoomItem[];
+  isCommunityRoomsLoading?: boolean;
+  isCommunityRoomsLoadingMore?: boolean;
   isLoading?: boolean;
   isLoadingMore?: boolean;
   isMyRoomLoading?: boolean;
@@ -29,6 +32,7 @@ type Props = {
 };
 
 export default function JamList({
+  communityRooms = [],
   friendsInRooms = [],
   isLoading = false,
   isLoadingMore = false,
@@ -50,7 +54,7 @@ export default function JamList({
       contentContainerStyle={[
         styles.content,
         { backgroundColor: colors.background, paddingBottom: 28 + insets.bottom },
-        rooms.length === 0 ? styles.emptyContent : null,
+        rooms.length === 0 && communityRooms.length === 0 ? styles.emptyContent : null,
       ]}
       data={rooms}
       keyExtractor={(item) => item.id}
@@ -61,22 +65,17 @@ export default function JamList({
           message={
             hasSearch
               ? "Try another room name, handle, or vibe."
-              : "No active jams right now."
+              : "No open jams right now."
           }
           title={hasSearch ? "No jams found" : "Quiet for the moment"}
         />
-      }
-      ListFooterComponent={
-        isLoadingMore ? (
-          <ActivityIndicator color={colors.primary} style={styles.footerLoader} />
-        ) : null
       }
       ListHeaderComponent={
         <View>
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={styles.headerCopy}>
               <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>
-                Live Rooms
+                Open Rooms
               </Text>
               <Text style={[styles.title, { color: colors.foreground }]}>Jams</Text>
             </View>
@@ -90,7 +89,7 @@ export default function JamList({
                 {rooms.length}
               </Text>
               <Text style={[styles.liveCountLabel, { color: colors.secondaryForeground }]}>
-                live
+                open
               </Text>
             </View>
           </View>
@@ -146,12 +145,34 @@ export default function JamList({
 
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-              Live Rooms
+              Open Rooms
             </Text>
             <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>
               {isLoading ? "Loading" : `${rooms.length} shown`}
             </Text>
           </View>
+        </View>
+      }
+      ListFooterComponent={
+        <View>
+          {isLoadingMore ? (
+            <ActivityIndicator color={colors.primary} style={styles.footerLoader} />
+          ) : null}
+          {communityRooms.length > 0 ? (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+                  Community Rooms
+                </Text>
+                <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>
+                  {communityRooms.length} shown
+                </Text>
+              </View>
+              {communityRooms.map((room) => (
+                <JamItem key={room.id} onPress={() => onOpenRoom?.(room)} room={room} />
+              ))}
+            </>
+          ) : null}
         </View>
       }
       onEndReached={onEndReached}
@@ -619,6 +640,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: 6,
+    textAlign: "center",
+  },
+  emptyCommunityText: {
+    fontSize: 13,
+    fontWeight: "700",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     textAlign: "center",
   },
   footerLoader: {

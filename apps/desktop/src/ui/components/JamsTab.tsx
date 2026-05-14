@@ -1,5 +1,5 @@
 // JamsTab.tsx — Hero landing page for live jam rooms
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/SearchInput";
@@ -17,7 +17,9 @@ import {
   List,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
-import { useActiveRooms, useMyRoom, useCreateRoom, useUpdateRoom, useActivateRoom, useDeactivateRoom, useFriendsInRooms } from "@/hooks/useRooms";
+import { useActiveCommunityRooms, useActiveRooms, useMyRoom, useCreateRoom, useUpdateRoom, useActivateRoom, useDeactivateRoom, useFriendsInRooms } from "@/hooks/useRooms";
+import { useConvexAuthStore } from "@/hooks/useConvexAuth";
+import { useProfileStore } from "@/hooks/useEnsureProfile";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingState } from "@/components/LoadingState";
@@ -29,10 +31,13 @@ interface JamsTabProps {
 
 function JamsTab({ onGuestAction }: JamsTabProps) {
   const { isGuest, user } = useAuthStore();
+  const isAuthSet = useConvexAuthStore((s) => s.isAuthSet);
+  const isProfileReady = useProfileStore((s) => s.isProfileReady);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = searchParams.get("search") || "";
   const { data: rooms = [], isLoading: roomsLoading } = useActiveRooms(undefined, searchQuery || undefined);
+  const { data: communityRooms = [], isLoading: communityRoomsLoading } = useActiveCommunityRooms(undefined, searchQuery || undefined);
   const { data: myRoom, isLoading: myRoomLoading } = useMyRoom();
   const { data: friendsInRooms = [] } = useFriendsInRooms();
   const createRoom = useCreateRoom();
@@ -44,6 +49,15 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
   const [isEditRoomOpen, setIsEditRoomOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isToggling, setIsToggling] = useState(false);
+  const isUserRoomReady = isGuest || !user || (isAuthSet && isProfileReady && !myRoomLoading);
+  const isInitialJamsLoading = roomsLoading || communityRoomsLoading || !isUserRoomReady;
+  const [hasLoadedJams, setHasLoadedJams] = useState(false);
+
+  useEffect(() => {
+    if (!isInitialJamsLoading) {
+      setHasLoadedJams(true);
+    }
+  }, [isInitialJamsLoading]);
 
   const handleSearchChange = useCallback((query: string) => {
     const params: Record<string, string> = {};
@@ -132,6 +146,11 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-3 pt-4">
+
+      {!hasLoadedJams ? (
+        <LoadingState message="Loading jams..." />
+      ) : (
+        <>
 
       {/* My Room Section */}
       {!isGuest && user && myRoom && (
@@ -310,15 +329,13 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
       {/* Other Jams Grid */}
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-muted-foreground mb-3">
-          Live Rooms
+          Open Rooms
         </h3>
       </div>
-      {roomsLoading ? (
-        <LoadingState message="Loading jams..." />
-      ) : rooms.length === 0 ? (
+      {rooms.length === 0 ? (
         <EmptyState
           icon={Music}
-          title={searchQuery ? "No jams found" : "No active jams"}
+          title={searchQuery ? "No jams found" : "No open jams"}
           description={searchQuery
             ? "Try adjusting your search"
             : "Create your room to start jamming!"}
@@ -335,6 +352,31 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
             <RoomCard key={room.id} room={room} onClick={handleRoomClick} variant="list" />
           ))}
         </div>
+      )}
+
+      {communityRooms.length > 0 && (
+        <>
+          <div className="mb-3 mt-5">
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+              Community Rooms
+            </h3>
+          </div>
+          {viewMode === "grid" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-stagger">
+              {communityRooms.map((room) => (
+                <RoomCard key={room.id} room={room} onClick={handleRoomClick} />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {communityRooms.map((room) => (
+                <RoomCard key={room.id} room={room} onClick={handleRoomClick} variant="list" />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+        </>
       )}
       </div>
     </div>

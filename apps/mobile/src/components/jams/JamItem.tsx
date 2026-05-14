@@ -17,7 +17,7 @@ export default function JamItem({ onPress, room }: Props) {
   const accessibilityLabel = [
     room.name,
     `jam ${room.handle}`,
-    isLive ? "Live" : "Idle",
+    isLive ? "Live" : "Open",
     room.description,
     `${room.participant_count} listeners`,
     `${room.max_performers} performers`,
@@ -79,7 +79,7 @@ export default function JamItem({ onPress, room }: Props) {
               { color: isLive ? colors.success : colors.secondaryForeground },
             ]}
           >
-            {isLive ? "Live" : "Idle"}
+            {isLive ? "Live" : "Open"}
           </Text>
         </View>
       </View>
