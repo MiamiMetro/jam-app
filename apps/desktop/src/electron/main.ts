@@ -34,6 +34,7 @@ function getSavedTheme(): 'dark' | 'light' {
 // Track the spawned client process
 let clientProcess: ChildProcess | null = null;
 type JamClientState = 'idle' | 'launching' | 'running' | 'failed' | 'exited';
+type JamBroadcastState = 'idle' | 'launching' | 'running' | 'failed' | 'exited' | 'stopping';
 type JamClientLaunchContext = {
     serverHost: string;
     serverPort: number;
@@ -44,10 +45,23 @@ type JamClientLaunchContext = {
     joinToken: string;
     codec: 'opus' | 'pcm';
     frames: number;
+    broadcastIpcPort?: number;
+};
+type JamBroadcastLaunchContext = {
+    roomId: string;
+    ipcPort: number;
+    srtUrl: string;
+    hlsUrl: string;
 };
 let jamClientState: JamClientState = 'idle';
 let jamClientExitCode: number | null = null;
 let jamClientError: string | undefined;
+let broadcasterProcess: ChildProcess | null = null;
+let jamBroadcastState: JamBroadcastState = 'idle';
+let jamBroadcastExitCode: number | null = null;
+let jamBroadcastError: string | undefined;
+let jamBroadcastHlsUrl: string | undefined;
+let jamBroadcastStopRequested = false;
 
 function getClientExecutablePath() {
     const platform = process.platform;
@@ -67,6 +81,24 @@ function getClientExecutablePath() {
     return clientPath;
 }
 
+function getBroadcasterExecutablePath() {
+    const platform = process.platform;
+    const broadcasterExecutable = platform === 'win32' ? 'jam_broadcaster.exe' : 'jam_broadcaster';
+
+    if (isDev()) {
+        return path.join(process.cwd(), 'resources', 'client', broadcasterExecutable);
+    }
+
+    let broadcasterPath = path.join(process.resourcesPath, 'client', broadcasterExecutable);
+    if (!existsSync(broadcasterPath)) {
+        const altPath = path.join(process.resourcesPath, 'resources', 'client', broadcasterExecutable);
+        if (existsSync(altPath)) {
+            broadcasterPath = altPath;
+        }
+    }
+    return broadcasterPath;
+}
+
 function isLaunchContext(value: unknown): value is JamClientLaunchContext {
     if (!value || typeof value !== 'object') return false;
     const context = value as Record<string, unknown>;
@@ -79,12 +111,24 @@ function isLaunchContext(value: unknown): value is JamClientLaunchContext {
         typeof context.displayName === 'string' &&
         typeof context.joinToken === 'string' &&
         (context.codec === 'opus' || context.codec === 'pcm') &&
-        typeof context.frames === 'number'
+        typeof context.frames === 'number' &&
+        (context.broadcastIpcPort === undefined || typeof context.broadcastIpcPort === 'number')
+    );
+}
+
+function isBroadcastLaunchContext(value: unknown): value is JamBroadcastLaunchContext {
+    if (!value || typeof value !== 'object') return false;
+    const context = value as Record<string, unknown>;
+    return (
+        typeof context.roomId === 'string' &&
+        typeof context.ipcPort === 'number' &&
+        typeof context.srtUrl === 'string' &&
+        typeof context.hlsUrl === 'string'
     );
 }
 
 function buildJamClientArgs(context: JamClientLaunchContext) {
-    return [
+    const args = [
         '--server', context.serverHost,
         '--port', String(context.serverPort),
         '--room', context.roomId,
@@ -95,6 +139,52 @@ function buildJamClientArgs(context: JamClientLaunchContext) {
         '--codec', context.codec,
         '--frames', String(context.frames),
     ];
+    if (context.broadcastIpcPort && context.broadcastIpcPort > 0) {
+        args.push('--broadcast-ipc-port', String(context.broadcastIpcPort));
+    }
+    return args;
+}
+
+function buildJamBroadcastArgs(context: JamBroadcastLaunchContext) {
+    return [
+        '--ipc-port', String(context.ipcPort),
+        '--srt-url', context.srtUrl,
+    ];
+}
+
+function getJamBroadcastStatus() {
+    if (broadcasterProcess && broadcasterProcess.exitCode === null) {
+        return {
+            state: jamBroadcastState,
+            exitCode: null,
+            error: jamBroadcastError,
+            hlsUrl: jamBroadcastHlsUrl,
+        };
+    }
+    return {
+        state: jamBroadcastState,
+        exitCode: jamBroadcastExitCode,
+        error: jamBroadcastError,
+        hlsUrl: jamBroadcastHlsUrl,
+    };
+}
+
+function stopProcessTree(processToStop: ChildProcess | null) {
+    if (!processToStop || processToStop.exitCode !== null || !processToStop.pid) {
+        return;
+    }
+    if (isWindows) {
+        spawn('taskkill', ['/pid', String(processToStop.pid), '/t', '/f'], {
+            stdio: 'ignore',
+            windowsHide: true,
+        });
+        return;
+    }
+    try {
+        processToStop.kill('SIGTERM');
+    } catch {
+        // Process may have already exited.
+    }
 }
 
 const PRESENCE_DISCONNECT_REQUEST_TIMEOUT_MS = 700;
@@ -263,6 +353,77 @@ if (!gotTheLock) {
         return { state: clientProcess ? jamClientState : jamClientState, exitCode: jamClientExitCode, error: jamClientError };
     });
 
+    ipcMain.handle('launch-jam-broadcast', async (_event, context: unknown) => {
+        try {
+            if (!isBroadcastLaunchContext(context)) {
+                jamBroadcastState = 'failed';
+                jamBroadcastError = 'Invalid native broadcast launch context';
+                return { success: false, ...getJamBroadcastStatus(), error: jamBroadcastError };
+            }
+
+            if (broadcasterProcess && broadcasterProcess.exitCode === null && broadcasterProcess.pid) {
+                return { success: false, ...getJamBroadcastStatus(), error: 'Broadcaster is already running' };
+            }
+
+            const broadcasterPath = getBroadcasterExecutablePath();
+            if (!existsSync(broadcasterPath)) {
+                jamBroadcastState = 'failed';
+                jamBroadcastError = `Broadcaster executable not found at ${broadcasterPath}`;
+                return { success: false, ...getJamBroadcastStatus(), error: jamBroadcastError };
+            }
+
+            jamBroadcastState = 'launching';
+            jamBroadcastExitCode = null;
+            jamBroadcastError = undefined;
+            jamBroadcastHlsUrl = context.hlsUrl;
+            jamBroadcastStopRequested = false;
+            broadcasterProcess = spawn(broadcasterPath, buildJamBroadcastArgs(context), {
+                stdio: 'ignore',
+                windowsHide: true,
+            });
+            jamBroadcastState = 'running';
+
+            broadcasterProcess.on('exit', (code) => {
+                jamBroadcastState = jamBroadcastStopRequested ? 'idle' : 'exited';
+                jamBroadcastExitCode = code;
+                jamBroadcastStopRequested = false;
+                broadcasterProcess = null;
+            });
+
+            broadcasterProcess.on('error', (error) => {
+                jamBroadcastState = 'failed';
+                jamBroadcastError = error.message;
+                broadcasterProcess = null;
+            });
+
+            return { success: true, ...getJamBroadcastStatus() };
+        } catch (error) {
+            broadcasterProcess = null;
+            jamBroadcastState = 'failed';
+            jamBroadcastError = error instanceof Error ? error.message : 'Unknown error';
+            return { success: false, ...getJamBroadcastStatus(), error: jamBroadcastError };
+        }
+    });
+
+    ipcMain.handle('stop-jam-broadcast', async () => {
+        if (!broadcasterProcess || broadcasterProcess.exitCode !== null) {
+            broadcasterProcess = null;
+            jamBroadcastState = 'idle';
+            jamBroadcastExitCode = null;
+            return { success: true, ...getJamBroadcastStatus() };
+        }
+
+        jamBroadcastState = 'stopping';
+        jamBroadcastStopRequested = true;
+        stopProcessTree(broadcasterProcess);
+        broadcasterProcess = null;
+        jamBroadcastState = 'idle';
+        jamBroadcastExitCode = null;
+        return { success: true, ...getJamBroadcastStatus() };
+    });
+
+    ipcMain.handle('get-jam-broadcast-status', async () => getJamBroadcastStatus());
+
     // Save theme preference so next launch uses correct background color
     ipcMain.handle('save-theme', (_event, theme: 'dark' | 'light') => {
         try {
@@ -304,7 +465,7 @@ if (!gotTheLock) {
                         "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " + // React needs unsafe-eval in dev
                         "style-src 'self' 'unsafe-inline'; " +
                         "img-src 'self' data: https:; " + // Allow images from HTTPS sources
-                        "connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.r2.cloudflarestorage.com https://media.welor.fun http://localhost:* ws://localhost:*; " + // Convex + R2 uploads + media CDN + dev server
+                        "connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.r2.cloudflarestorage.com https://*.welor.fun http://*.welor.fun:* http://localhost:* ws://localhost:*; " + // Convex + R2 uploads + media CDN + HLS + dev server
                         "media-src 'self' https: http: blob:; " + // Allow HLS video streams
                         "font-src 'self' data:; " +
                         "object-src 'none'; " + // Block plugins
@@ -356,6 +517,8 @@ if (!gotTheLock) {
 
         app.on('before-quit', () => {
             isAppQuitting = true;
+            stopProcessTree(broadcasterProcess);
+            broadcasterProcess = null;
             if (quitTimeoutId) {
                 clearTimeout(quitTimeoutId);
                 quitTimeoutId = null;

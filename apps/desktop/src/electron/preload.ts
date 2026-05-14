@@ -4,6 +4,9 @@ contextBridge.exposeInMainWorld('electron', {
     platform: process.platform as 'darwin' | 'win32' | 'linux',
     launchJamClient: (context: unknown) => ipcRenderer.invoke('launch-jam-client', context),
     getJamClientStatus: () => ipcRenderer.invoke('get-jam-client-status'),
+    launchJamBroadcast: (context: unknown) => ipcRenderer.invoke('launch-jam-broadcast', context),
+    stopJamBroadcast: () => ipcRenderer.invoke('stop-jam-broadcast'),
+    getJamBroadcastStatus: () => ipcRenderer.invoke('get-jam-broadcast-status'),
     openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
     onNavigate: (callback: (path: string) => void) => {
         ipcRenderer.removeAllListeners('navigate');

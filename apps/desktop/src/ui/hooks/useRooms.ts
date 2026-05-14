@@ -186,3 +186,15 @@ export function useCreatePerformerJoinToken() {
 export function useRefreshJamSession() {
   return useMutation(api.rooms.refreshJamSession);
 }
+
+export function useStartListenerMode() {
+  return useMutation(api.rooms.startListenerMode);
+}
+
+export function useStopListenerMode() {
+  return useMutation(api.rooms.stopListenerMode);
+}
+
+export function useRefreshListenerMode() {
+  return useMutation(api.rooms.refreshListenerMode);
+}

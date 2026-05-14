@@ -210,6 +210,19 @@ export default defineSchema({
     isActive: v.boolean(),
     streamUrl: v.optional(v.string()),
     status: v.union(v.literal("idle"), v.literal("live")),
+    listenerStatus: v.optional(
+      v.union(
+        v.literal("off"),
+        v.literal("starting"),
+        v.literal("live"),
+        v.literal("error")
+      )
+    ),
+    listenerSessionId: v.optional(v.id("listener_publish_sessions")),
+    listenerStartedAt: v.optional(v.number()),
+    listenerUpdatedAt: v.optional(v.number()),
+    listenerExpiresAt: v.optional(v.number()),
+    listenerError: v.optional(v.string()),
     communityId: v.optional(v.id("communities")),
     scopeKey: v.optional(v.string()),
     lastActiveAt: v.number(),
@@ -251,6 +264,27 @@ export default defineSchema({
     expiresAt: v.number(),
   })
     .index("by_room_status", ["roomId", "status"])
+    .index("by_expires_at", ["expiresAt"]),
+
+  listener_publish_sessions: defineTable({
+    roomId: v.id("rooms"),
+    ownerProfileId: v.id("profiles"),
+    status: v.union(
+      v.literal("active"),
+      v.literal("revoked"),
+      v.literal("expired")
+    ),
+    path: v.string(),
+    publicHlsUrl: v.string(),
+    publishUser: v.string(),
+    publishKeyHash: v.string(),
+    createdAt: v.number(),
+    lastRefreshAt: v.number(),
+    expiresAt: v.number(),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_room_status", ["roomId", "status"])
+    .index("by_publish_user", ["publishUser"])
     .index("by_expires_at", ["expiresAt"]),
 
   room_messages: defineTable({

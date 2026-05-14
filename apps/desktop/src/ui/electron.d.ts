@@ -1,4 +1,5 @@
 export type JamClientState = 'idle' | 'launching' | 'running' | 'failed' | 'exited';
+export type JamBroadcastState = 'idle' | 'launching' | 'running' | 'failed' | 'exited' | 'stopping';
 
 export interface JamClientLaunchContext {
     serverHost: string;
@@ -10,12 +11,30 @@ export interface JamClientLaunchContext {
     joinToken: string;
     codec: 'opus' | 'pcm';
     frames: number;
+    broadcastIpcPort?: number;
+}
+
+export interface JamBroadcastLaunchContext {
+    roomId: string;
+    ipcPort: number;
+    srtUrl: string;
+    hlsUrl: string;
+}
+
+export interface JamBroadcastStatus {
+    state: JamBroadcastState;
+    exitCode?: number | null;
+    error?: string;
+    hlsUrl?: string;
 }
 
 export interface ElectronAPI {
     platform: 'darwin' | 'win32' | 'linux';
     launchJamClient: (context: JamClientLaunchContext) => Promise<{ success: boolean; error?: string; state?: JamClientState }>;
     getJamClientStatus: () => Promise<{ state: JamClientState; exitCode?: number | null; error?: string }>;
+    launchJamBroadcast: (context: JamBroadcastLaunchContext) => Promise<{ success: boolean; error?: string } & JamBroadcastStatus>;
+    stopJamBroadcast: () => Promise<{ success: boolean; error?: string } & JamBroadcastStatus>;
+    getJamBroadcastStatus: () => Promise<JamBroadcastStatus>;
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
     onNavigate: (callback: (path: string) => void) => void;
     onToggleTheme: (callback: () => void) => void;

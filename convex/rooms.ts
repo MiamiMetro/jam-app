@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { internalMutation, query, mutation } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -21,16 +21,32 @@ import { checkRateLimit } from "./rateLimiter";
 import { Presence } from "@convex-dev/presence";
 import { components } from "./_generated/api";
 
+declare const process: {
+  env: Record<string, string | undefined>;
+};
+
 const presence = new Presence(components.presence);
 
 // ============================================
 // Room Constants
 // ============================================
 
-const MOCK_STREAM_URL =
-  "https://virtual-channel.unified-streaming.com/demo_channel-stable.isml/.m3u8";
 const JOIN_TOKEN_TTL_MS = 2 * 60 * 1000;
 const JAM_SESSION_TTL_MS = 5 * 60 * 1000;
+const LISTENER_SESSION_TTL_MS = 5 * 60 * 1000;
+const LISTENER_IPC_PORT = 39000;
+const LISTENER_HLS_BASE_URL = envOrDefault(
+  "LISTENER_PUBLIC_HLS_BASE_URL",
+  "http://127.0.0.1:8080/hls"
+);
+const LISTENER_SRT_BASE_URL = envOrDefault(
+  "LISTENER_SRT_BASE_URL",
+  "srt://127.0.0.1:8890"
+);
+const LISTENER_SRT_PASSPHRASE = envOrDefault(
+  "LISTENER_SRT_PASSPHRASE",
+  "jam-v3-publish-passphrase"
+);
 
 import { ROOM_GENRES } from "./shared";
 export { ROOM_GENRES, type RoomGenre } from "./shared";
@@ -42,6 +58,11 @@ function roomPresenceId(roomId: string) {
 
 function roomScopeKey(communityId?: Id<"communities">) {
   return communityId ? `community:${communityId}` : "global";
+}
+
+function envOrDefault(name: string, fallback: string): string {
+  const value = process.env[name]?.trim();
+  return value ? value.replace(/\/+$/, "") : fallback;
 }
 
 function toHex(bytes: ArrayBuffer): string {
@@ -66,12 +87,32 @@ async function hmacSha256Hex(secret: string, payload: string): Promise<string> {
   return toHex(signature);
 }
 
+async function sha256Hex(payload: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(payload)
+  );
+  return toHex(digest);
+}
+
 function randomNonce(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+function localListenerHlsUrl(room: Doc<"rooms">): string {
+  return `${LISTENER_HLS_BASE_URL}/${room.handle}/stream.m3u8`;
+}
+
+function localListenerSrtUrl(room: Doc<"rooms">, publishUser: string, publishKey: string): string {
+  return `${LISTENER_SRT_BASE_URL}?streamid=publish:${room.handle}:${publishUser}:${publishKey}&passphrase=${LISTENER_SRT_PASSPHRASE}&pkt_size=1316`;
+}
+
+function requireRoomHost(profile: Doc<"profiles">, room: Doc<"rooms">) {
+  if (room.hostId !== profile._id) throw new Error("NOT_HOST");
 }
 
 async function requireRoomAccess(
@@ -186,6 +227,21 @@ async function formatRoom(ctx: QueryCtx | MutationCtx, room: Doc<"rooms">) {
     is_active: room.isActive,
     stream_url: room.streamUrl ?? null,
     status: room.status,
+    listener: {
+      status: room.listenerStatus ?? "off",
+      hls_url: room.streamUrl ?? null,
+      session_id: room.listenerSessionId ?? null,
+      started_at: room.listenerStartedAt
+        ? new Date(room.listenerStartedAt).toISOString()
+        : null,
+      updated_at: room.listenerUpdatedAt
+        ? new Date(room.listenerUpdatedAt).toISOString()
+        : null,
+      expires_at: room.listenerExpiresAt
+        ? new Date(room.listenerExpiresAt).toISOString()
+        : null,
+      error: room.listenerError ?? null,
+    },
     community_id: room.communityId ?? null,
     participant_count: onlineUsers.length,
     last_active_at: new Date(room.lastActiveAt).toISOString(),
@@ -548,8 +604,8 @@ export const create = mutation({
       maxPerformers,
       isPrivate: args.isPrivate ?? false,
       isActive: true,
-      streamUrl: MOCK_STREAM_URL,
       status: "idle",
+      listenerStatus: "off",
       communityId: args.communityId,
       scopeKey,
       lastActiveAt: Date.now(),
@@ -818,6 +874,243 @@ export const refreshJamSession = mutation({
     });
     await ctx.db.patch(session.roomId, { status: "live", lastActiveAt: now });
     return { refreshed: true };
+  },
+});
+
+export const startListenerMode = mutation({
+  args: { roomId: v.id("rooms") },
+  handler: async (ctx, args) => {
+    const profile = await requireAuth(ctx);
+    await checkRateLimit(ctx, "roomServerUpdate", profile._id);
+
+    const room = await ctx.db.get(args.roomId);
+    if (!room) throw new Error("ROOM_NOT_FOUND");
+    requireRoomHost(profile, room);
+    if (!room.isActive) throw new Error("ROOM_INACTIVE");
+
+    const now = Date.now();
+    const activeSessions = await ctx.db
+      .query("listener_publish_sessions")
+      .withIndex("by_room_status", (q) =>
+        q.eq("roomId", args.roomId).eq("status", "active")
+      )
+      .take(20);
+
+    for (const session of activeSessions) {
+      await ctx.db.patch(session._id, {
+        status: session.expiresAt <= now ? "expired" : "revoked",
+        revokedAt: session.expiresAt <= now ? undefined : now,
+      });
+    }
+
+    const hlsUrl = localListenerHlsUrl(room);
+    validateUrl(hlsUrl);
+    const publishKey = randomNonce() + randomNonce();
+    const publishUser = randomNonce();
+    const expiresAt = now + LISTENER_SESSION_TTL_MS;
+    const publishSessionId = await ctx.db.insert("listener_publish_sessions", {
+      roomId: args.roomId,
+      ownerProfileId: profile._id,
+      status: "active",
+      path: room.handle,
+      publicHlsUrl: hlsUrl,
+      publishUser,
+      publishKeyHash: await sha256Hex(publishKey),
+      createdAt: now,
+      lastRefreshAt: now,
+      expiresAt,
+    });
+
+    await ctx.db.patch(args.roomId, {
+      streamUrl: hlsUrl,
+      status: "live",
+      listenerStatus: "starting",
+      listenerSessionId: publishSessionId,
+      listenerStartedAt: now,
+      listenerUpdatedAt: now,
+      listenerExpiresAt: expiresAt,
+      listenerError: undefined,
+      lastActiveAt: now,
+    });
+
+    return {
+      ipcPort: LISTENER_IPC_PORT,
+      srtUrl: localListenerSrtUrl(room, publishUser, publishKey),
+      hlsUrl,
+      roomPath: room.handle,
+      publishSessionId,
+      publishUser,
+      publishKey,
+      expiresAtMs: expiresAt,
+    };
+  },
+});
+
+export const refreshListenerMode = mutation({
+  args: { publishSessionId: v.id("listener_publish_sessions") },
+  handler: async (ctx, args) => {
+    const profile = await requireAuth(ctx);
+    const session = await ctx.db.get(args.publishSessionId);
+    if (!session || session.status !== "active") return { refreshed: false };
+
+    const room = await ctx.db.get(session.roomId);
+    if (!room) {
+      await ctx.db.patch(args.publishSessionId, { status: "expired" });
+      return { refreshed: false };
+    }
+    requireRoomHost(profile, room);
+
+    const now = Date.now();
+    if (session.expiresAt <= now) {
+      await ctx.db.patch(args.publishSessionId, { status: "expired" });
+      await ctx.db.patch(session.roomId, {
+        listenerStatus: "off",
+        listenerSessionId: undefined,
+        listenerUpdatedAt: now,
+        listenerExpiresAt: undefined,
+        streamUrl: undefined,
+      });
+      return { refreshed: false };
+    }
+
+    const expiresAt = now + LISTENER_SESSION_TTL_MS;
+    await ctx.db.patch(args.publishSessionId, {
+      lastRefreshAt: now,
+      expiresAt,
+    });
+    await ctx.db.patch(session.roomId, {
+      listenerStatus: "live",
+      listenerUpdatedAt: now,
+      listenerExpiresAt: expiresAt,
+      lastActiveAt: now,
+    });
+    return { refreshed: true, expiresAtMs: expiresAt };
+  },
+});
+
+export const stopListenerMode = mutation({
+  args: {
+    roomId: v.id("rooms"),
+    publishSessionId: v.optional(v.id("listener_publish_sessions")),
+  },
+  handler: async (ctx, args) => {
+    const profile = await requireAuth(ctx);
+    await checkRateLimit(ctx, "roomServerUpdate", profile._id);
+
+    const room = await ctx.db.get(args.roomId);
+    if (!room) throw new Error("ROOM_NOT_FOUND");
+    requireRoomHost(profile, room);
+
+    const now = Date.now();
+    if (args.publishSessionId) {
+      const session = await ctx.db.get(args.publishSessionId);
+      if (session?.roomId === args.roomId && session.status === "active") {
+        await ctx.db.patch(args.publishSessionId, {
+          status: "revoked",
+          revokedAt: now,
+        });
+      }
+    }
+
+    const activeSessions = await ctx.db
+      .query("listener_publish_sessions")
+      .withIndex("by_room_status", (q) =>
+        q.eq("roomId", args.roomId).eq("status", "active")
+      )
+      .take(20);
+
+    for (const session of activeSessions) {
+      await ctx.db.patch(session._id, {
+        status: "revoked",
+        revokedAt: now,
+      });
+    }
+
+    const activeJamSession = await getActiveJamSession(ctx, args.roomId);
+    await ctx.db.patch(args.roomId, {
+      streamUrl: undefined,
+      status: activeJamSession && activeJamSession.expiresAt > now ? "live" : "idle",
+      listenerStatus: "off",
+      listenerSessionId: undefined,
+      listenerUpdatedAt: now,
+      listenerExpiresAt: undefined,
+      listenerError: undefined,
+      lastActiveAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+export const expireStaleListenerSessions = internalMutation({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const staleSessions = await ctx.db
+      .query("listener_publish_sessions")
+      .withIndex("by_expires_at", (q) => q.lte("expiresAt", now))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .take(Math.min(args.limit ?? 50, 100));
+
+    let expired = 0;
+    for (const session of staleSessions) {
+      await ctx.db.patch(session._id, { status: "expired" });
+      expired += 1;
+
+      const room = await ctx.db.get(session.roomId);
+      if (room?.listenerSessionId === session._id) {
+        await ctx.db.patch(session.roomId, {
+          streamUrl: undefined,
+          listenerStatus: "off",
+          listenerSessionId: undefined,
+          listenerUpdatedAt: now,
+          listenerExpiresAt: undefined,
+        });
+      }
+    }
+    return { expired };
+  },
+});
+
+export const validateListenerPublish = internalMutation({
+  args: {
+    action: v.string(),
+    protocol: v.string(),
+    path: v.string(),
+    user: v.optional(v.string()),
+    password: v.optional(v.string()),
+    token: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    if (args.action === "read" || args.action === "playback") {
+      return { authorized: true };
+    }
+    if (args.action !== "publish" || args.protocol !== "srt") {
+      return { authorized: false };
+    }
+    if (!args.user) return { authorized: false };
+
+    const secret = args.password || args.token;
+    if (!secret) return { authorized: false };
+
+    const session = await ctx.db
+      .query("listener_publish_sessions")
+      .withIndex("by_publish_user", (q) => q.eq("publishUser", args.user!))
+      .first();
+    if (!session || session.status !== "active") return { authorized: false };
+    if (session.path !== args.path) return { authorized: false };
+
+    const now = Date.now();
+    if (session.expiresAt <= now) {
+      await ctx.db.patch(session._id, { status: "expired" });
+      return { authorized: false };
+    }
+
+    const keyHash = await sha256Hex(secret);
+    if (keyHash !== session.publishKeyHash) return { authorized: false };
+
+    await ctx.db.patch(session._id, { lastRefreshAt: now });
+    return { authorized: true };
   },
 });
 

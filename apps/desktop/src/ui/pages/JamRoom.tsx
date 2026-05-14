@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Volume2,
   VolumeX,
+  Radio,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useUIStore } from "@/stores/uiStore";
@@ -31,9 +32,12 @@ import {
   useDisconnectPresence,
   useCreatePerformerJoinToken,
   useRefreshJamSession,
+  useStartListenerMode,
+  useStopListenerMode,
+  useRefreshListenerMode,
 } from "@/hooks/useRooms";
 import type { Id } from "@jam-app/convex";
-import type { JamClientState } from "../electron";
+import type { JamBroadcastState, JamClientState } from "../electron";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { usePostAudio } from "@/contexts/PostAudioContext";
 import { Timestamp } from "@/components/Timestamp";
@@ -44,6 +48,8 @@ import { censorText } from "@/lib/bannedWords";
 interface JamRoomProps {
   roomHandle?: string;
 }
+
+const BROADCAST_IPC_PORT = 39000;
 
 function nativeJamErrorMessage(error: unknown) {
   const message =
@@ -86,13 +92,26 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const disconnectPresence = useDisconnectPresence();
   const createPerformerJoinToken = useCreatePerformerJoinToken();
   const refreshJamSession = useRefreshJamSession();
+  const startListenerMode = useStartListenerMode();
+  const stopListenerMode = useStopListenerMode();
+  const refreshListenerMode = useRefreshListenerMode();
   const censorshipEnabled = useUIStore((s) => s.censorshipEnabled);
   const [message, setMessage] = useState("");
   const [clientError, setClientError] = useState<string | null>(null);
+  const [broadcastError, setBroadcastError] = useState<string | null>(null);
   const [isPerforming, setIsPerforming] = useState(false);
   const [clientState, setClientState] = useState<JamClientState>("idle");
+  const [broadcastState, setBroadcastState] = useState<JamBroadcastState>("idle");
+  const [broadcastHlsUrl, setBroadcastHlsUrl] = useState<string | null>(null);
+  const [publishSessionId, setPublishSessionId] = useState<Id<"listener_publish_sessions"> | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const jamSessionIdRef = useRef<Id<"jam_sessions"> | null>(null);
+  const listenerCleanupRef = useRef<{
+    isHost: boolean;
+    roomId: Id<"rooms"> | null;
+    publishSessionId: Id<"listener_publish_sessions"> | null;
+    stopListenerMode: typeof stopListenerMode;
+  } | null>(null);
 
   // HLS stream player (shared via context so StatusBar can control it too)
   const hlsPlayer = usePlayer();
@@ -205,6 +224,15 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     (s) => s.setCurrentJamRoomHandle
   );
   const handleLeaveRoom = useCallback(() => {
+    if (isHost) {
+      window.electron?.stopJamBroadcast?.().catch(() => {});
+      if (room?.id) {
+        const args = publishSessionId
+          ? { roomId: room.id as Id<"rooms">, publishSessionId }
+          : { roomId: room.id as Id<"rooms"> };
+        stopListenerMode(args).catch(() => {});
+      }
+    }
     if (sessionTokenRef.current) {
       disconnectPresence({ sessionToken: sessionTokenRef.current }).catch(
         () => {}
@@ -213,7 +241,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     }
     setCurrentJamRoomHandle(null);
     navigate("/jams");
-  }, [navigate, setCurrentJamRoomHandle, disconnectPresence]);
+  }, [isHost, room?.id, publishSessionId, navigate, setCurrentJamRoomHandle, disconnectPresence, stopListenerMode]);
 
   const handleJoinClient = useCallback(async () => {
     try {
@@ -241,6 +269,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         joinToken: launchContext.joinToken,
         codec: launchContext.codec,
         frames: launchContext.frames,
+        broadcastIpcPort: isHost ? BROADCAST_IPC_PORT : undefined,
       });
       if (result.success) {
         setIsPerforming(true);
@@ -255,7 +284,81 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         nativeJamErrorMessage(error)
       );
     }
-  }, [room?.id, createPerformerJoinToken]);
+  }, [room?.id, isHost, createPerformerJoinToken]);
+
+  const handleStartBroadcast = useCallback(async () => {
+    try {
+      setBroadcastError(null);
+      if (!window.electron) {
+        setBroadcastError("Electron API not available");
+        return;
+      }
+      if (!room?.id) {
+        setBroadcastError("Room is not ready");
+        return;
+      }
+      if (clientState !== "running" && clientState !== "launching") {
+        setBroadcastError("Start jamming before enabling listener mode");
+        return;
+      }
+
+      setBroadcastState("launching");
+      const launchContext = await startListenerMode({
+        roomId: room.id as Id<"rooms">,
+      });
+      setPublishSessionId(launchContext.publishSessionId);
+      setBroadcastHlsUrl(launchContext.hlsUrl);
+
+      const result = await window.electron.launchJamBroadcast({
+        roomId: String(room.id),
+        ipcPort: launchContext.ipcPort,
+        srtUrl: launchContext.srtUrl,
+        hlsUrl: launchContext.hlsUrl,
+      });
+      setBroadcastState(result.state);
+      setBroadcastHlsUrl(result.hlsUrl ?? launchContext.hlsUrl);
+
+      if (!result.success) {
+        await stopListenerMode({
+          roomId: room.id as Id<"rooms">,
+          publishSessionId: launchContext.publishSessionId,
+        }).catch(() => {});
+        setPublishSessionId(null);
+        setBroadcastError(result.error || "Failed to start listener mode");
+        return;
+      }
+    } catch (error) {
+      setBroadcastState("failed");
+      setBroadcastError(
+        error instanceof Error ? error.message : "Failed to start listener mode"
+      );
+    }
+  }, [clientState, room?.id, startListenerMode, stopListenerMode]);
+
+  const handleStopBroadcast = useCallback(async () => {
+    try {
+      setBroadcastError(null);
+      setBroadcastState("stopping");
+      const result = await window.electron?.stopJamBroadcast?.();
+      setBroadcastState(result?.state ?? "idle");
+      if (room?.id) {
+        const args = publishSessionId
+          ? { roomId: room.id as Id<"rooms">, publishSessionId }
+          : { roomId: room.id as Id<"rooms"> };
+        await stopListenerMode(args);
+      }
+      setPublishSessionId(null);
+      if (!result?.success) {
+        setBroadcastError(result?.error || "Failed to stop listener mode");
+        return;
+      }
+    } catch (error) {
+      setBroadcastState("failed");
+      setBroadcastError(
+        error instanceof Error ? error.message : "Failed to stop listener mode"
+      );
+    }
+  }, [room?.id, publishSessionId, stopListenerMode]);
 
   useEffect(() => {
     if (!window.electron || (clientState !== "launching" && clientState !== "running")) {
@@ -281,6 +384,80 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     poll().catch(() => {});
     return () => window.clearInterval(timer);
   }, [clientState]);
+
+  useEffect(() => {
+    if (
+      !window.electron ||
+      (broadcastState !== "launching" &&
+        broadcastState !== "running" &&
+        broadcastState !== "stopping")
+    ) {
+      return;
+    }
+
+    const poll = async () => {
+      const status = await window.electron?.getJamBroadcastStatus();
+      if (!status) return;
+      setBroadcastState(status.state);
+      if (status.hlsUrl) {
+        setBroadcastHlsUrl(status.hlsUrl);
+      }
+      if (status.state === "failed") {
+        setBroadcastError(status.error || "Native broadcaster failed");
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      poll().catch(() => {});
+    }, 2_000);
+    poll().catch(() => {});
+    return () => window.clearInterval(timer);
+  }, [broadcastState]);
+
+  useEffect(() => {
+    listenerCleanupRef.current = {
+      isHost: Boolean(isHost),
+      roomId: room?.id ? (room.id as Id<"rooms">) : null,
+      publishSessionId,
+      stopListenerMode,
+    };
+  }, [isHost, room?.id, publishSessionId, stopListenerMode]);
+
+  useEffect(() => {
+    return () => {
+      const cleanup = listenerCleanupRef.current;
+      if (!cleanup?.isHost || !cleanup.roomId) return;
+
+      window.electron?.stopJamBroadcast?.().catch(() => {});
+      const args = cleanup.publishSessionId
+        ? { roomId: cleanup.roomId, publishSessionId: cleanup.publishSessionId }
+        : { roomId: cleanup.roomId };
+      cleanup.stopListenerMode(args).catch(() => {});
+    };
+  }, []);
+
+  useEffect(() => {
+    if (broadcastState !== "running" || !publishSessionId) return;
+
+    const refresh = () => {
+      refreshListenerMode({ publishSessionId })
+        .then((result) => {
+          if (!result.refreshed) {
+            setBroadcastState("failed");
+            setBroadcastError("Listener mode session expired");
+            window.electron?.stopJamBroadcast?.().catch(() => {});
+          }
+        })
+        .catch((error) => {
+          setBroadcastError(
+            error instanceof Error ? error.message : "Failed to refresh listener mode"
+          );
+        });
+    };
+
+    const timer = window.setInterval(refresh, 60_000);
+    return () => window.clearInterval(timer);
+  }, [broadcastState, publishSessionId, refreshListenerMode]);
 
   useEffect(() => {
     if (clientState !== "running" || !jamSessionIdRef.current) return;
@@ -401,6 +578,28 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
               </Button>
               {isHost && (
                 <Button
+                  variant={broadcastState === "running" ? "outline" : "default"}
+                  size="sm"
+                  className={broadcastState === "running" ? "glass-solid border-border/50" : ""}
+                  onClick={broadcastState === "running" ? handleStopBroadcast : handleStartBroadcast}
+                  disabled={
+                    broadcastState === "launching" ||
+                    broadcastState === "stopping" ||
+                    (clientState !== "running" && clientState !== "launching")
+                  }
+                >
+                  <Radio className="h-3.5 w-3.5 mr-1.5" />
+                  {broadcastState === "launching"
+                    ? "Starting..."
+                    : broadcastState === "stopping"
+                      ? "Stopping..."
+                      : broadcastState === "running"
+                        ? "Stop Listener"
+                        : "Start Listener"}
+                </Button>
+              )}
+              {isHost && (
+                <Button
                   variant="outline"
                   size="sm"
                   className="glass-solid border-border/50"
@@ -425,6 +624,18 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
             <div className="glass-solid rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs text-destructive mt-2">
               <AlertTriangle className="h-3 w-3 shrink-0" />
               <span className="truncate">{clientError}</span>
+            </div>
+          )}
+          {(broadcastError || broadcastState === "running") && (
+            <div className={`glass-solid rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs mt-2 ${broadcastError ? "text-destructive" : "text-green-400"}`}>
+              {broadcastError ? (
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+              ) : (
+                <Radio className="h-3 w-3 shrink-0" />
+              )}
+              <span className="truncate">
+                {broadcastError || `Listener mode live: ${broadcastHlsUrl ?? room.stream_url ?? ""}`}
+              </span>
             </div>
           )}
         </div>

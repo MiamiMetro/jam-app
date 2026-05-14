@@ -12,5 +12,12 @@ crons.interval(
   (internal as any).mediaCleanup.runDailyCleanup
 );
 
+crons.interval(
+  "expire stale listener sessions",
+  { minutes: 1 },
+  (internal as any).rooms.expireStaleListenerSessions,
+  {}
+);
+
 export default crons;
 
