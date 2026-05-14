@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PostList from "@/components/posts/PostList";
@@ -20,12 +21,28 @@ const HomeScreen = () => {
         ListHeaderComponent={
           <>
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.headerIcon, { color: colors.mutedForeground }]}>
-                RSS
-              </Text>
-              <Text style={[styles.headerTitle, { color: colors.secondaryForeground }]}>
-                Feed
-              </Text>
+              <View style={styles.headerCopy}>
+                <Text style={[styles.headerEyebrow, { color: colors.mutedForeground }]}>
+                  Latest posts
+                </Text>
+                <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+                  Feed
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.headerIcon,
+                  { backgroundColor: colors.accentMuted, borderColor: colors.border },
+                ]}
+              >
+                <Ionicons
+                  accessibilityElementsHidden
+                  color={colors.primary}
+                  importantForAccessibility="no-hide-descendants"
+                  name="radio-outline"
+                  size={20}
+                />
+              </View>
             </View>
             <ComposePost profile={profile} />
           </>
@@ -50,17 +67,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomWidth: 1,
     flexDirection: "row",
-    gap: 8,
+    justifyContent: "space-between",
     paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
-  headerIcon: {
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerEyebrow: {
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0,
+    textTransform: "uppercase",
   },
   headerTitle: {
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: 24,
+    fontWeight: "900",
+    letterSpacing: 0,
+    marginTop: 2,
+  },
+  headerIcon: {
+    alignItems: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
   },
 });
