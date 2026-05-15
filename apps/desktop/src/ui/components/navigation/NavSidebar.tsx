@@ -16,8 +16,6 @@ import {
   LogOut,
   User as UserIcon,
   Settings as SettingsIcon,
-  Download,
-  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -41,7 +39,6 @@ import { api } from "@jam-app/convex";
 import { useAuthStore } from "@/stores/authStore";
 import { useUIStore } from "@/stores/uiStore";
 import { useAuthModalStore } from "@/stores/authModalStore";
-import type { UpdateStatus } from "@/electron";
 
 import { useFriends } from "@/hooks/useFriends";
 import { useOnlineUsers } from "@/hooks/useUsers";
@@ -115,7 +112,6 @@ export default function NavSidebar() {
   const setIsStatusChanging = usePresenceStore((state) => state.setIsStatusChanging);
 
   const [statusError, setStatusError] = useState<string | null>(null);
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: "idle" });
 
   const { data: friends = [] } = useFriends();
   const { data: onlineUsers = [] } = useOnlineUsers();
@@ -235,52 +231,6 @@ export default function NavSidebar() {
     return () => clearTimeout(timer);
   }, [statusError]);
 
-  useEffect(() => {
-    if (!window.electron?.getUpdateStatus || !window.electron?.onUpdateStatus) return;
-
-    let isMounted = true;
-    window.electron.getUpdateStatus().then((status) => {
-      if (isMounted) setUpdateStatus(status);
-    });
-
-    const removeListener = window.electron.onUpdateStatus((status) => {
-      setUpdateStatus(status);
-    });
-
-    return () => {
-      isMounted = false;
-      removeListener();
-    };
-  }, []);
-
-  const updateButtonLabel =
-    updateStatus.state === "downloaded"
-      ? "Restart to Update"
-      : updateStatus.state === "downloading"
-        ? `Downloading ${updateStatus.progress ?? 0}%`
-        : "Update Available";
-
-  const updateButtonDetail =
-    updateStatus.state === "downloaded"
-      ? "Ready to install"
-      : updateStatus.state === "available"
-        ? "Downloading in background"
-        : "Keep using Jam";
-
-  const isUpdateBusy = updateStatus.state === "checking" || updateStatus.state === "downloading";
-  const shouldShowUpdateButton =
-    updateStatus.state === "available" ||
-    updateStatus.state === "downloading" ||
-    updateStatus.state === "downloaded";
-
-  const handleUpdateClick = () => {
-    if (isUpdateBusy) return;
-    if (updateStatus.state === "downloaded") {
-      void window.electron?.installUpdate?.();
-      return;
-    }
-  };
-
   return (
     <div className="w-[220px] min-w-[220px] surface-elevated flex flex-col h-full select-none relative z-10">
       {/* Brand + drag region */}
@@ -383,26 +333,6 @@ export default function NavSidebar() {
 
       {/* Bottom section */}
       <div className="px-3 pb-3 flex-shrink-0 space-y-2">
-        {shouldShowUpdateButton && (
-          <button
-            type="button"
-            onClick={handleUpdateClick}
-            disabled={isUpdateBusy}
-            className="w-full flex items-center gap-3 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-left text-primary transition-colors hover:bg-primary/15 disabled:cursor-default disabled:opacity-80"
-          >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/15">
-              {isUpdateBusy ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">{updateButtonLabel}</span>
-              <span className="block truncate text-[11px] text-primary/75">{updateButtonDetail}</span>
-            </span>
-          </button>
-        )}
         {!isGuest && user ? (
           <div>
             <DropdownMenu>

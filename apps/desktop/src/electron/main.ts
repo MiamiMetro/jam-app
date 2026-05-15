@@ -1,13 +1,10 @@
-import { app, BrowserWindow, ipcMain, Menu, session, shell } from 'electron';
-import electronUpdater from 'electron-updater';
+import { app, BrowserWindow, ipcMain, Menu, protocol, session, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { isDev } from './util.js';
-
-const { autoUpdater } = electronUpdater;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,6 +23,47 @@ const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
+protocol.registerSchemesAsPrivileged([
+    {
+        scheme: 'jam',
+        privileges: {
+            standard: true,
+            secure: true,
+            supportFetchAPI: true,
+            corsEnabled: true,
+        },
+    },
+]);
+
+function getRendererContentType(filePath: string) {
+    const extension = path.extname(filePath).toLowerCase();
+    switch (extension) {
+        case '.html':
+            return 'text/html; charset=utf-8';
+        case '.js':
+            return 'text/javascript; charset=utf-8';
+        case '.css':
+            return 'text/css; charset=utf-8';
+        case '.json':
+            return 'application/json; charset=utf-8';
+        case '.svg':
+            return 'image/svg+xml';
+        case '.png':
+            return 'image/png';
+        case '.jpg':
+        case '.jpeg':
+            return 'image/jpeg';
+        case '.webp':
+            return 'image/webp';
+        case '.ico':
+            return 'image/x-icon';
+        case '.woff2':
+            return 'font/woff2';
+        default:
+            return 'application/octet-stream';
+    }
+}
 
 function getSavedTheme(): 'dark' | 'light' {
     try {
@@ -58,12 +96,6 @@ type JamBroadcastLaunchContext = {
     srtUrl: string;
     hlsUrl: string;
 };
-type UpdateStatus = {
-    state: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'unavailable' | 'error';
-    version?: string;
-    progress?: number;
-    error?: string;
-};
 let jamClientState: JamClientState = 'idle';
 let jamClientExitCode: number | null = null;
 let jamClientError: string | undefined;
@@ -73,51 +105,6 @@ let jamBroadcastExitCode: number | null = null;
 let jamBroadcastError: string | undefined;
 let jamBroadcastHlsUrl: string | undefined;
 let jamBroadcastStopRequested = false;
-let updateStatus: UpdateStatus = { state: 'idle' };
-
-autoUpdater.autoDownload = true;
-autoUpdater.autoInstallOnAppQuit = true;
-
-function setUpdateStatus(status: UpdateStatus) {
-    updateStatus = status;
-    for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) {
-            window.webContents.send('update-status', updateStatus);
-        }
-    }
-}
-
-function setupAutoUpdates() {
-    autoUpdater.on('checking-for-update', () => {
-        setUpdateStatus({ state: 'checking' });
-    });
-
-    autoUpdater.on('update-available', (info) => {
-        setUpdateStatus({ state: 'available', version: info.version });
-    });
-
-    autoUpdater.on('download-progress', (progress) => {
-        setUpdateStatus({
-            state: 'downloading',
-            progress: Math.round(progress.percent),
-        });
-    });
-
-    autoUpdater.on('update-downloaded', (info) => {
-        setUpdateStatus({ state: 'downloaded', version: info.version });
-    });
-
-    autoUpdater.on('update-not-available', () => {
-        setUpdateStatus({ state: 'unavailable' });
-    });
-
-    autoUpdater.on('error', (error) => {
-        setUpdateStatus({
-            state: 'error',
-            error: error instanceof Error ? error.message : 'Update check failed',
-        });
-    });
-}
 
 function getClientExecutablePath() {
     const platform = process.platform;
@@ -320,37 +307,6 @@ if (!gotTheLock) {
 
     let mainWindow: BrowserWindow | null = null;
 
-    setupAutoUpdates();
-
-    ipcMain.handle('get-update-status', async () => updateStatus);
-
-    ipcMain.handle('check-for-updates', async () => {
-        if (isDev()) {
-            setUpdateStatus({ state: 'unavailable' });
-            return updateStatus;
-        }
-
-        try {
-            await autoUpdater.checkForUpdates();
-            return updateStatus;
-        } catch (error) {
-            setUpdateStatus({
-                state: 'error',
-                error: error instanceof Error ? error.message : 'Update check failed',
-            });
-            return updateStatus;
-        }
-    });
-
-    ipcMain.handle('install-update', async () => {
-        if (updateStatus.state !== 'downloaded') {
-            return { success: false, error: 'No downloaded update is ready to install.' };
-        }
-
-        autoUpdater.quitAndInstall(false, true);
-        return { success: true };
-    });
-
     // IPC handler for opening external links
     ipcMain.handle('open-external', async (_event, url: string) => {
         try {
@@ -541,9 +497,40 @@ if (!gotTheLock) {
         const preloadPath = isDev()
             ? path.join(process.cwd(), 'dist-electron', 'preload.js')
             : path.join(__dirname, 'preload.js');
+        const appSession = session.fromPartition('persist:jam-desktop');
+
+        if (!isDev()) {
+            const rendererRoot = path.resolve(app.getAppPath(), 'dist-react');
+            appSession.protocol.handle('jam', (request) => {
+                const requestUrl = new URL(request.url);
+                const requestPath = decodeURIComponent(requestUrl.pathname);
+                const relativePath = requestPath === '/' || requestPath === ''
+                    ? 'index.html'
+                    : requestPath.slice(1);
+                const resolvedPath = path.resolve(rendererRoot, relativePath);
+
+                if (resolvedPath !== rendererRoot && !resolvedPath.startsWith(`${rendererRoot}${path.sep}`)) {
+                    return new Response('Forbidden', {
+                        status: 403,
+                        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                    });
+                }
+
+                try {
+                    return new Response(readFileSync(resolvedPath), {
+                        headers: { 'Content-Type': getRendererContentType(resolvedPath) },
+                    });
+                } catch {
+                    return new Response('Not found', {
+                        status: 404,
+                        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                    });
+                }
+            });
+        }
 
         // Configure Content Security Policy
-        session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+        appSession.webRequest.onHeadersReceived((details, callback) => {
             callback({
                 responseHeaders: {
                     ...details.responseHeaders,
@@ -552,7 +539,7 @@ if (!gotTheLock) {
                         "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " + // React needs unsafe-eval in dev
                         "style-src 'self' 'unsafe-inline'; " +
                         "img-src 'self' data: https:; " + // Allow images from HTTPS sources
-                        "connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.r2.cloudflarestorage.com https://*.welor.fun http://*.welor.fun:* http://localhost:* ws://localhost:*; " + // Convex + R2 uploads + media CDN + HLS + dev server
+                        "connect-src 'self' https://*.convex.cloud https://*.convex.site wss://*.convex.cloud https://*.r2.cloudflarestorage.com https://*.welor.fun http://*.welor.fun:* http://localhost:* ws://localhost:*; " + // Convex + R2 uploads + media CDN + HLS + dev server
                         "media-src 'self' https: http: blob:; " + // Allow HLS video streams
                         "font-src 'self' data:; " +
                         "object-src 'none'; " + // Block plugins
@@ -639,9 +626,9 @@ if (!gotTheLock) {
         mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
             const parsedUrl = new URL(navigationUrl);
 
-            // In dev, allow localhost. In production, only allow file protocol
+            // In dev, allow localhost. In production, only allow the app's native protocol.
             const allowedHosts = isDev() ? ['localhost', '127.0.0.1'] : [];
-            const allowedProtocols = ['file:', 'devtools:'];
+            const allowedProtocols = isDev() ? ['file:', 'devtools:'] : ['jam:', 'devtools:'];
 
             if (!allowedHosts.includes(parsedUrl.hostname) && !allowedProtocols.includes(parsedUrl.protocol)) {
                 event.preventDefault();
@@ -761,20 +748,12 @@ if (!gotTheLock) {
         // Show window when ready to prevent white screen flash
         mainWindow.once('ready-to-show', () => {
             mainWindow?.show();
-            if (!isDev()) {
-                void autoUpdater.checkForUpdates().catch((error) => {
-                    setUpdateStatus({
-                        state: 'error',
-                        error: error instanceof Error ? error.message : 'Update check failed',
-                    });
-                });
-            }
         });
 
         if (isDev()) {
             mainWindow.loadURL('http://localhost:5123');
         } else {
-            mainWindow.loadFile(path.join(app.getAppPath(), 'dist-react/index.html'));
+            mainWindow.loadURL('jam://jam/index.html');
         }
     });
 

@@ -18,11 +18,13 @@ const siteUrls = [process.env.SITE_URL, process.env.VITE_SITE_URL]
 const webOrigins =
   siteUrls.length > 0 ? siteUrls : ["http://localhost:5173"];
 
+export const nativeOrigins = ["jam://", "jam://jam"];
+
 export const authComponent = createClient<DataModel>(components.betterAuth);
 
 export const createAuth = (ctx: GenericCtx<DataModel>) =>
   betterAuth({
-    trustedOrigins: [...webOrigins, "jam://"],
+    trustedOrigins: [...webOrigins, ...nativeOrigins],
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: true,

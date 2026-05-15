@@ -1,7 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { authComponent, createAuth } from "./auth";
+import { authComponent, createAuth, nativeOrigins } from "./auth";
 import {
   finalizeUploadFromApp,
   finalizeUploadOptions,
@@ -11,7 +11,11 @@ import {
 
 const http = httpRouter();
 
-authComponent.registerRoutes(http, createAuth, { cors: true });
+authComponent.registerRoutes(http, createAuth, {
+  cors: {
+    allowedOrigins: nativeOrigins,
+  },
+});
 
 /**
  * Health check endpoint
