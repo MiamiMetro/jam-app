@@ -20,6 +20,10 @@
     "artifactName": "jam-desktop-Setup-${version}.${ext}",
     "icon": "desktopIcon.png",
     "asar": true,
+    "electronLanguages": [
+        "en-US",
+        "tr"
+    ],
     "npmRebuild": false,
     "publish": {
         "provider": "github",

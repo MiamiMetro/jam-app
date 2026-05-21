@@ -73,6 +73,10 @@ function listArtifacts() {
     .filter((path) => statSync(path).isFile())
     .filter((path) => {
       const lower = path.toLowerCase();
+      const name = lower.split(/[\\/]/).pop() ?? "";
+      if (name.startsWith("builder-")) {
+        return false;
+      }
       return (
         lower.endsWith(".exe") ||
         lower.endsWith(".dmg") ||
