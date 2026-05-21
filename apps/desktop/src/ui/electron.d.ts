@@ -1,5 +1,11 @@
 export type JamClientState = 'idle' | 'launching' | 'running' | 'failed' | 'exited';
 export type JamBroadcastState = 'idle' | 'launching' | 'running' | 'failed' | 'exited' | 'stopping';
+export type UpdateStatus = {
+    state: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'unavailable' | 'error';
+    version?: string;
+    progress?: number;
+    error?: string;
+};
 
 export interface JamClientLaunchContext {
     serverHost: string;
@@ -40,6 +46,10 @@ export interface ElectronAPI {
     onToggleTheme: (callback: () => void) => void;
     saveTheme: (theme: 'dark' | 'light') => void;
     updateTitleBarOverlay: (theme: 'dark' | 'light') => void;
+    getUpdateStatus: () => Promise<UpdateStatus>;
+    checkForUpdates: () => Promise<UpdateStatus>;
+    installUpdate: () => Promise<{ success: boolean; error?: string }>;
+    onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void;
     setPresenceSessionState: (state: { sessionToken: string | null; convexUrl?: string | null }) => void;
 }
 

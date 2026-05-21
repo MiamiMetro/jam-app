@@ -3,7 +3,7 @@
   "author": "MiamiMetro",
   "description": "jam desktop application",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -39,6 +39,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.35.1",
+    "electron-updater": "^6.8.3",
     "hls.js": "^1.6.15",
     "lucide-react": "^0.561.0",
     "react": "^19.2.0",

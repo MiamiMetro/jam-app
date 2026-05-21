@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, Menu, protocol, session, shell } from 'electron';
+import electronUpdater from 'electron-updater';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -6,6 +7,7 @@ import { spawn, ChildProcess } from 'child_process';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { isDev } from './util.js';
 
+const { autoUpdater } = electronUpdater;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -96,6 +98,12 @@ type JamBroadcastLaunchContext = {
     srtUrl: string;
     hlsUrl: string;
 };
+type UpdateStatus = {
+    state: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'unavailable' | 'error';
+    version?: string;
+    progress?: number;
+    error?: string;
+};
 let jamClientState: JamClientState = 'idle';
 let jamClientExitCode: number | null = null;
 let jamClientError: string | undefined;
@@ -105,6 +113,77 @@ let jamBroadcastExitCode: number | null = null;
 let jamBroadcastError: string | undefined;
 let jamBroadcastHlsUrl: string | undefined;
 let jamBroadcastStopRequested = false;
+let updateStatus: UpdateStatus = { state: 'idle' };
+let updateCheckInFlight = false;
+
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+function setUpdateStatus(status: UpdateStatus) {
+    updateStatus = status;
+    for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) {
+            window.webContents.send('update-status', updateStatus);
+        }
+    }
+}
+
+function setupAutoUpdates() {
+    autoUpdater.on('checking-for-update', () => {
+        setUpdateStatus({ state: 'checking' });
+    });
+
+    autoUpdater.on('update-available', (info) => {
+        setUpdateStatus({ state: 'available', version: info.version });
+    });
+
+    autoUpdater.on('download-progress', (progress) => {
+        setUpdateStatus({
+            state: 'downloading',
+            progress: Math.round(progress.percent),
+        });
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+        setUpdateStatus({ state: 'downloaded', version: info.version });
+    });
+
+    autoUpdater.on('update-not-available', () => {
+        setUpdateStatus({ state: 'unavailable' });
+    });
+
+    autoUpdater.on('error', (error) => {
+        setUpdateStatus({
+            state: 'error',
+            error: error instanceof Error ? error.message : 'Update check failed',
+        });
+    });
+}
+
+async function checkForUpdates() {
+    if (isDev() || !app.isPackaged) {
+        setUpdateStatus({ state: 'unavailable' });
+        return updateStatus;
+    }
+
+    if (updateCheckInFlight) {
+        return updateStatus;
+    }
+
+    updateCheckInFlight = true;
+    try {
+        await autoUpdater.checkForUpdates();
+        return updateStatus;
+    } catch (error) {
+        setUpdateStatus({
+            state: 'error',
+            error: error instanceof Error ? error.message : 'Update check failed',
+        });
+        return updateStatus;
+    } finally {
+        updateCheckInFlight = false;
+    }
+}
 
 function getClientExecutablePath() {
     const platform = process.platform;
@@ -306,6 +385,19 @@ if (!gotTheLock) {
     });
 
     let mainWindow: BrowserWindow | null = null;
+
+    setupAutoUpdates();
+
+    ipcMain.handle('get-update-status', async () => updateStatus);
+    ipcMain.handle('check-for-updates', async () => checkForUpdates());
+    ipcMain.handle('install-update', async () => {
+        if (updateStatus.state !== 'downloaded') {
+            return { success: false, error: 'No downloaded update is ready to install.' };
+        }
+
+        autoUpdater.quitAndInstall(false, true);
+        return { success: true };
+    });
 
     // IPC handler for opening external links
     ipcMain.handle('open-external', async (_event, url: string) => {
@@ -748,6 +840,7 @@ if (!gotTheLock) {
         // Show window when ready to prevent white screen flash
         mainWindow.once('ready-to-show', () => {
             mainWindow?.show();
+            void checkForUpdates();
         });
 
         if (isDev()) {
