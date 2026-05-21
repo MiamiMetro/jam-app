@@ -46,6 +46,7 @@ export interface ElectronAPI {
     onToggleTheme: (callback: () => void) => void;
     saveTheme: (theme: 'dark' | 'light') => void;
     updateTitleBarOverlay: (theme: 'dark' | 'light') => void;
+    getAppVersion: () => Promise<string>;
     getUpdateStatus: () => Promise<UpdateStatus>;
     checkForUpdates: () => Promise<UpdateStatus>;
     installUpdate: () => Promise<{ success: boolean; error?: string }>;

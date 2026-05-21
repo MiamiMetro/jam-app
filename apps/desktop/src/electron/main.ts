@@ -388,6 +388,7 @@ if (!gotTheLock) {
 
     setupAutoUpdates();
 
+    ipcMain.handle('get-app-version', async () => app.getVersion());
     ipcMain.handle('get-update-status', async () => updateStatus);
     ipcMain.handle('check-for-updates', async () => checkForUpdates());
     ipcMain.handle('install-update', async () => {

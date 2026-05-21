@@ -4,6 +4,9 @@
  * Yeni kelime eklemek için bu diziye string eklemeniz yeterlidir.
  */
 export const BANNED_WORDS: string[] = [
+  // Test words
+  "patates",
+
   // Türkçe
   "amk",
   "bok",

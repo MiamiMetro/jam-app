@@ -34,6 +34,7 @@ export default function Settings() {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
 
   const toFriendlyError = (raw: unknown): string => {
     const message = typeof raw === "string" ? raw : (raw as any)?.message ?? "Request failed.";
@@ -53,6 +54,17 @@ export default function Settings() {
     setUsername(me.username ?? "");
     setDmPrivacy((me.dm_privacy as "friends" | "everyone") ?? "friends");
   }, [me?.id, me?.username, me?.dm_privacy]);
+
+  useEffect(() => {
+    let isMounted = true;
+    window.electron?.getAppVersion?.().then((version) => {
+      if (isMounted) setAppVersion(version);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const usernameChanged = useMemo(() => {
     if (!me) return false;
@@ -234,9 +246,9 @@ export default function Settings() {
                   <Eye className="h-4 w-4 text-muted-foreground" />
                 )}
                 <div>
-                  <p className="text-sm font-medium">Sansür (Censorship)</p>
+                  <p className="text-sm font-medium">Censorship</p>
                   <p className="text-xs text-muted-foreground">
-                    Yasaklı kelimeleri otomatik olarak *** şeklinde maskeler.
+                    Automatically masks banned words as ***.
                   </p>
                 </div>
               </div>
@@ -295,6 +307,14 @@ export default function Settings() {
                   <ExternalLink className="h-3.5 w-3.5" />
                 </Button>
               ))}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-border glass-solid p-4 space-y-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">About</h2>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Version</span>
+              <span className="font-medium text-foreground">{appVersion ?? "Web"}</span>
             </div>
           </section>
 
