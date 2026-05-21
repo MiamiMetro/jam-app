@@ -396,7 +396,7 @@ if (!gotTheLock) {
             return { success: false, error: 'No downloaded update is ready to install.' };
         }
 
-        autoUpdater.quitAndInstall(false, true);
+        autoUpdater.quitAndInstall(true, true);
         return { success: true };
     });
 
