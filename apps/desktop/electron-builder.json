@@ -17,6 +17,7 @@
     "directories": {
         "output": "dist"
     },
+    "artifactName": "jam-desktop-Setup-${version}.${ext}",
     "icon": "desktopIcon.png",
     "asar": true,
     "npmRebuild": false,

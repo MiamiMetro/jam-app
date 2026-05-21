@@ -258,6 +258,8 @@ export default function NavSidebar() {
       ? "Restart to Update"
       : updateStatus.state === "downloading"
         ? `Downloading ${updateStatus.progress ?? 0}%`
+        : updateStatus.state === "error"
+          ? "Update Failed"
         : "Update Available";
 
   const updateButtonDetail =
@@ -265,18 +267,25 @@ export default function NavSidebar() {
       ? "Ready to install"
       : updateStatus.state === "available"
         ? "Downloading in background"
+        : updateStatus.state === "error"
+          ? updateStatus.error ?? "Try again later"
         : "Keep using Jam";
 
   const isUpdateBusy = updateStatus.state === "checking" || updateStatus.state === "downloading";
   const shouldShowUpdateButton =
     updateStatus.state === "available" ||
     updateStatus.state === "downloading" ||
-    updateStatus.state === "downloaded";
+    updateStatus.state === "downloaded" ||
+    updateStatus.state === "error";
 
   const handleUpdateClick = () => {
     if (isUpdateBusy) return;
     if (updateStatus.state === "downloaded") {
       void window.electron?.installUpdate?.();
+      return;
+    }
+    if (updateStatus.state === "error") {
+      void window.electron?.checkForUpdates?.();
     }
   };
 

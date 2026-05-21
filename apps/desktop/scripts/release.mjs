@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,6 +21,7 @@ const desktopPackage = JSON.parse(readFileSync(desktopPackagePath, "utf8"));
 const tag = `v${desktopPackage.version}`;
 const releaseTitle = tag;
 const releaseNotes = `Jam desktop ${tag}`;
+const distDir = join(desktopDir, "dist");
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -67,7 +68,6 @@ function commandName(command) {
 }
 
 function listArtifacts() {
-  const distDir = join(desktopDir, "dist");
   return readdirSync(distDir)
     .map((name) => join(distDir, name))
     .filter((path) => statSync(path).isFile())
@@ -83,6 +83,8 @@ function listArtifacts() {
       );
     });
 }
+
+rmSync(distDir, { recursive: true, force: true });
 
 run(commandName("npm"), ["run", `dist:${target}`], {
   shell: process.platform === "win32",
