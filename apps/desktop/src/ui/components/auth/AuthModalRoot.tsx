@@ -4,7 +4,7 @@ import LoginModal from "@/components/auth/LoginModal";
 import SignupModal from "@/components/auth/SignupModal";
 import UsernameSetupModal from "@/components/auth/UsernameSetupModal";
 import { useAuthModalStore } from "@/stores/authModalStore";
-import { useProfileStore } from "@/hooks/useEnsureProfile";
+import { useProfileStore } from "@/stores/profileStore";
 import { useAuthStore } from "@/stores/authStore";
 
 export default function AuthModalRoot() {

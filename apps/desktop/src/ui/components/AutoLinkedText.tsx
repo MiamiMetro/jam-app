@@ -8,7 +8,6 @@ interface AutoLinkedTextProps {
   className?: string;
   linkClassName?: string;
 }
-
 /**
  * Component that automatically detects URLs in text and converts them to clickable links.
  * Internal links (starting with /) navigate within the app.
@@ -56,20 +55,4 @@ export function AutoLinkedText({ text, className, linkClassName = "text-blue-500
       })}
     </span>
   );
-}
-
-/**
- * Hook to extract URLs from text
- */
-export function useExtractUrls(text: string): string[] {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  return text.match(urlRegex) || [];
-}
-
-/**
- * Hook to check if text contains URLs
- */
-export function useHasUrls(text: string): boolean {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  return urlRegex.test(text);
 }

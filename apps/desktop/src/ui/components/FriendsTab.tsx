@@ -20,8 +20,8 @@ import {
   useConversations,
   useOnlineUsers,
   useEnsureDmConversation,
-  type PresenceStatus,
 } from "@/hooks/useUsers";
+import type { PresenceStatus } from "@/stores/presenceStore";
 import { Timestamp } from "@/components/Timestamp";
 import DMConversation from "@/components/social/DMConversation";
 import { ErrorBoundary } from "@/components/ErrorBoundary";

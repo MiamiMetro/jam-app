@@ -1,5 +1,5 @@
 // RoomFormDialog.tsx — Shared create/edit room dialog with glass styling
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ComponentType } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,9 +80,6 @@ function RoomFormBody({
   isCreate: boolean;
 }) {
   const [form, setForm] = useState<RoomFormData>(initialData);
-  useEffect(() => {
-    setForm(initialData);
-  }, [initialData]);
 
   const submitLabel = isCreate
     ? isPending ? "Creating..." : "Create Room"
@@ -261,6 +258,9 @@ export function RoomFormDialog({
   const description = isCreate
     ? "Create your personal jam room. You can only have one room, but you can manage its settings anytime."
     : "Update your room settings. Changes will apply immediately.";
+  const formKey = isCreate
+    ? `create-${open}`
+    : `edit-${open}-${initialData?.handle ?? ""}-${initialData?.name ?? ""}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -270,6 +270,7 @@ export function RoomFormDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <RoomFormBody
+          key={formKey}
           initialData={initialData ?? EMPTY_FORM}
           onSubmit={onSubmit}
           isPending={isPending}

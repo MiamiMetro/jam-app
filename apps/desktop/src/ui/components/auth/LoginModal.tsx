@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useAuthModalStore } from "@/stores/authModalStore";
+import { getErrorMessage } from "@/lib/errors";
 import { AuthModalShell } from "./AuthModalShell";
 
 export default function LoginModal() {
@@ -30,8 +31,8 @@ export default function LoginModal() {
       setPassword("");
       setError(null);
       close();
-    } catch (err: any) {
-      setError(err.message || "Login failed");
+    } catch (err) {
+      setError(getErrorMessage(err, "Login failed"));
     } finally {
       setIsSubmitting(false);
     }

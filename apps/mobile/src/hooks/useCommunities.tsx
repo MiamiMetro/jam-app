@@ -70,7 +70,7 @@ export function useJoinedCommunities() {
   );
 
   return {
-    data: results,
+    data: results as CommunityListItem[],
     fetchNextPage: () => loadMore(50),
     hasNextPage: status === "CanLoadMore",
     isLoading: status === "LoadingFirstPage",

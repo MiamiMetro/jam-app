@@ -4,6 +4,11 @@ import Hls from "hls.js";
 type PlayingRef = { current: boolean };
 type HlsAudioElement = HTMLAudioElement & { __playingRef?: PlayingRef };
 
+function setAudioPlayingRef(audio: HlsAudioElement | null, isPlaying: boolean) {
+  const playingRef = audio?.__playingRef;
+  if (playingRef) playingRef.current = isPlaying;
+}
+
 export function useHLSPlayer(streamUrl?: string) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -322,8 +327,7 @@ export function useHLSPlayer(streamUrl?: string) {
         : "Failed to play stream");
       setIsPlaying(false);
       setIsLoading(false);
-      const playingRef = (audioRef.current as HlsAudioElement | null)?.__playingRef;
-      if (playingRef) playingRef.current = false;
+      setAudioPlayingRef(audioRef.current as HlsAudioElement | null, false);
     }
   }, [initializeHLS]);
 
@@ -335,8 +339,7 @@ export function useHLSPlayer(streamUrl?: string) {
       setIsPlaying(false);
       
       // Update playing ref
-      const playingRef = (audioRef.current as HlsAudioElement).__playingRef;
-      if (playingRef) playingRef.current = false;
+      setAudioPlayingRef(audioRef.current as HlsAudioElement, false);
     }
     // Stop loading the stream when paused to save bandwidth
     if (hlsRef.current) {

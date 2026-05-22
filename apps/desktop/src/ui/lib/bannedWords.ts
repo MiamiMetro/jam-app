@@ -3,7 +3,7 @@
  * Kullanıcı bu listeyi göremez ve değiştiremez.
  * Yeni kelime eklemek için bu diziye string eklemeniz yeterlidir.
  */
-export const BANNED_WORDS: string[] = [
+const BANNED_WORDS: string[] = [
   // Test words
   "patates",
 

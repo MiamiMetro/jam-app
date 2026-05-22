@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCreateCommunity, useCommunityCreatedCount } from "@/hooks/useCommunities";
 import { COMMUNITY_THEME_COLOR_KEYS, COMMUNITY_TAGS, getCommunityColors } from "@/lib/communityColors";
+import { getErrorMessage } from "@/lib/errors";
 
 interface CreateCommunityDialogProps {
   open: boolean;
@@ -79,8 +80,8 @@ export function CreateCommunityDialog({ open, onOpenChange }: CreateCommunityDia
       });
       onOpenChange(false);
       navigate(`/community/${handle.trim()}`);
-    } catch (err: any) {
-      setError(err?.message || "Failed to create community.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to create community."));
     }
   };
 

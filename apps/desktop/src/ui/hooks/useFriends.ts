@@ -3,7 +3,7 @@ import { useState } from "react";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
 import { useAuthStore } from "@/stores/authStore";
-import { useProfileStore } from "./useEnsureProfile";
+import { useProfileStore } from "@/stores/profileStore";
 import { useConvexAuthStore } from "./useConvexAuth";
 import type { User } from "@/lib/api/types";
 

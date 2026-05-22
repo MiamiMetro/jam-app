@@ -164,10 +164,20 @@ export function useCommunityPosts(communityId: string | undefined) {
 }
 
 export function useGlobalPosts() {
-  const result = usePosts();
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.posts.getFeedPaginated,
+    {},
+    { initialNumItems: 20 },
+  );
+  const flags = getPaginatedStatusFlags(status);
+
   return {
-    ...result,
-    data: result.data.filter((post) => !post.communityId),
+    data: results.map(convertPost).filter((post) => !post.communityId),
+    posts: results,
+    ...flags,
+    fetchNextPage: () => loadMore(20),
+    loadMore,
+    refetch: () => {},
   };
 }
 
@@ -362,13 +372,19 @@ export function usePostLikes(postId: string | null) {
   const flags = getPaginatedStatusFlags(status);
 
   return {
-    data: results,
+    data: results as Array<{
+      avatar_url?: string | null;
+      display_name?: string | null;
+      id: string;
+      liked_at: string;
+      username: string;
+    }>,
     ...flags,
     fetchNextPage: () => loadMore(20),
   };
 }
 
-export function useUserPosts(username: string | undefined) {
+export function useUserPosts(username: string) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.posts.getByUsernamePaginated,
     username ? { username } : "skip",

@@ -217,7 +217,7 @@ export default function DMConversation({
               </Button>
             </div>
           )}
-          {messages.map((message: any, index: number) => {
+          {messages.map((message, index) => {
             const isOwn = message.senderId === user?.id;
             const isFirstUnread = shouldShowUnreadDivider(
               message, index, messages, isOwn,

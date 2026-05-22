@@ -16,8 +16,9 @@ import { Label } from "@/components/ui/label";
 
 import { useAuthStore } from "@/stores/authStore";
 import { useAuthModalStore } from "@/stores/authModalStore";
-import { useProfileStore } from "@/hooks/useEnsureProfile";
+import { useProfileStore } from "@/stores/profileStore";
 import { Logo } from "@/components/Logo";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function UsernameSetupModal() {
   const { isOpen, mode, close } = useAuthModalStore();
@@ -53,8 +54,8 @@ export default function UsernameSetupModal() {
       setDisplayName("");
       setError(null);
       close();
-    } catch (err: any) {
-      const msg = err.message || "Failed to create profile";
+    } catch (err) {
+      const msg = getErrorMessage(err, "Failed to create profile");
       if (msg.includes("USERNAME_TAKEN:")) {
         setError("Username already taken. Please try a different one.");
       } else if (msg.includes("USERNAME_RESERVED:")) {

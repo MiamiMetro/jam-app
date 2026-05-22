@@ -1,6 +1,5 @@
 import { useConvex, useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AppState } from "react-native";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
 import type { User } from "@/types";
@@ -183,54 +182,21 @@ export function useOnlineUsers() {
 }
 
 export function useOnlineIdsSnapshot(userIds: Id<"profiles">[], enabled = true) {
-  const convex = useConvex();
   const stableUserIds = useMemo(
     () => Array.from(new Map(userIds.map((id) => [String(id), id])).values()),
     [userIds],
   );
-  const idsKey = useMemo(() => stableUserIds.map(String).join(","), [stableUserIds]);
-  const [data, setData] = useState<Id<"profiles">[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const canQuery = enabled && stableUserIds.length > 0;
+  const result = useQuery(
+    api.users.getOnlineIds,
+    canQuery ? { userIds: stableUserIds } : "skip",
+  );
 
-  useEffect(() => {
-    if (!enabled || stableUserIds.length === 0) {
-      setData([]);
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-    const fetchOnlineIds = async () => {
-      setIsLoading(true);
-      try {
-        const result = await convex.query(api.users.getOnlineIds, {
-          userIds: stableUserIds,
-        });
-        if (!cancelled) {
-          setData(result);
-          setError(null);
-        }
-      } catch (err) {
-        if (!cancelled) setError(err as Error);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void fetchOnlineIds();
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void fetchOnlineIds();
-    });
-
-    return () => {
-      cancelled = true;
-      subscription.remove();
-    };
-  }, [convex, enabled, idsKey, stableUserIds]);
-
-  return { data, error, isLoading };
+  return {
+    data: result ?? [],
+    error: null,
+    isLoading: canQuery && result === undefined,
+  };
 }
 
 export function useUser(username: string | undefined) {

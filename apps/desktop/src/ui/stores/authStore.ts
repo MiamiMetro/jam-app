@@ -2,8 +2,12 @@ import { create } from 'zustand';
 import { authClient } from '@/lib/auth-client';
 import type { User } from '@/lib/api/types';
 import { useConvexAuthStore } from '@/hooks/useConvexAuth';
-import { useProfileStore } from '@/hooks/useEnsureProfile';
+import { useProfileStore } from './profileStore';
 import { useUIStore } from './uiStore';
+
+type AuthSessionWithUser = {
+  user?: User | null;
+};
 
 interface AuthState {
   isGuest: boolean;
@@ -50,7 +54,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
 
-      const user = (session as any).user as User | null | undefined;
+      const user = (session as unknown as AuthSessionWithUser).user;
       set({ user: user ?? null, isGuest: false, isLoading: false, pendingProfile: null });
     } catch (error) {
       console.error('Session check failed:', error);

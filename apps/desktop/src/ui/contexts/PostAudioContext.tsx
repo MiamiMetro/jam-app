@@ -1,7 +1,7 @@
 // PostAudioContext.tsx — Global singleton audio player for posts & comments
 // Ensures only one audio plays at a time and survives virtual scroll unmounts.
 import { createContext, useContext, useRef, useState, useCallback, useEffect } from "react";
-import { usePlayer } from "@/contexts/PlayerContext";
+import { usePlayer } from "@/contexts/usePlayer";
 
 export interface PostAudioTrack {
   id: string;

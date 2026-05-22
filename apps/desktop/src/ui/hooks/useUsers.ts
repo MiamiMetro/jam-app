@@ -5,7 +5,7 @@ import type { Id } from "@jam-app/convex";
 import type { User } from "@/lib/api/types";
 import { useAuthStore } from "@/stores/authStore";
 import { usePresenceStore } from "@/stores/presenceStore";
-import { useProfileStore } from "./useEnsureProfile";
+import { useProfileStore } from "@/stores/profileStore";
 import { useConvexAuthStore } from "./useConvexAuth";
 
 export type PresenceStatus = "online" | "away" | "busy";
@@ -193,73 +193,20 @@ export const useOnlineIdsSnapshot = (
   userIds: Id<"profiles">[],
   enabled = true
 ) => {
-  const convex = useConvex();
   const stableUserIds = useMemo(
     () => Array.from(new Map(userIds.map((id) => [String(id), id])).values()),
     [userIds]
   );
-  const idsKey = useMemo(
-    () => stableUserIds.map((id) => String(id)).join(","),
-    [stableUserIds]
+  const canQuery = enabled && stableUserIds.length > 0;
+  const result = useQuery(
+    api.users.getOnlineIds,
+    canQuery ? { userIds: stableUserIds } : "skip"
   );
 
-  const [data, setData] = useState<Id<"profiles">[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    if (!enabled) {
-      setData([]);
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-    const fetchOnlineIds = async () => {
-      try {
-        const result = await convex.query(api.users.getOnlineIds, {
-          userIds: stableUserIds,
-        });
-        if (!cancelled) {
-          setData(result);
-          setError(null);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err as Error);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    setIsLoading(true);
-    void fetchOnlineIds();
-
-    const intervalId = window.setInterval(() => {
-      void fetchOnlineIds();
-    }, 60_000);
-
-    const handleWindowFocus = () => {
-      void fetchOnlineIds();
-    };
-
-    window.addEventListener("focus", handleWindowFocus);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", handleWindowFocus);
-    };
-  }, [convex, enabled, idsKey, stableUserIds]);
-
   return {
-    data,
-    isLoading,
-    error,
+    data: result ?? [],
+    isLoading: canQuery && result === undefined,
+    error: null,
   };
 };
 
@@ -453,28 +400,27 @@ export const useMessages = (userId: string, conversationId: string) => {
   const [initialLastReadMessageAt, setInitialLastReadMessageAt] = useState<number | null>(null);
   const [hasInitializedLastRead, setHasInitializedLastRead] = useState(false);
   const previousConversationIdRef = useRef<string | null>(null);
-  const conversationOpenedAtRef = useRef<number>(Date.now());
+  const [conversationOpenedAt, setConversationOpenedAt] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!conversationId) {
-      previousConversationIdRef.current = null;
+    const timer = window.setTimeout(() => {
+      if (!conversationId) {
+        previousConversationIdRef.current = null;
+        setConversationOpenedAt(null);
+      } else if (previousConversationIdRef.current !== conversationId) {
+        previousConversationIdRef.current = conversationId;
+        setConversationOpenedAt(Date.now());
+      } else {
+        return;
+      }
       setOlderMessages([]);
       setNextCursor(null);
       setHasMore(false);
       setIsLoadingMore(false);
       setInitialLastReadMessageAt(null);
       setHasInitializedLastRead(false);
-      return;
-    }
-    if (previousConversationIdRef.current === conversationId) return;
-    previousConversationIdRef.current = conversationId;
-    setOlderMessages([]);
-    setNextCursor(null);
-    setHasMore(false);
-    setIsLoadingMore(false);
-    setInitialLastReadMessageAt(null);
-    setHasInitializedLastRead(false);
-    conversationOpenedAtRef.current = Date.now();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [conversationId]);
 
   const firstPageResult = useQuery(
@@ -483,14 +429,17 @@ export const useMessages = (userId: string, conversationId: string) => {
   );
 
   useEffect(() => {
-    if (firstPageResult?.data && !hasInitializedLastRead) {
-      setInitialLastReadMessageAt(firstPageResult.lastReadMessageAt ?? null);
-      setHasInitializedLastRead(true);
-    }
-    if (firstPageResult && olderMessages.length === 0) {
-      setNextCursor(firstPageResult.nextCursor ?? null);
-      setHasMore(firstPageResult.hasMore ?? false);
-    }
+    const timer = window.setTimeout(() => {
+      if (firstPageResult?.data && !hasInitializedLastRead) {
+        setInitialLastReadMessageAt(firstPageResult.lastReadMessageAt ?? null);
+        setHasInitializedLastRead(true);
+      }
+      if (firstPageResult && olderMessages.length === 0) {
+        setNextCursor(firstPageResult.nextCursor ?? null);
+        setHasMore(firstPageResult.hasMore ?? false);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [firstPageResult, hasInitializedLastRead, olderMessages.length]);
 
   const convex = useConvex();
@@ -523,13 +472,13 @@ export const useMessages = (userId: string, conversationId: string) => {
     }
   };
 
-  const allMessages = useMemo(() => {
+  const allMessages = (() => {
     if (!firstPageResult?.data) return olderMessages;
     const firstPageMessages = firstPageResult.data.map(convertMessage);
     const firstPageIds = new Set(firstPageMessages.map((m: LocalUIMessage) => String(m.id)));
     const dedupedOlder = olderMessages.filter((m) => !firstPageIds.has(String(m.id)));
     return [...dedupedOlder, ...firstPageMessages];
-  }, [olderMessages, firstPageResult?.data]);
+  })();
 
   const reset = () => {
     setOlderMessages([]);
@@ -550,7 +499,7 @@ export const useMessages = (userId: string, conversationId: string) => {
     fetchNextPage,
     refetch: reset,
     lastReadMessageAt: initialLastReadMessageAt,
-    conversationOpenedAt: conversationOpenedAtRef.current,
+    conversationOpenedAt,
     otherParticipantLastRead: firstPageResult?.otherParticipantLastRead ?? null,
     error: null,
   };

@@ -1,6 +1,7 @@
 // JamsTab.tsx — Hero landing page for live jam rooms
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import type { Id } from "@jam-app/convex";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/SearchInput";
 import { RoomFormDialog, type RoomFormData } from "@/components/RoomFormDialog";
@@ -19,7 +20,7 @@ import {
 import { useAuthStore } from "@/stores/authStore";
 import { useActiveCommunityRooms, useActiveRooms, useMyRoom, useCreateRoom, useUpdateRoom, useActivateRoom, useDeactivateRoom, useFriendsInRooms } from "@/hooks/useRooms";
 import { useConvexAuthStore } from "@/hooks/useConvexAuth";
-import { useProfileStore } from "@/hooks/useEnsureProfile";
+import { useProfileStore } from "@/stores/profileStore";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingState } from "@/components/LoadingState";
@@ -51,13 +52,7 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
   const [isToggling, setIsToggling] = useState(false);
   const isUserRoomReady = isGuest || !user || (isAuthSet && isProfileReady && !myRoomLoading);
   const isInitialJamsLoading = roomsLoading || communityRoomsLoading || !isUserRoomReady;
-  const [hasLoadedJams, setHasLoadedJams] = useState(false);
-
-  useEffect(() => {
-    if (!isInitialJamsLoading) {
-      setHasLoadedJams(true);
-    }
-  }, [isInitialJamsLoading]);
+  const hasLoadedJams = !isInitialJamsLoading;
 
   const handleSearchChange = useCallback((query: string) => {
     const params: Record<string, string> = {};
@@ -96,7 +91,7 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
 
     try {
       await updateRoom({
-        roomId: myRoom.id as any,
+        roomId: myRoom.id as Id<"rooms">,
         name: data.name.trim(),
         description: data.description.trim() || undefined,
         genre: data.genre.trim() || undefined,
@@ -117,9 +112,9 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
     setIsToggling(true);
     try {
       if (myRoom.is_active) {
-        await deactivateRoom({ roomId: myRoom.id as any });
+        await deactivateRoom({ roomId: myRoom.id as Id<"rooms"> });
       } else {
-        await activateRoom({ roomId: myRoom.id as any });
+        await activateRoom({ roomId: myRoom.id as Id<"rooms"> });
       }
     } catch (error) {
       console.error("Failed to toggle room:", error);

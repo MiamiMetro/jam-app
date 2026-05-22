@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Search, X } from "lucide-react";
-import { useDebouncedValue } from "@tanstack/react-pacer";
 
 interface SearchInputProps {
   placeholder?: string;
@@ -20,23 +19,37 @@ export function SearchInput({
   debounceMs = 300,
 }: SearchInputProps) {
   const [input, setInput] = useState(value);
-  const [debounced] = useDebouncedValue(input, { wait: debounceMs });
+  const searchTimeoutRef = useRef<number | null>(null);
   const onSearchRef = useRef(onSearch);
-  onSearchRef.current = onSearch;
 
-  // Sync external value changes (e.g. URL param clears)
   useEffect(() => {
-    setInput(value);
-  }, [value]);
+    onSearchRef.current = onSearch;
+  }, [onSearch]);
 
-  // Fire onSearch when debounced value changes — use ref to avoid infinite loops
-  // when onSearch is a new function reference on every parent render
   useEffect(() => {
-    onSearchRef.current(debounced);
-  }, [debounced]);
+    return () => {
+      if (searchTimeoutRef.current) {
+        window.clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const updateSearch = (nextValue: string) => {
+    setInput(nextValue);
+    if (searchTimeoutRef.current) {
+      window.clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = window.setTimeout(() => {
+      onSearchRef.current(nextValue);
+    }, debounceMs);
+  };
 
   const handleClear = () => {
     setInput("");
+    if (searchTimeoutRef.current) {
+      window.clearTimeout(searchTimeoutRef.current);
+    }
+    onSearchRef.current("");
   };
 
   return (
@@ -47,7 +60,7 @@ export function SearchInput({
           type="text"
           placeholder={placeholder}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => updateSearch(e.target.value)}
           className="pl-10 pr-8 border-0 bg-transparent shadow-none focus:ring-0"
         />
         {input && (

@@ -11,6 +11,7 @@ import {
   type Community,
 } from "@/hooks/useCommunities";
 import { COMMUNITY_THEME_COLOR_KEYS, COMMUNITY_TAGS, getCommunityColors } from "@/lib/communityColors";
+import { getErrorMessage } from "@/lib/errors";
 
 interface EditCommunityDialogProps {
   open: boolean;
@@ -46,28 +47,34 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
   // Sync state when community data arrives or dialog opens
   useEffect(() => {
     if (!community) return;
-    setName(community.name ?? "");
-    setDescription(community.description ?? "");
-    setThemeColor(community.theme_color ?? "purple");
-    setTags(community.tags ?? []);
-    setAvatarUrl(community.avatar_url ?? "");
-    setBannerUrl(community.banner_url ?? "");
-    setPendingAvatarFile(null);
-    setPendingBannerFile(null);
-    setError(null);
-  }, [community?.id, open]);
+    const timer = window.setTimeout(() => {
+      setName(community.name ?? "");
+      setDescription(community.description ?? "");
+      setThemeColor(community.theme_color ?? "purple");
+      setTags(community.tags ?? []);
+      setAvatarUrl(community.avatar_url ?? "");
+      setBannerUrl(community.banner_url ?? "");
+      setPendingAvatarFile(null);
+      setPendingBannerFile(null);
+      setError(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [community, open]);
 
   useEffect(() => {
     const settings = jamSettings.data;
     if (!settings) return;
-    setJamEnabled(settings.enabled);
-    setJamName(settings.name);
-    setJamHost(settings.host);
-    setJamPort(settings.port);
-    setJamServerId(settings.serverId);
-    setJamRegion(settings.region);
-    setJamSecret("");
-    setJamError(null);
+    const timer = window.setTimeout(() => {
+      setJamEnabled(settings.enabled);
+      setJamName(settings.name);
+      setJamHost(settings.host);
+      setJamPort(settings.port);
+      setJamServerId(settings.serverId);
+      setJamRegion(settings.region);
+      setJamSecret("");
+      setJamError(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [jamSettings.data, open]);
 
   const handlePickImage = (kind: "avatar" | "banner", file: File) => {
@@ -107,13 +114,13 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
       setPendingAvatarFile(null);
       setPendingBannerFile(null);
       onOpenChange(false);
-    } catch (err: any) {
-      setError(err?.message || "Failed to update community.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to update community."));
     }
   };
 
-  const jamErrorMessage = (err: any) => {
-    const message = err?.message || "";
+  const jamErrorMessage = (err: unknown) => {
+    const message = getErrorMessage(err, "");
     if (message.includes("COMMUNITY_JAM_SERVER_ACTIVE_EDIT_BLOCKED")) {
       return "Stop active jam sessions before changing server settings.";
     }
@@ -143,7 +150,7 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
         region: jamRegion.trim() || undefined,
       });
       setJamSecret("");
-    } catch (err: any) {
+    } catch (err) {
       setJamError(jamErrorMessage(err));
     }
   };

@@ -3,7 +3,7 @@ import { useConvex, useMutation } from "convex/react";
 import { api } from "@jam-app/convex";
 import { useAuthStore } from "@/stores/authStore";
 import { useConvexAuthStore } from "@/hooks/useConvexAuth";
-import { useProfileStore } from "@/hooks/useEnsureProfile";
+import { useProfileStore } from "@/stores/profileStore";
 import { usePresenceStore } from "@/stores/presenceStore";
 
 const HEARTBEAT_INTERVAL_MS = 20_000;

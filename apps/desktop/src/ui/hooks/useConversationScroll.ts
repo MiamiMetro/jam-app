@@ -2,7 +2,7 @@
 import { useRef, useState, useEffect, useLayoutEffect } from "react";
 
 interface UseConversationScrollOptions {
-  messages: Array<{ id: string; [key: string]: any }>;
+  messages: Array<{ id: string }>;
   conversationId: string;
   isLoadingOlderMessages: boolean;
 }
@@ -115,16 +115,19 @@ export function useConversationScroll({
 
   // Full reset on conversation change
   useEffect(() => {
-    setIsScrolledUp(false);
-    setNewMessagesWhileScrolledUp(0);
-    setScrollUpStartMessageId(null);
-    lastMessageIdRef.current = null;
-    scrollStateRef.current = null;
-    isLoadingOlderRef.current = false;
-    justLoadedOlderMessagesRef.current = false;
-    justSentMessageRef.current = false;
-    prevMessagesLengthRef.current = 0;
-    shouldAutoScrollRef.current = true;
+    const timer = window.setTimeout(() => {
+      setIsScrolledUp(false);
+      setNewMessagesWhileScrolledUp(0);
+      setScrollUpStartMessageId(null);
+      lastMessageIdRef.current = null;
+      scrollStateRef.current = null;
+      isLoadingOlderRef.current = false;
+      justLoadedOlderMessagesRef.current = false;
+      justSentMessageRef.current = false;
+      prevMessagesLengthRef.current = 0;
+      shouldAutoScrollRef.current = true;
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [conversationId]);
 
   const scrollToBottom = () => {

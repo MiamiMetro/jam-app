@@ -1,6 +1,6 @@
 // JamRoom.tsx — Live jam room with performer/listener split, chat, audio stream
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, memo, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -46,7 +46,7 @@ import {
 } from "@/hooks/useRooms";
 import type { Id } from "@jam-app/convex";
 import type { JamBroadcastState, JamClientState } from "../electron";
-import { usePlayer } from "@/contexts/PlayerContext";
+import { usePlayer } from "@/contexts/usePlayer";
 import { usePostAudio } from "@/contexts/PostAudioContext";
 import { Timestamp } from "@/components/Timestamp";
 import { LoadingState } from "@/components/LoadingState";
@@ -112,6 +112,10 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const revokeAccessGrant = useRevokeRoomAccessGrant();
   const reportContent = useReportContent();
   const censorshipEnabled = useUIStore((s) => s.censorshipEnabled);
+  const currentJamRoomHandle = useUIStore((s) => s.currentJamRoomHandle);
+  const setCurrentJamRoomHandle = useUIStore(
+    (s) => s.setCurrentJamRoomHandle
+  );
   const [message, setMessage] = useState("");
   const [clientError, setClientError] = useState<string | null>(null);
   const [broadcastError, setBroadcastError] = useState<string | null>(null);
@@ -143,19 +147,8 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   }, [hlsPlayer.isPlaying, postAudio]);
 
   // Presence heartbeat — only beats while user is actively in this room
-  const currentJamRoomHandle = useUIStore((s) => s.currentJamRoomHandle);
   const isInRoom = currentJamRoomHandle === handleToUse;
-  const sessionIdRef = useRef<string>(null as any);
-  if (!sessionIdRef.current) {
-    const key = `jam-session-${handleToUse}`;
-    sessionIdRef.current =
-      sessionStorage.getItem(key) ||
-      (() => {
-        const id = `room-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        sessionStorage.setItem(key, id);
-        return id;
-      })();
-  }
+  const sessionId = useId();
   const sessionTokenRef = useRef<string | null>(null);
   useEffect(() => {
     if (!room?.id || !isInRoom) {
@@ -173,12 +166,12 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
       const heartbeatFn = isGuest
         ? guestRoomHeartbeat({
             roomId: room.id as Id<"rooms">,
-            sessionId: sessionIdRef.current,
+            sessionId,
             interval: HEARTBEAT_INTERVAL,
           })
         : roomHeartbeat({
             roomId: room.id as Id<"rooms">,
-            sessionId: sessionIdRef.current,
+            sessionId,
             interval: HEARTBEAT_INTERVAL,
           });
       return heartbeatFn
@@ -210,7 +203,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         sessionTokenRef.current = null;
       }
     };
-  }, [room?.id, isGuest, isInRoom, roomHeartbeat, guestRoomHeartbeat, disconnectPresence]);
+  }, [room?.id, isGuest, isInRoom, roomHeartbeat, guestRoomHeartbeat, disconnectPresence, sessionId, setCurrentJamRoomHandle]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -242,12 +235,9 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         // silently ignore send errors
       }
     },
-    [message, isGuest, room?.id, sendRoomMessage]
+    [message, isGuest, room, sendRoomMessage]
   );
 
-  const setCurrentJamRoomHandle = useUIStore(
-    (s) => s.setCurrentJamRoomHandle
-  );
   const handleLeaveRoom = useCallback(() => {
     if (isHost) {
       window.electron?.stopJamBroadcast?.().catch(() => {});
@@ -266,7 +256,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     }
     setCurrentJamRoomHandle(null);
     navigate("/jams");
-  }, [isHost, room?.id, publishSessionId, navigate, setCurrentJamRoomHandle, disconnectPresence, stopListenerMode]);
+  }, [isHost, room, publishSessionId, navigate, setCurrentJamRoomHandle, disconnectPresence, stopListenerMode]);
 
   const handleReportRoom = useCallback(async () => {
     if (!room?.id) return;
@@ -278,7 +268,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     });
     setReportSubmitted(true);
     window.setTimeout(() => setReportSubmitted(false), 1000);
-  }, [reportContent, room?.id]);
+  }, [reportContent, room]);
 
   const handleUpdateRoomSettings = useCallback(async (data: RoomFormData) => {
     if (!room?.id || !data.name.trim()) return;
@@ -299,7 +289,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     } catch (error) {
       console.error("Failed to update room:", error);
     }
-  }, [room?.id, updateRoom]);
+  }, [room, updateRoom]);
 
   const handleRequestAccess = useCallback(async (type: "listen" | "jam") => {
     if (!room?.id) return;
@@ -309,7 +299,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     } finally {
       setRequestingAccess(null);
     }
-  }, [requestRoomAccess, room?.id]);
+  }, [requestRoomAccess, room]);
 
   const handleDecideAccessRequest = useCallback(async (
     requestId: Id<"room_access_requests">,
@@ -367,7 +357,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         nativeJamErrorMessage(error)
       );
     }
-  }, [room?.id, room?.viewer_access?.can_jam, isHost, createPerformerJoinToken]);
+  }, [room, isHost, createPerformerJoinToken]);
 
   const handleStartBroadcast = useCallback(async () => {
     try {
@@ -414,7 +404,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         error instanceof Error ? error.message : "Failed to start listener mode"
       );
     }
-  }, [clientState, room?.id, startListenerMode, stopListenerMode]);
+  }, [clientState, room, startListenerMode, stopListenerMode]);
 
   const handleStopBroadcast = useCallback(async () => {
     try {
@@ -439,7 +429,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         error instanceof Error ? error.message : "Failed to stop listener mode"
       );
     }
-  }, [room?.id, publishSessionId, stopListenerMode]);
+  }, [room, publishSessionId, stopListenerMode]);
 
   useEffect(() => {
     if (
@@ -450,7 +440,10 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
       return;
     }
 
-    handleStopBroadcast().catch(() => {});
+    const timer = window.setTimeout(() => {
+      handleStopBroadcast().catch(() => {});
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [isHost, broadcastState, clientState, handleStopBroadcast]);
 
   useEffect(() => {

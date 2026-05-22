@@ -3,7 +3,7 @@ import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
 import { useAuthStore } from "@/stores/authStore";
 import { useConvexAuthStore } from "./useConvexAuth";
-import { useProfileStore } from "./useEnsureProfile";
+import { useProfileStore } from "@/stores/profileStore";
 
 // Re-export from shared constants (safe for browser import)
 export { ROOM_GENRES } from "@jam-app/convex";

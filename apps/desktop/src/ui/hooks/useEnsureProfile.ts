@@ -2,24 +2,9 @@ import { useEffect  } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@jam-app/convex";
 import { useAuthStore } from "@/stores/authStore";
+import { useProfileStore } from "@/stores/profileStore";
 import { authClient } from "@/lib/auth-client";
 import { useConvexAuthStore } from "./useConvexAuth";
-import { create } from "zustand";
-
-// Store to track if profile is ready and if username setup is needed
-interface ProfileState {
-  isProfileReady: boolean;
-  needsUsernameSetup: boolean;
-  setProfileReady: (ready: boolean) => void;
-  setNeedsUsernameSetup: (needs: boolean) => void;
-}
-
-export const useProfileStore = create<ProfileState>((set) => ({
-  isProfileReady: false,
-  needsUsernameSetup: false,
-  setProfileReady: (ready) => set({ isProfileReady: ready }),
-  setNeedsUsernameSetup: (needs) => set({ needsUsernameSetup: needs }),
-}));
 
 /**
  * Hook that checks if a Convex profile exists for the authenticated user.

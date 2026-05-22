@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { useMe, useSoftDeleteProfile, useUpdateProfile } from "@/hooks/useUsers";
 import { useAuthStore } from "@/stores/authStore";
 import { useConvexAuthStore } from "@/hooks/useConvexAuth";
-import { useProfileStore } from "@/hooks/useEnsureProfile";
+import { useProfileStore } from "@/stores/profileStore";
 import { useUIStore } from "@/stores/uiStore";
 import { authClient } from "@/lib/auth-client";
 import { Switch } from "@/components/ui/switch";
 import { LEGAL_LINKS } from "@/lib/legal";
 import { openExternal } from "@/lib/openExternal";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -23,7 +24,10 @@ export default function Settings() {
   const censorshipEnabled = useUIStore((s) => s.censorshipEnabled);
   const setCensorshipEnabled = useUIStore((s) => s.setCensorshipEnabled);
 
-  const [username, setUsername] = useState("");
+  const [usernameDraft, setUsernameDraft] = useState<{
+    profileId: string | null;
+    value: string;
+  }>({ profileId: null, value: "" });
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [isSavingUsername, setIsSavingUsername] = useState(false);
@@ -33,7 +37,7 @@ export default function Settings() {
   const [appVersion, setAppVersion] = useState<string | null>(null);
 
   const toFriendlyError = (raw: unknown): string => {
-    const message = typeof raw === "string" ? raw : (raw as any)?.message ?? "Request failed.";
+    const message = getErrorMessage(raw, "Request failed.");
     if (message.includes("USERNAME_TAKEN:")) return "Username is already taken.";
     if (message.includes("USERNAME_TOO_SHORT:")) return "Username must be at least 3 characters.";
     if (message.includes("USERNAME_TOO_LONG:")) return "Username must be 15 characters or less.";
@@ -45,10 +49,14 @@ export default function Settings() {
     return message;
   };
 
-  useEffect(() => {
-    if (!me) return;
-    setUsername(me.username ?? "");
-  }, [me?.id, me?.username]);
+  const username =
+    usernameDraft.profileId === (me?.id ?? null)
+      ? usernameDraft.value
+      : me?.username ?? "";
+
+  const setUsername = (value: string) => {
+    setUsernameDraft({ profileId: me?.id ?? null, value });
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -77,7 +85,7 @@ export default function Settings() {
       });
       setUser(updated);
       setSaveSuccess("Username updated.");
-      setUsername(updated.username ?? "");
+      setUsernameDraft({ profileId: updated.id, value: updated.username ?? "" });
     } catch (error) {
       setSaveError(toFriendlyError(error));
     } finally {

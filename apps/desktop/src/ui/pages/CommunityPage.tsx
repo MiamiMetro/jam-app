@@ -1,5 +1,5 @@
 // CommunityPage.tsx — Community detail page, standardized header like Profile
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Hash as HashIcon, Users, Settings2, Shield, UserMinus, ChevronUp, ChevronDown, Music, Plus, LayoutGrid, List, Lock } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -101,26 +101,27 @@ function CommunityPage() {
 
   const displayedMembers = memberSearch.length >= 2 ? searchedMembers : allMembers;
   const showJamTab = jamAvailability.data.enabled || communityRooms.length > 0;
-
-  useEffect(() => {
-    if (activeTab === "jam" && !showJamTab) {
-      setActiveTab("feed");
-    }
-  }, [activeTab, showJamTab]);
+  const selectedTab = activeTab === "jam" && !showJamTab ? "feed" : activeTab;
 
   const handleJoin = async () => {
     if (!community) return;
-    try { await joinMutation.mutateAsync(community.id); } catch {}
+    try { await joinMutation.mutateAsync(community.id); } catch (error) {
+      console.error("Failed to join community:", error);
+    }
   };
 
   const handleLeave = async () => {
     if (!community) return;
-    try { await leaveMutation.mutateAsync(community.id); } catch {}
+    try { await leaveMutation.mutateAsync(community.id); } catch (error) {
+      console.error("Failed to leave community:", error);
+    }
   };
 
   const handleLikePost = async (postId: string) => {
     if (isGuest) return;
-    try { await toggleLikeMutation.mutateAsync(postId); } catch {}
+    try { await toggleLikeMutation.mutateAsync(postId); } catch (error) {
+      console.error("Failed to toggle post like:", error);
+    }
   };
 
   const handleCreatePost = async (content: string, audioFile: File | null) => {
@@ -308,7 +309,7 @@ function CommunityPage() {
             <button
               onClick={() => setActiveTab("feed")}
               className={`text-sm py-2.5 border-b-2 transition-colors cursor-pointer ${
-                activeTab === "feed"
+                selectedTab === "feed"
                   ? "text-foreground border-b-primary font-medium"
                   : "text-muted-foreground border-b-transparent hover:text-foreground"
               }`}
@@ -319,7 +320,7 @@ function CommunityPage() {
               <button
                 onClick={() => setActiveTab("jam")}
                 className={`text-sm py-2.5 border-b-2 transition-colors cursor-pointer ${
-                  activeTab === "jam"
+                  selectedTab === "jam"
                     ? "text-foreground border-b-primary font-medium"
                     : "text-muted-foreground border-b-transparent hover:text-foreground"
                 }`}
@@ -331,7 +332,7 @@ function CommunityPage() {
               <button
                 onClick={() => setActiveTab("moderation")}
                 className={`text-sm py-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === "moderation"
+                  selectedTab === "moderation"
                     ? "text-foreground border-b-primary font-medium"
                     : "text-muted-foreground border-b-transparent hover:text-foreground"
                 }`}
@@ -344,7 +345,7 @@ function CommunityPage() {
 
           {/* Scrollable tab content */}
           <div className="flex-1 overflow-y-auto">
-            {activeTab === "feed" ? (
+            {selectedTab === "feed" ? (
               <>
                 {isMember && !isGuest && (
                   <div className="px-5 py-4 border-b border-border/50">
@@ -393,7 +394,7 @@ function CommunityPage() {
                   </>
                 )}
               </>
-            ) : activeTab === "jam" ? (
+            ) : selectedTab === "jam" ? (
               <div className="px-5 py-4 space-y-4">
                 {!isMember ? (
                   <div className="glass-solid rounded-lg p-4 flex items-center justify-between gap-4">
@@ -551,7 +552,8 @@ function CommunityPage() {
                 ) : (
                   <>
                     <div className="space-y-1">
-                      {displayedMembers.map((member: any) => {
+                      {displayedMembers.map((member) => {
+                        if (!member) return null;
                         const isOwnerRow = member.role === "owner";
                         const isModRow = member.role === "mod";
                         const isMemberRow = member.role === "member";

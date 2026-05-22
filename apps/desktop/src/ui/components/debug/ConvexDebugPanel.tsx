@@ -3,7 +3,7 @@ import { useConvexDebugStore, type TrackedSubscription } from "@/lib/convex-debu
 
 export default function ConvexDebugPanel() {
   const { subscriptions, isOpen, toggle } = useConvexDebugStore();
-  const [, tick] = useState(0);
+  const [now, setNow] = useState(0);
 
   // Toggle with Ctrl+Shift+D
   useEffect(() => {
@@ -20,8 +20,12 @@ export default function ConvexDebugPanel() {
   // Tick every second to update durations
   useEffect(() => {
     if (!isOpen) return;
-    const id = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(id);
+    const initial = window.setTimeout(() => setNow(Date.now()), 0);
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      window.clearTimeout(initial);
+      clearInterval(id);
+    };
   }, [isOpen]);
 
   // Group by function name
@@ -100,7 +104,7 @@ export default function ConvexDebugPanel() {
           </div>
         )}
         {grouped.map(([fnName, subs]) => (
-          <FunctionGroup key={fnName} fnName={fnName} subs={subs} />
+          <FunctionGroup key={fnName} fnName={fnName} now={now} subs={subs} />
         ))}
       </div>
     </div>
@@ -159,9 +163,11 @@ function CopyButton({ subscriptions }: { subscriptions: Map<number, TrackedSubsc
 
 function FunctionGroup({
   fnName,
+  now,
   subs,
 }: {
   fnName: string;
+  now: number;
   subs: TrackedSubscription[];
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -202,7 +208,7 @@ function FunctionGroup({
       {expanded && (
         <div style={{ paddingLeft: 16, marginTop: 4 }}>
           {subs.map((sub) => (
-            <SubDetail key={sub.id} sub={sub} />
+            <SubDetail key={sub.id} now={now} sub={sub} />
           ))}
         </div>
       )}
@@ -210,8 +216,8 @@ function FunctionGroup({
   );
 }
 
-function SubDetail({ sub }: { sub: TrackedSubscription }) {
-  const duration = formatDuration(Date.now() - sub.startTime);
+function SubDetail({ now, sub }: { now: number; sub: TrackedSubscription }) {
+  const duration = formatDuration(Math.max(0, now - sub.startTime));
   const argsStr =
     sub.args === "skip"
       ? '"skip"'

@@ -9,6 +9,7 @@ import { useAuthModalStore } from "@/stores/authModalStore";
 import { AuthModalShell } from "./AuthModalShell";
 import { LEGAL_LINKS } from "@/lib/legal";
 import { openExternal } from "@/lib/openExternal";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function SignupModal() {
   const location = useLocation();
@@ -45,8 +46,8 @@ export default function SignupModal() {
       setAcceptedLegal(false);
       setError(null);
       openUsernameSetup();
-    } catch (err: any) {
-      setError(err.message || "Registration failed");
+    } catch (err) {
+      setError(getErrorMessage(err, "Registration failed"));
     } finally {
       setIsSubmitting(false);
     }

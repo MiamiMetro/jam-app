@@ -1,4 +1,4 @@
-// useUnifiedSearch.ts — Combined user + community search hook
+// useUnifiedSearch.ts -- Combined user + community search hook
 import { useAllUsers } from "@/hooks/useUsers";
 import { useCommunities } from "@/hooks/useCommunities";
 import type { User } from "@/lib/api/types";
@@ -11,24 +11,16 @@ export interface UnifiedSearchResult {
   hasResults: boolean;
 }
 
-/**
- * Combines user and community search into a single hook.
- * Both queries fire in parallel using existing hooks.
- * Only activates when query is non-empty (>= 1 char).
- */
 export function useUnifiedSearch(query: string): UnifiedSearchResult {
   const trimmed = query.trim();
   const enabled = trimmed.length > 0;
 
-  const {
-    data: users = [],
-    isLoading: isLoadingUsers,
-  } = useAllUsers(trimmed || undefined, enabled);
-
-  const {
-    data: communities = [],
-    isLoading: isLoadingCommunities,
-  } = useCommunities(enabled ? { search: trimmed } : undefined);
+  const { data: users = [], isLoading: isLoadingUsers } = useAllUsers(
+    trimmed || undefined,
+    enabled
+  );
+  const { data: communities = [], isLoading: isLoadingCommunities } =
+    useCommunities(enabled ? { search: trimmed } : undefined);
 
   const isLoading = enabled && (isLoadingUsers || isLoadingCommunities);
   const hasResults = users.length > 0 || communities.length > 0;

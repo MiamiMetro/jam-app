@@ -21,6 +21,11 @@
     "convex:codegen": "convex codegen"
   },
   "dependencies": {
+    "@better-auth/expo": "1.5.3",
+    "@convex-dev/better-auth": "0.11.4",
+    "@convex-dev/presence": "0.3.0",
+    "@convex-dev/rate-limiter": "0.3.2",
+    "better-auth": "1.5.3",
     "convex": "^1.36.1"
   }
 }

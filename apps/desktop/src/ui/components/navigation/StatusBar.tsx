@@ -1,10 +1,10 @@
 // StatusBar.tsx — Bottom bar showing current room info & post audio mini-player
-import { useRef, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Hash, Users, LogOut, Play, Pause, Volume2, VolumeX, Music, X, MessageCircle } from "lucide-react";
 import { useUIStore } from "@/stores/uiStore";
 import { useRoom, useRoomMessages } from "@/hooks/useRooms";
-import { usePlayer } from "@/contexts/PlayerContext";
+import { usePlayer } from "@/contexts/usePlayer";
 import { usePostAudio } from "@/contexts/PostAudioContext";
 import { formatDuration } from "@/lib/postUtils";
 
@@ -27,15 +27,17 @@ export default function StatusBar() {
 
   // Unread chat badge — track last seen count when on room page
   const { data: messages = [] } = useRoomMessages(room?.id);
-  const lastSeenCount = useRef(0);
+  const [lastSeenCount, setLastSeenCount] = useState(0);
 
   useEffect(() => {
-    if (isOnRoomPage) {
-      lastSeenCount.current = messages.length;
+    if (!isOnRoomPage) {
+      return;
     }
+    const timer = window.setTimeout(() => setLastSeenCount(messages.length), 0);
+    return () => window.clearTimeout(timer);
   }, [isOnRoomPage, messages.length]);
 
-  const unreadCount = isOnRoomPage ? 0 : Math.max(0, messages.length - lastSeenCount.current);
+  const unreadCount = isOnRoomPage ? 0 : Math.max(0, messages.length - lastSeenCount);
 
   const showJamRoom = currentJamRoomHandle && room && !isOnRoomPage;
   const showPostAudio = postAudio.currentTrack && !postAudio.isCurrentTrackVisible;
