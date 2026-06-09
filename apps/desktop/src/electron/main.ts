@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { spawn, ChildProcess } from 'child_process';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { isDev } from './util.js';
 
 const { autoUpdater } = electronUpdater;
@@ -107,6 +107,7 @@ type UpdateStatus = {
 let jamClientState: JamClientState = 'idle';
 let jamClientExitCode: number | null = null;
 let jamClientError: string | undefined;
+let jamClientLogPath: string | undefined;
 let broadcasterProcess: ChildProcess | null = null;
 let jamBroadcastState: JamBroadcastState = 'idle';
 let jamBroadcastExitCode: number | null = null;
@@ -250,6 +251,10 @@ function isBroadcastLaunchContext(value: unknown): value is JamBroadcastLaunchCo
 }
 
 function buildJamClientArgs(context: JamClientLaunchContext) {
+    const logDir = path.join(app.getPath('userData'), 'native-client-logs');
+    mkdirSync(logDir, { recursive: true });
+    jamClientLogPath = path.join(logDir, `client-${new Date().toISOString().replace(/[:.]/g, '-')}.log`);
+
     const args = [
         '--server', context.serverHost,
         '--port', String(context.serverPort),
@@ -260,6 +265,9 @@ function buildJamClientArgs(context: JamClientLaunchContext) {
         '--join-token', context.joinToken,
         '--codec', context.codec,
         '--frames', String(context.frames),
+        '--latency-profile', 'balanced',
+        '--auto-jitter',
+        '--log-file', jamClientLogPath,
     ];
     if (context.broadcastIpcPort && context.broadcastIpcPort > 0) {
         args.push('--broadcast-ipc-port', String(context.broadcastIpcPort));
@@ -469,7 +477,7 @@ if (!gotTheLock) {
 
             clientProcess.unref();
 
-            return { success: true, state: jamClientState };
+            return { success: true, state: jamClientState, logPath: jamClientLogPath };
         } catch (error) {
             clientProcess = null;
             jamClientState = 'failed';
@@ -484,9 +492,9 @@ if (!gotTheLock) {
 
     ipcMain.handle('get-jam-client-status', async () => {
         if (clientProcess && clientProcess.exitCode === null) {
-            return { state: jamClientState, exitCode: null, error: jamClientError };
+            return { state: jamClientState, exitCode: null, error: jamClientError, logPath: jamClientLogPath };
         }
-        return { state: clientProcess ? jamClientState : jamClientState, exitCode: jamClientExitCode, error: jamClientError };
+        return { state: clientProcess ? jamClientState : jamClientState, exitCode: jamClientExitCode, error: jamClientError, logPath: jamClientLogPath };
     });
 
     ipcMain.handle('launch-jam-broadcast', async (_event, context: unknown) => {

@@ -36,8 +36,8 @@ export interface JamBroadcastStatus {
 
 export interface ElectronAPI {
     platform: 'darwin' | 'win32' | 'linux';
-    launchJamClient: (context: JamClientLaunchContext) => Promise<{ success: boolean; error?: string; state?: JamClientState }>;
-    getJamClientStatus: () => Promise<{ state: JamClientState; exitCode?: number | null; error?: string }>;
+    launchJamClient: (context: JamClientLaunchContext) => Promise<{ success: boolean; error?: string; state?: JamClientState; logPath?: string }>;
+    getJamClientStatus: () => Promise<{ state: JamClientState; exitCode?: number | null; error?: string; logPath?: string }>;
     launchJamBroadcast: (context: JamBroadcastLaunchContext) => Promise<{ success: boolean; error?: string } & JamBroadcastStatus>;
     stopJamBroadcast: () => Promise<{ success: boolean; error?: string } & JamBroadcastStatus>;
     getJamBroadcastStatus: () => Promise<JamBroadcastStatus>;
