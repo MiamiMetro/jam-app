@@ -267,6 +267,7 @@ function buildJamClientArgs(context: JamClientLaunchContext) {
         '--frames', String(context.frames),
         '--latency-profile', 'balanced',
         '--auto-jitter',
+        '--app-version', app.getVersion(),
         '--log-file', jamClientLogPath,
     ];
     if (context.broadcastIpcPort && context.broadcastIpcPort > 0) {
