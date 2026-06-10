@@ -252,7 +252,9 @@ function isBroadcastLaunchContext(value: unknown): value is JamBroadcastLaunchCo
 
 function buildJamClientArgs(context: JamClientLaunchContext) {
     const logDir = path.join(app.getPath('userData'), 'native-client-logs');
+    const configDir = path.join(app.getPath('userData'), 'native-client');
     mkdirSync(logDir, { recursive: true });
+    mkdirSync(configDir, { recursive: true });
     jamClientLogPath = path.join(logDir, `client-${new Date().toISOString().replace(/[:.]/g, '-')}.log`);
 
     const args = [
@@ -268,6 +270,7 @@ function buildJamClientArgs(context: JamClientLaunchContext) {
         '--latency-profile', 'balanced',
         '--auto-jitter',
         '--app-version', app.getVersion(),
+        '--config-dir', configDir,
         '--log-file', jamClientLogPath,
     ];
     if (context.broadcastIpcPort && context.broadcastIpcPort > 0) {
