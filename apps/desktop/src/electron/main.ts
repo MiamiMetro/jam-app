@@ -268,7 +268,6 @@ function buildJamClientArgs(context: JamClientLaunchContext) {
         '--codec', context.codec,
         '--frames', String(context.frames),
         '--latency-profile', 'balanced',
-        '--auto-jitter',
         '--app-version', app.getVersion(),
         '--config-dir', configDir,
         '--log-file', jamClientLogPath,
