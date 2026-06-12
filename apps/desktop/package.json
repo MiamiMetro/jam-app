@@ -3,7 +3,7 @@
   "author": "MiamiMetro",
   "description": "jam desktop application",
   "private": true,
-  "version": "0.0.12",
+  "version": "0.0.13",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
