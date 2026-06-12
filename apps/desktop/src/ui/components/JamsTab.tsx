@@ -1,7 +1,7 @@
 // JamsTab.tsx — Hero landing page for live jam rooms
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import type { Id } from "@jam-app/convex";
+import type { Id, RoomFeedItem } from "@jam-app/convex";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/SearchInput";
 import { RoomFormDialog, type RoomFormData } from "@/components/RoomFormDialog";
@@ -25,9 +25,40 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingState } from "@/components/LoadingState";
 import { RoomCard } from "@/components/RoomCard";
+import { getCommunityColors } from "@/lib/communityColors";
 
 interface JamsTabProps {
   onGuestAction?: () => void;
+}
+
+type CommunityRoomGroup = {
+  key: string;
+  community: NonNullable<RoomFeedItem["community"]> | null;
+  rooms: RoomFeedItem[];
+};
+
+function groupCommunityRooms(rooms: RoomFeedItem[]): CommunityRoomGroup[] {
+  const groups = new Map<string, CommunityRoomGroup>();
+
+  for (const room of rooms) {
+    const community = room.community ?? null;
+    const key = community?.id ?? room.community_id ?? "unknown-community";
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.rooms.push(room);
+      if (!existing.community && community) existing.community = community;
+      continue;
+    }
+
+    groups.set(key, {
+      key,
+      community,
+      rooms: [room],
+    });
+  }
+
+  return Array.from(groups.values());
 }
 
 function JamsTab({ onGuestAction }: JamsTabProps) {
@@ -53,6 +84,10 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
   const isUserRoomReady = isGuest || !user || (isAuthSet && isProfileReady && !myRoomLoading);
   const isInitialJamsLoading = roomsLoading || communityRoomsLoading || !isUserRoomReady;
   const hasLoadedJams = !isInitialJamsLoading;
+  const communityRoomGroups = useMemo(
+    () => groupCommunityRooms(communityRooms),
+    [communityRooms]
+  );
 
   const handleSearchChange = useCallback((query: string) => {
     const params: Record<string, string> = {};
@@ -358,27 +393,61 @@ function JamsTab({ onGuestAction }: JamsTabProps) {
         </div>
       )}
 
-      {communityRooms.length > 0 && (
-        <>
-          <div className="mb-3 mt-5">
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3">
-              Community Rooms
-            </h3>
-          </div>
-          {viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-stagger">
-              {communityRooms.map((room) => (
-                <RoomCard key={room.id} room={room} onClick={handleRoomClick} />
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {communityRooms.map((room) => (
-                <RoomCard key={room.id} room={room} onClick={handleRoomClick} variant="list" />
-              ))}
-            </div>
-          )}
-        </>
+      {communityRoomGroups.length > 0 && (
+        <div className="mt-5 space-y-5">
+          <h3 className="text-sm font-semibold text-muted-foreground">
+            Community Rooms
+          </h3>
+          {communityRoomGroups.map((group) => {
+            const community = group.community;
+            const colors = getCommunityColors(community?.theme_color);
+            const communityName = community?.name ?? "Community";
+            const communityHandle = community?.handle ?? null;
+
+            return (
+              <section key={group.key} className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    disabled={!communityHandle}
+                    onClick={() => communityHandle && navigate(`/community/${communityHandle}`)}
+                    className="flex min-w-0 items-center gap-2 rounded-md text-left disabled:cursor-default"
+                  >
+                    <Avatar size="xs" className={`h-6 w-6 shrink-0 ring-1 ${colors.ring}`}>
+                      <AvatarImage src={community?.avatar_url ?? ""} alt={communityName} />
+                      <AvatarFallback className={`${colors.avatarBg} ${colors.text} text-[9px]`}>
+                        {communityName.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-foreground">
+                        {communityName}
+                      </span>
+                      {communityHandle && (
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          #{communityHandle}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </div>
+                {viewMode === "grid" ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-stagger">
+                    {group.rooms.map((room) => (
+                      <RoomCard key={room.id} room={room} onClick={handleRoomClick} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {group.rooms.map((room) => (
+                      <RoomCard key={room.id} room={room} onClick={handleRoomClick} variant="list" />
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
       )}
         </>
       )}

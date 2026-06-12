@@ -54,6 +54,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { RoomFormDialog, type RoomFormData } from "@/components/RoomFormDialog";
 import { censorText } from "@/lib/bannedWords";
 import { useReportContent } from "@/hooks/usePosts";
+import { useJoinCommunity } from "@/hooks/useCommunities";
 
 interface JamRoomProps {
   roomHandle?: string;
@@ -110,6 +111,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const requestRoomAccess = useRequestRoomAccess();
   const decideAccessRequest = useDecideRoomAccessRequest();
   const revokeAccessGrant = useRevokeRoomAccessGrant();
+  const joinCommunity = useJoinCommunity();
   const reportContent = useReportContent();
   const censorshipEnabled = useUIStore((s) => s.censorshipEnabled);
   const currentJamRoomHandle = useUIStore((s) => s.currentJamRoomHandle);
@@ -124,6 +126,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const [broadcastState, setBroadcastState] = useState<JamBroadcastState>("idle");
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [isRoomSettingsOpen, setIsRoomSettingsOpen] = useState(false);
+  const [showCommunityJoinActions, setShowCommunityJoinActions] = useState(false);
   const [roomPanel, setRoomPanel] = useState<"listeners" | "requests" | "approved">("listeners");
   const [requestingAccess, setRequestingAccess] = useState<"listen" | "jam" | null>(null);
   const [publishSessionId, setPublishSessionId] = useState<Id<"listener_publish_sessions"> | null>(null);
@@ -210,6 +213,10 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    setShowCommunityJoinActions(false);
+  }, [room?.id]);
+
   const performers = useMemo(
     () => participants.filter((p) => (p.role as string) === "performer"),
     [participants]
@@ -219,6 +226,8 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     [participants]
   );
   const isHost = !isGuest && user && room && room.host_id === user.id;
+  const communityName = room?.community?.name ?? "Community";
+  const communityHandle = room?.community?.handle ?? null;
 
   const handleSendMessage = useCallback(
     async (e: React.FormEvent) => {
@@ -312,12 +321,25 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     await revokeAccessGrant({ grantId });
   }, [revokeAccessGrant]);
 
+  const handleJoinCommunity = useCallback(async () => {
+    if (!room?.community_id) return;
+    try {
+      await joinCommunity.mutateAsync(room.community_id);
+      setShowCommunityJoinActions(false);
+      setClientError(null);
+    } catch (error) {
+      setClientError(error instanceof Error ? error.message : "Failed to join community");
+    }
+  }, [joinCommunity, room?.community_id]);
+
   const handleJoinClient = useCallback(async () => {
     if (!room?.viewer_access?.can_jam) {
+      setShowCommunityJoinActions(false);
       setClientError("Ask the host for permission to jam.");
       return;
     }
     try {
+      setShowCommunityJoinActions(false);
       setClientError(null);
       if (!window.electron) {
         setClientError("Electron API not available");
@@ -353,11 +375,15 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
       }
     } catch (error) {
       setClientState("failed");
-      setClientError(
-        nativeJamErrorMessage(error)
+      const message = nativeJamErrorMessage(error);
+      setClientError(message);
+      setShowCommunityJoinActions(
+        message === "Join this community before jamming." &&
+          Boolean(room?.community_id) &&
+          !isGuest
       );
     }
-  }, [room, isHost, createPerformerJoinToken]);
+  }, [room, isHost, createPerformerJoinToken, isGuest]);
 
   const handleStartBroadcast = useCallback(async () => {
     try {
@@ -660,6 +686,19 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
                 </span>
                 <span className="text-border">&middot;</span>
                 <span>Host: {room.host?.display_name || room.host?.username || "Unknown"}</span>
+                {room.community && (
+                  <>
+                    <span className="text-border">&middot;</span>
+                    <button
+                      type="button"
+                      disabled={!communityHandle}
+                      onClick={() => communityHandle && navigate(`/community/${communityHandle}`)}
+                      className="no-drag truncate rounded text-muted-foreground transition-colors hover:text-foreground disabled:cursor-default disabled:hover:text-muted-foreground"
+                    >
+                      Community: {communityName}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -748,7 +787,30 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
           {clientError && (
             <div className="glass-solid rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs text-destructive mt-2">
               <AlertTriangle className="h-3 w-3 shrink-0" />
-              <span className="truncate">{clientError}</span>
+              <span className="truncate flex-1">{clientError}</span>
+              {showCommunityJoinActions && room.community_id && (
+                <>
+                  {communityHandle && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => navigate(`/community/${communityHandle}`)}
+                    >
+                      View
+                    </Button>
+                  )}
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    disabled={joinCommunity.isPending}
+                    onClick={handleJoinCommunity}
+                  >
+                    {joinCommunity.isPending ? "Joining..." : "Join"}
+                  </Button>
+                </>
+              )}
             </div>
           )}
           {(broadcastError || broadcastState === "running") && (

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -31,6 +32,36 @@ type Props = {
   searchValue?: string;
 };
 
+type CommunityRoomGroup = {
+  key: string;
+  community: NonNullable<RoomFeedItem["community"]> | null;
+  rooms: RoomFeedItem[];
+};
+
+function groupCommunityRooms(rooms: RoomFeedItem[]): CommunityRoomGroup[] {
+  const groups = new Map<string, CommunityRoomGroup>();
+
+  for (const room of rooms) {
+    const community = room.community ?? null;
+    const key = community?.id ?? room.community_id ?? "unknown-community";
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.rooms.push(room);
+      if (!existing.community && community) existing.community = community;
+      continue;
+    }
+
+    groups.set(key, {
+      key,
+      community,
+      rooms: [room],
+    });
+  }
+
+  return Array.from(groups.values());
+}
+
 export default function JamList({
   communityRooms = [],
   friendsInRooms = [],
@@ -48,6 +79,10 @@ export default function JamList({
   const { colors } = useMobileTheme();
   const insets = useSafeAreaInsets();
   const hasSearch = searchValue.trim().length > 0;
+  const communityRoomGroups = useMemo(
+    () => groupCommunityRooms(communityRooms),
+    [communityRooms]
+  );
 
   return (
     <FlatList
@@ -158,19 +193,43 @@ export default function JamList({
           {isLoadingMore ? (
             <ActivityIndicator color={colors.primary} style={styles.footerLoader} />
           ) : null}
-          {communityRooms.length > 0 ? (
+          {communityRoomGroups.length > 0 ? (
             <>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
                   Community Rooms
                 </Text>
-                <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>
-                  {communityRooms.length} shown
-                </Text>
               </View>
-              {communityRooms.map((room) => (
-                <JamItem key={room.id} onPress={() => onOpenRoom?.(room)} room={room} />
-              ))}
+              {communityRoomGroups.map((group) => {
+                const communityName = group.community?.name ?? "Community";
+                const communityHandle = group.community?.handle ?? null;
+
+                return (
+                  <View key={group.key}>
+                    <View style={styles.communityGroupHeader}>
+                      <View style={styles.communityGroupNameWrap}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.communityGroupName, { color: colors.foreground }]}
+                        >
+                          {communityName}
+                        </Text>
+                        {communityHandle ? (
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.communityGroupHandle, { color: colors.mutedForeground }]}
+                          >
+                            #{communityHandle}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    {group.rooms.map((room) => (
+                      <JamItem key={room.id} onPress={() => onOpenRoom?.(room)} room={room} />
+                    ))}
+                  </View>
+                );
+              })}
             </>
           ) : null}
         </View>
@@ -623,6 +682,28 @@ const styles = StyleSheet.create({
   sectionMeta: {
     fontSize: 11,
     fontWeight: "800",
+  },
+  communityGroupHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingBottom: 8,
+    paddingTop: 18,
+  },
+  communityGroupNameWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  communityGroupName: {
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  communityGroupHandle: {
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 2,
   },
   emptyState: {
     alignItems: "center",

@@ -17,6 +17,7 @@ import {
   MAX_LENGTHS,
   MIN_LENGTHS,
 } from "./helpers";
+import { resolvePublicMediaUrl } from "./mediaService";
 import { checkRateLimit } from "./rateLimiter";
 import { Presence } from "@convex-dev/presence";
 import { components } from "./_generated/api";
@@ -339,6 +340,7 @@ async function getActiveJamSession(ctx: MutationCtx, roomId: Id<"rooms">) {
 
 async function formatRoom(ctx: QueryCtx | MutationCtx, room: Doc<"rooms">) {
   const host = await ctx.db.get(room.hostId);
+  const community = room.communityId ? await ctx.db.get(room.communityId) : null;
   const currentProfile = await getCurrentProfile(ctx);
   const canListen = await canListenToRoom(ctx, currentProfile, room);
   const canJam = currentProfile
@@ -400,6 +402,18 @@ async function formatRoom(ctx: QueryCtx | MutationCtx, room: Doc<"rooms">) {
       error: room.listenerError ?? null,
     },
     community_id: room.communityId ?? null,
+    community: community
+      ? {
+          id: community._id,
+          name: community.name,
+          handle: community.handle,
+          avatar_url: resolvePublicMediaUrl({
+            url: community.avatarUrl,
+            objectKey: community.avatarObjectKey,
+          }),
+          theme_color: community.themeColor,
+        }
+      : null,
     participant_count: onlineUsers.length,
     last_active_at: new Date(room.lastActiveAt).toISOString(),
     created_at: new Date(room._creationTime).toISOString(),
