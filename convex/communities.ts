@@ -1,10 +1,8 @@
 import { query, mutation } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import { Presence } from "@convex-dev/presence";
 import type { Id, Doc } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
-import { components } from "./_generated/api";
 import {
   extractManagedMediaObjectKeyFromUrl,
   resolvePublicMediaUrl,
@@ -26,8 +24,6 @@ import { checkRateLimit } from "./rateLimiter";
 // ============================================
 // Community Constants
 // ============================================
-
-const presence = new Presence(components.presence);
 
 export const COMMUNITY_THEME_COLORS = [
   "amber",
@@ -69,11 +65,6 @@ export type CommunityTag = (typeof COMMUNITY_TAGS)[number];
 
 const MAX_OWNED_COMMUNITIES = 3;
 const MAX_COMMUNITY_TAGS = 5;
-const ACTIVE_JAM_EDIT_BLOCK_WINDOW_MS = 90 * 1000;
-
-function roomPresenceId(roomId: string) {
-  return `room:${roomId}`;
-}
 
 function sanitizeServerField(value: string, field: string) {
   const sanitized = sanitizeText(value) ?? "";
@@ -115,61 +106,6 @@ async function getCommunityServer(ctx: QueryCtx | MutationCtx, communityId: Id<"
     )
     .filter((q) => q.eq(q.field("kind"), "community"))
     .first();
-}
-
-async function hasActiveJamSessionsForServer(
-  ctx: QueryCtx | MutationCtx,
-  jamServerId: Id<"jam_servers">
-) {
-  const now = Date.now();
-  const activeAfter = now - ACTIVE_JAM_EDIT_BLOCK_WINDOW_MS;
-  const activeSessions = await ctx.db
-    .query("jam_sessions")
-    .filter((q) =>
-      q.and(
-        q.eq(q.field("jamServerId"), jamServerId),
-        q.eq(q.field("status"), "active"),
-        q.gt(q.field("expiresAt"), now),
-        q.gt(q.field("lastRefreshAt"), activeAfter)
-      )
-    )
-    .take(1);
-  return activeSessions.length > 0;
-}
-
-async function hasActiveCommunityRoomPresence(
-  ctx: QueryCtx | MutationCtx,
-  communityId: Id<"communities">
-) {
-  const rooms = await ctx.db
-    .query("rooms")
-    .withIndex("by_community_active", (q) =>
-      q.eq("communityId", communityId).eq("isActive", true)
-    )
-    .take(50);
-
-  for (const room of rooms) {
-    const onlineUsers = await presence.listRoom(
-      ctx,
-      roomPresenceId(String(room._id)),
-      true
-    );
-    if (onlineUsers.length > 0) return true;
-  }
-
-  return false;
-}
-
-async function isCommunityJamEditBlocked(
-  ctx: QueryCtx | MutationCtx,
-  communityId: Id<"communities">,
-  jamServerId: Id<"jam_servers">
-) {
-  return (
-    await hasActiveJamSessionsForServer(ctx, jamServerId)
-  ) || (
-    await hasActiveCommunityRoomPresence(ctx, communityId)
-  );
 }
 
 // ============================================
@@ -381,7 +317,6 @@ export const getJamServerSettings = query({
         serverId: "",
         region: "",
         hasSecret: false,
-        activeEditBlocked: false,
       };
     }
 
@@ -393,11 +328,6 @@ export const getJamServerSettings = query({
       serverId: server.serverId,
       region: server.region ?? "",
       hasSecret: server.joinSecret.trim().length > 0,
-      activeEditBlocked: await isCommunityJamEditBlocked(
-        ctx,
-        args.communityId,
-        server._id
-      ),
     };
   },
 });
@@ -768,11 +698,6 @@ export const updateJamServerSettings = mutation({
       throw new Error("UNAUTHORIZED: Only the owner can edit jam server settings");
     }
 
-    const existing = await getCommunityServer(ctx, args.communityId);
-    if (existing && await isCommunityJamEditBlocked(ctx, args.communityId, existing._id)) {
-      throw new Error("COMMUNITY_JAM_SERVER_ACTIVE_EDIT_BLOCKED");
-    }
-
     const name = sanitizeServerField(args.name, "SERVER_NAME");
     const host = validateJamServerHost(args.host);
     const serverId = sanitizeServerField(args.serverId, "SERVER_ID");
@@ -784,6 +709,7 @@ export const updateJamServerSettings = mutation({
     const now = Date.now();
     const status = args.enabled ? "enabled" as const : "disabled" as const;
     const nextSecret = args.joinSecret?.trim();
+    const existing = await getCommunityServer(ctx, args.communityId);
 
     if (!existing) {
       if (!nextSecret) throw new Error("COMMUNITY_JAM_SERVER_SECRET_REQUIRED");

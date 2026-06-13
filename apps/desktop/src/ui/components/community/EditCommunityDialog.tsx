@@ -121,9 +121,6 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
 
   const jamErrorMessage = (err: unknown) => {
     const message = getErrorMessage(err, "");
-    if (message.includes("COMMUNITY_JAM_SERVER_ACTIVE_EDIT_BLOCKED")) {
-      return "Stop active jam sessions before changing server settings.";
-    }
     if (message.includes("COMMUNITY_JAM_SERVER_SECRET_REQUIRED")) {
       return "Set a join secret before saving jam settings.";
     }
@@ -324,22 +321,15 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
               <button
                 type="button"
                 onClick={() => setJamEnabled((value) => !value)}
-                disabled={jamSettings.data?.activeEditBlocked}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                   jamEnabled
                     ? "bg-primary/20 text-primary"
                     : "bg-muted text-muted-foreground"
-                } disabled:opacity-50`}
+                }`}
               >
                 {jamEnabled ? "Enabled" : "Disabled"}
               </button>
             </div>
-
-            {jamSettings.data?.activeEditBlocked && (
-              <p className="text-xs text-amber-400">
-                Stop active jam sessions before changing server settings.
-              </p>
-            )}
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
@@ -347,7 +337,6 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
                 <Input
                   value={jamName}
                   onChange={(e) => setJamName(e.target.value)}
-                  disabled={jamSettings.data?.activeEditBlocked}
                   placeholder="Community SFU"
                   className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
                 />
@@ -357,7 +346,6 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
                 <Input
                   value={jamServerId}
                   onChange={(e) => setJamServerId(e.target.value)}
-                  disabled={jamSettings.data?.activeEditBlocked}
                   placeholder="my-community"
                   className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
                 />
@@ -367,7 +355,6 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
                 <Input
                   value={jamHost}
                   onChange={(e) => setJamHost(e.target.value)}
-                  disabled={jamSettings.data?.activeEditBlocked}
                   placeholder="127.0.0.1"
                   className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
                 />
@@ -380,7 +367,6 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
                   max={65535}
                   value={jamPort}
                   onChange={(e) => setJamPort(Number(e.target.value))}
-                  disabled={jamSettings.data?.activeEditBlocked}
                   className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
                 />
               </div>
@@ -389,7 +375,6 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
                 <Input
                   value={jamRegion}
                   onChange={(e) => setJamRegion(e.target.value)}
-                  disabled={jamSettings.data?.activeEditBlocked}
                   placeholder="optional"
                   className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
                 />
@@ -402,7 +387,6 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
                   type="password"
                   value={jamSecret}
                   onChange={(e) => setJamSecret(e.target.value)}
-                  disabled={jamSettings.data?.activeEditBlocked}
                   placeholder={jamSettings.data?.hasSecret ? "Leave blank to keep" : "Required"}
                   className="bg-muted/50 border-transparent focus:bg-background focus:border-border"
                 />
@@ -418,7 +402,6 @@ export function EditCommunityDialog({ open, onOpenChange, community }: EditCommu
                 variant="outline"
                 disabled={
                   updateJamSettings.isPending ||
-                  jamSettings.data?.activeEditBlocked ||
                   !jamName.trim() ||
                   !jamHost.trim() ||
                   !jamServerId.trim()
