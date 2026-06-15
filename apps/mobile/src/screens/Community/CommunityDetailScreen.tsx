@@ -45,6 +45,7 @@ import { useMobileTheme } from "@/theme/MobileTheme";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
 import type { CommunityMemberItem, PostFeedItem, RoomFeedItem } from "@/types";
 import type { Id } from "@jam-app/convex";
+import { getNativeAvatarUri } from "@/utils/avatar";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CommunityDetail">;
 type DetailTab = "feed" | "jam" | "moderation";
@@ -481,10 +482,10 @@ export default function CommunityDetailScreen({ navigation, route }: Props) {
                     },
                   ]}
                 >
-                  {community.avatar_url && !avatarFailed ? (
+                  {getNativeAvatarUri(community.avatar_url) && !avatarFailed ? (
                     <Image
                       onError={() => setAvatarFailed(true)}
-                      source={{ uri: community.avatar_url }}
+                      source={{ uri: getNativeAvatarUri(community.avatar_url) }}
                       style={styles.avatarImage}
                     />
                   ) : (
@@ -1152,10 +1153,10 @@ function MemberRow({
   return (
     <View style={[styles.memberRow, { borderBottomColor: colors.border }]}>
       <View style={[styles.memberAvatar, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-        {member.avatar_url && !avatarFailed ? (
+        {getNativeAvatarUri(member.avatar_url) && !avatarFailed ? (
           <Image
             onError={() => setAvatarFailed(true)}
-            source={{ uri: member.avatar_url }}
+            source={{ uri: getNativeAvatarUri(member.avatar_url) }}
             style={styles.memberAvatarImage}
           />
         ) : (

@@ -15,7 +15,7 @@ type ProfileSeed = {
 const now = () => Date.now();
 
 const avatar = (seed: string) =>
-  `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
+  `https://api.dicebear.com/7.x/avataaars/png?seed=${encodeURIComponent(seed)}`;
 
 const banner =
   "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1600&q=80";

@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import type { RoomFeedItem } from "@/types";
 import { useMobileTheme } from "@/theme/MobileTheme";
+import { getNativeAvatarUri } from "@/utils/avatar";
 
 type Props = {
   onPress?: () => void;
@@ -11,7 +12,7 @@ type Props = {
 export default function JamItem({ onPress, room }: Props) {
   const { colors } = useMobileTheme();
   const hostName = room.host?.username ?? room.handle;
-  const hostAvatar = room.host?.avatar_url ?? "";
+  const hostAvatar = getNativeAvatarUri(room.host?.avatar_url);
   const initials = hostName.slice(0, 2).toUpperCase();
   const isLive = room.status === "live" || room.participant_count > 0;
   const accessibilityLabel = [

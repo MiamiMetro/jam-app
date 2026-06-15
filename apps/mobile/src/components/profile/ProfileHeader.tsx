@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import type { User } from "@/types";
 import { useMobileTheme } from "@/theme/MobileTheme";
 import Surface from "@/components/ui/Surface";
+import { getNativeAvatarUri } from "@/utils/avatar";
 
 type Props = {
   profile: User;
@@ -12,7 +13,7 @@ type Props = {
 export default function ProfileHeader({ profile, onSignOut }: Props) {
   const { colors } = useMobileTheme();
   const [avatarLoadFailed, setAvatarLoadFailed] = React.useState(false);
-  const avatarUri = profile.avatar_url || "";
+  const avatarUri = getNativeAvatarUri(profile.avatar_url);
   const showAvatarImage = Boolean(avatarUri) && !avatarLoadFailed;
   const fallbackLetter = (profile.display_name || profile.username || "?")
     .slice(0, 1)

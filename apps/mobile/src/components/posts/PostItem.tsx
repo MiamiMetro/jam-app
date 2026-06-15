@@ -8,6 +8,7 @@ import { useMyProfile } from "@/hooks/useMyProfile";
 import { useDeletePost, useReportContent, useToggleLike } from "@/hooks/usePosts";
 import { useBlockUser } from "@/hooks/useUsers";
 import { useMobileTheme } from "@/theme/MobileTheme";
+import { getNativeAvatarUri } from "@/utils/avatar";
 
 type Props = {
   post: PostFeedItem;
@@ -27,6 +28,7 @@ export default function PostItem({ post }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const authorName = post.author?.username ?? "unknown";
+  const avatarUri = getNativeAvatarUri(post.author?.avatar_url);
   const isOwnPost = profile?.id === post.author_id;
   const fallbackLetters = useMemo(
     () => authorName.slice(0, 2).toUpperCase(),
@@ -44,6 +46,10 @@ export default function PostItem({ post }: Props) {
   ]
     .filter(Boolean)
     .join(", ");
+
+  React.useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarUri]);
 
   if (post.deleted_at) {
     return null;
@@ -127,10 +133,10 @@ export default function PostItem({ post }: Props) {
           { backgroundColor: colors.muted, borderColor: colors.border },
         ]}
       >
-        {post.author?.avatar_url && !avatarFailed ? (
+        {avatarUri && !avatarFailed ? (
           <Image
             onError={() => setAvatarFailed(true)}
-            source={{ uri: post.author.avatar_url }}
+            source={{ uri: avatarUri }}
             style={styles.avatarImage}
           />
         ) : (

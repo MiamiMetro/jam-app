@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
 import type { User } from "@/types";
+import { getNativeAvatarUri } from "@/utils/avatar";
 
 export type PresenceStatus = "online" | "away" | "busy";
 export type OnlinePresenceUser = User & {
@@ -71,7 +72,7 @@ function normalizeUser(profile: CompactProfile): User {
     id: profile.id,
     username: profile.username,
     display_name: profile.display_name ?? "",
-    avatar_url: profile.avatar_url ?? "",
+    avatar_url: getNativeAvatarUri(profile.avatar_url),
     banner_url: profile.banner_url ?? "",
     bio: profile.bio ?? "",
     instruments: profile.instruments ?? [],
@@ -135,7 +136,7 @@ function convertConversation(conv: {
           id: conv.other_user.id as Id<"profiles">,
           username: conv.other_user.username,
           display_name: conv.other_user.display_name ?? "",
-          avatar_url: conv.other_user.avatar_url ?? "",
+          avatar_url: getNativeAvatarUri(conv.other_user.avatar_url),
         }
       : undefined,
     hasUnread: conv.hasUnread,

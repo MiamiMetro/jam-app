@@ -30,6 +30,7 @@ import { useMyProfile } from "@/hooks/useMyProfile";
 import { useMobileTheme } from "@/theme/MobileTheme";
 import type { RoomParticipant } from "@/types";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
+import { getNativeAvatarUri } from "@/utils/avatar";
 
 type Props = NativeStackScreenProps<RootStackParamList, "JamRoom">;
 
@@ -646,6 +647,7 @@ function Avatar({
 }) {
   const { colors } = useMobileTheme();
   const radius = size / 2;
+  const imageUri = getNativeAvatarUri(image);
 
   return (
     <View
@@ -660,9 +662,9 @@ function Avatar({
         },
       ]}
     >
-      {image ? (
+      {imageUri ? (
         <Image
-          source={{ uri: image }}
+          source={{ uri: imageUri }}
           style={{
             borderRadius: radius,
             height: size,

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
 import type { User } from "@/types";
+import { getNativeAvatarUri } from "@/utils/avatar";
 
 type MutationOptions = {
   onError?: (error: Error) => void;
@@ -38,7 +39,7 @@ function normalizeUser(profile: CompactProfile): FriendProfile | null {
     id: profile.id,
     username: profile.username,
     display_name: profile.display_name ?? "",
-    avatar_url: profile.avatar_url ?? "",
+    avatar_url: getNativeAvatarUri(profile.avatar_url),
     banner_url: profile.banner_url ?? "",
     bio: profile.bio ?? "",
     instruments: profile.instruments ?? [],

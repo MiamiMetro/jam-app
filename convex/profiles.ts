@@ -420,7 +420,7 @@ export const createProfile = mutation({
         authSubject: identity.subject,
         username: username,
         displayName: displayName ?? username,
-        avatarUrl: avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+        avatarUrl: avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/png?seed=${username}`,
         avatarObjectKey,
         bannerUrl: "",
         bannerObjectKey: undefined,
@@ -448,4 +448,3 @@ export const createProfile = mutation({
     }
   },
 });
-

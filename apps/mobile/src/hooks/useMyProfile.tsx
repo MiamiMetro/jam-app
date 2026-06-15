@@ -1,12 +1,16 @@
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@jam-app/convex";
+import { getNativeAvatarUri } from "@/utils/avatar";
 
 export function useMyProfile() {
   const profile = useQuery(api.profiles.getMe);
+  const normalizedProfile = profile
+    ? { ...profile, avatar_url: getNativeAvatarUri(profile.avatar_url) }
+    : profile;
 
   return {
-    profile,
+    profile: normalizedProfile,
     isLoading: profile === undefined,
   };
 }

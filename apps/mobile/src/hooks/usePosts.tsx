@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "@jam-app/convex";
 import type { Id } from "@jam-app/convex";
 import type { Comment, Post } from "@/types";
+import { getNativeAvatarUri } from "@/utils/avatar";
 
 type MutationOptions<T = void> = {
   onError?: (error: Error) => void;
@@ -65,7 +66,7 @@ function convertPost(post: Post): FrontendPost {
     authorId: post.author_id,
     author: {
       username: post.author?.username || "unknown",
-      avatar: post.author?.avatar_url || undefined,
+      avatar: getNativeAvatarUri(post.author?.avatar_url) || undefined,
     },
     content: post.text || "",
     text: post.text,
@@ -98,7 +99,7 @@ function convertComment(comment: Comment): FrontendComment {
     depth: comment.depth ?? 0,
     author: {
       username: comment.author?.username || "unknown",
-      avatar: comment.author?.avatar_url || undefined,
+      avatar: getNativeAvatarUri(comment.author?.avatar_url) || undefined,
     },
     content: comment.text || "",
     audio_url: comment.audio_url || null,
