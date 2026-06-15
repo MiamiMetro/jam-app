@@ -1,7 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import { formatPublicProfileIdentity, requireAuth } from "./helpers";
+import { formatPublicProfileIdentity, getCurrentProfile, requireAuth } from "./helpers";
 import { checkRateLimit } from "./rateLimiter";
 
 /**
@@ -125,7 +125,9 @@ export const isBlockedByMe = query({
     userId: v.id("profiles"),
   },
   handler: async (ctx, args) => {
-    const profile = await requireAuth(ctx);
+    const profile = await getCurrentProfile(ctx);
+    if (!profile) return false;
+
     const block = await ctx.db
       .query("blocks")
       .withIndex("by_blocker_and_blocked", (q) =>

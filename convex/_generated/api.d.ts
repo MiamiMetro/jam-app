@@ -14,6 +14,7 @@ import type * as blocks from "../blocks.js";
 import type * as comments from "../comments.js";
 import type * as communities from "../communities.js";
 import type * as crons from "../crons.js";
+import type * as demoSeed from "../demoSeed.js";
 import type * as friends from "../friends.js";
 import type * as helpers from "../helpers.js";
 import type * as http from "../http.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   comments: typeof comments;
   communities: typeof communities;
   crons: typeof crons;
+  demoSeed: typeof demoSeed;
   friends: typeof friends;
   helpers: typeof helpers;
   http: typeof http;
