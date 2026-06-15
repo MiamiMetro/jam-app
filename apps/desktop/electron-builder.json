@@ -34,7 +34,17 @@
         "target": [
             "dmg",
             "zip"
-        ]
+        ],
+        "entitlements": "build-resources/entitlements.mac.plist",
+        "entitlementsInherit": "build-resources/entitlements.mac.inherit.plist",
+        "extendInfo": {
+            "NSMicrophoneUsageDescription": "Jam needs microphone access so you can perform in live jam rooms.",
+            "NSAudioCaptureUsageDescription": "Jam needs audio capture access so you can perform in live jam rooms."
+        },
+        "hardenedRuntime": true,
+        "gatekeeperAssess": false,
+        "notarize": true,
+        "forceCodeSigning": true
     },
     "linux": {
         "target": "AppImage",

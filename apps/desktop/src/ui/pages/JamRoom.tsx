@@ -487,6 +487,9 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
       }
       if (status.state === "exited") {
         jamSessionIdRef.current = null;
+        if (status.error) {
+          setClientError(status.error);
+        }
       }
     };
 

@@ -117,6 +117,28 @@ let jamBroadcastStopRequested = false;
 let updateStatus: UpdateStatus = { state: 'idle' };
 let updateCheckInFlight = false;
 
+function readLogTail(filePath: string | undefined, maxChars = 2000) {
+    if (!filePath || !existsSync(filePath)) {
+        return undefined;
+    }
+
+    try {
+        const contents = readFileSync(filePath, 'utf-8').trim();
+        if (!contents) {
+            return undefined;
+        }
+        return contents.slice(-maxChars);
+    } catch {
+        return undefined;
+    }
+}
+
+function buildJamClientExitError(code: number | null) {
+    const prefix = code === null ? 'Native jam client exited' : `Native jam client exited with code ${code}`;
+    const logTail = readLogTail(jamClientLogPath);
+    return logTail ? `${prefix}. Recent log: ${logTail}` : prefix;
+}
+
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
@@ -469,12 +491,14 @@ if (!gotTheLock) {
             clientProcess.on('exit', (code) => {
                 jamClientState = 'exited';
                 jamClientExitCode = code;
+                jamClientError = code === 0 ? undefined : buildJamClientExitError(code);
                 clientProcess = null;
             });
 
             clientProcess.on('error', (error) => {
                 jamClientState = 'failed';
-                jamClientError = error.message;
+                const logTail = readLogTail(jamClientLogPath);
+                jamClientError = logTail ? `${error.message}. Recent log: ${logTail}` : error.message;
                 clientProcess = null;
             });
 
