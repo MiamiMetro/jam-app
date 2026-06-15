@@ -119,19 +119,6 @@ function Profile() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!profileUser) return;
-    const timer = window.setTimeout(() => {
-      setEditDisplayName(profileUser.display_name ?? "");
-      setEditBio(profileUser.bio ?? "");
-      setEditAvatarUrl(profileUser.avatar_url ?? "");
-      setEditBannerUrl(profileUser.banner_url ?? "");
-      setEditInstruments(profileUser.instruments ?? []);
-      setEditGenres(profileUser.genres ?? []);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [profileUser]);
-
   const isOwnProfile = currentUser?.username === profileUser?.username;
   const { data: isBlockedByMe } = useIsBlockedByMe(!isOwnProfile ? profileUser?.id : null);
   const isPreviewing = isOwnProfile && previewDraft !== null;
