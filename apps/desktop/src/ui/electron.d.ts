@@ -32,6 +32,7 @@ export interface JamBroadcastStatus {
     exitCode?: number | null;
     error?: string;
     hlsUrl?: string;
+    logPath?: string;
 }
 
 export interface ElectronAPI {
