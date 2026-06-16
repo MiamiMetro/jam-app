@@ -3,7 +3,7 @@ import electronUpdater from 'electron-updater';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, spawnSync, ChildProcess } from 'child_process';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync, type WriteStream } from 'fs';
 import { isDev } from './util.js';
 
@@ -270,18 +270,37 @@ function getResourceToolPath(executable: string) {
 
 function getFfmpegExecutablePath() {
     const executable = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-    const resourcePath = getResourceToolPath(executable);
-    if (resourcePath) {
-        return resourcePath;
-    }
-
-    const candidates =
-        process.platform === 'darwin'
-            ? ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg']
+    const candidates = [
+        getResourceToolPath(executable),
+        ...(process.platform === 'darwin'
+            ? [
+                '/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg',
+                '/usr/local/opt/ffmpeg-full/bin/ffmpeg',
+                '/opt/homebrew/bin/ffmpeg',
+                '/usr/local/bin/ffmpeg',
+                '/usr/bin/ffmpeg',
+            ]
             : process.platform === 'linux'
                 ? ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg']
-                : [];
-    return candidates.find((candidate) => existsSync(candidate));
+                : []),
+    ].filter((candidate): candidate is string => Boolean(candidate));
+
+    return candidates.find((candidate) => existsSync(candidate) && ffmpegSupportsProtocol(candidate, 'srt'));
+}
+
+function ffmpegSupportsProtocol(ffmpegPath: string, protocol: string) {
+    const result = spawnSync(ffmpegPath, ['-hide_banner', '-protocols'], {
+        encoding: 'utf-8',
+        windowsHide: true,
+        timeout: 3000,
+    });
+    if (result.status !== 0) {
+        return false;
+    }
+    return result.stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .includes(protocol);
 }
 
 function isLaunchContext(value: unknown): value is JamClientLaunchContext {
