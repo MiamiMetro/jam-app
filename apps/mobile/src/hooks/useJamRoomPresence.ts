@@ -1,5 +1,5 @@
 import React from "react";
-import { useDisconnectPresence, useRoomHeartbeat } from "@/hooks/useRooms";
+import { useDisconnectPresence, useLeaveRoomPresence, useRoomHeartbeat } from "@/hooks/useRooms";
 import type { Id } from "@jam-app/convex";
 
 const HEARTBEAT_INTERVAL_MS = 20_000;
@@ -7,23 +7,35 @@ const HEARTBEAT_INTERVAL_MS = 20_000;
 export function useJamRoomPresence(roomId: string | undefined, enabled: boolean) {
   const roomHeartbeat = useRoomHeartbeat();
   const disconnectPresence = useDisconnectPresence();
+  const leaveRoomPresence = useLeaveRoomPresence();
   const sessionIdRef = React.useRef<string | null>(null);
   const sessionTokenRef = React.useRef<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isConnected, setIsConnected] = React.useState(false);
 
   if (!sessionIdRef.current) {
-    sessionIdRef.current = `mobile-room-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2)}`;
+    sessionIdRef.current = createRoomPresenceSessionId();
   }
 
   React.useEffect(() => {
-    if (!roomId || !enabled) {
-      if (sessionTokenRef.current) {
-        disconnectPresence({ sessionToken: sessionTokenRef.current }).catch(() => {});
-        sessionTokenRef.current = null;
+    const leaveRoom = () => {
+      const sessionId = sessionIdRef.current;
+      const sessionToken = sessionTokenRef.current;
+      if (roomId && sessionId) {
+        leaveRoomPresence({
+          roomId: roomId as Id<"rooms">,
+          sessionId,
+          sessionToken: sessionToken ?? undefined,
+        }).catch(() => {});
+      } else if (sessionToken) {
+        disconnectPresence({ sessionToken }).catch(() => {});
       }
+      sessionTokenRef.current = null;
+      sessionIdRef.current = createRoomPresenceSessionId();
+    };
+
+    if (!roomId || !enabled) {
+      leaveRoom();
       setIsConnected(false);
       return;
     }
@@ -60,14 +72,15 @@ export function useJamRoomPresence(roomId: string | undefined, enabled: boolean)
     return () => {
       cancelled = true;
       clearInterval(timer);
-      if (sessionTokenRef.current) {
-        disconnectPresence({ sessionToken: sessionTokenRef.current }).catch(() => {});
-        sessionTokenRef.current = null;
-      }
+      leaveRoom();
     };
-  }, [disconnectPresence, enabled, roomHeartbeat, roomId]);
+  }, [disconnectPresence, enabled, leaveRoomPresence, roomHeartbeat, roomId]);
 
   return { error, isConnected };
+}
+
+function createRoomPresenceSessionId() {
+  return `mobile-room-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function getPresenceError(error: unknown) {

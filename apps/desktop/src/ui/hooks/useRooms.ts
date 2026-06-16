@@ -210,6 +210,10 @@ export function useDisconnectPresence() {
   return useMutation(api.presence.disconnect);
 }
 
+export function useLeaveRoomPresence() {
+  return useMutation(api.presence.leaveRoomPresence);
+}
+
 export function useDeleteRoom() {
   return useMutation(api.rooms.deleteRoom);
 }

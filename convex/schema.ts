@@ -322,6 +322,15 @@ export default defineSchema({
     .index("by_room", ["roomId"])
     .index("by_room_profile", ["roomId", "profileId"]),
 
+  room_presence_leaves: defineTable({
+    roomId: v.id("rooms"),
+    profileId: v.id("profiles"),
+    sessionId: v.string(),
+    leftAt: v.number(),
+  })
+    .index("by_room", ["roomId"])
+    .index("by_room_profile", ["roomId", "profileId"]),
+
   // Backend-only jam server registry. Secrets must never be returned by public queries.
   jam_servers: defineTable({
     kind: v.union(v.literal("official"), v.literal("community")),

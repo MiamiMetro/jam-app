@@ -334,6 +334,40 @@ async function getActiveJamSession(ctx: MutationCtx, roomId: Id<"rooms">) {
     .first();
 }
 
+async function hasLeftRoomPresence(
+  ctx: QueryCtx | MutationCtx,
+  roomId: Id<"rooms">,
+  profileId: Id<"profiles">
+) {
+  return Boolean(
+    await ctx.db
+      .query("room_presence_leaves")
+      .withIndex("by_room_profile", (q) =>
+        q.eq("roomId", roomId).eq("profileId", profileId)
+      )
+      .first()
+  );
+}
+
+async function filterVisibleRoomPresenceUsers<T extends { userId: string }>(
+  ctx: QueryCtx | MutationCtx,
+  roomId: Id<"rooms">,
+  users: T[]
+) {
+  const visible: T[] = [];
+  for (const user of users) {
+    if (!user.userId || user.userId.startsWith("guest:")) {
+      visible.push(user);
+      continue;
+    }
+    const profileId = user.userId as Id<"profiles">;
+    if (!(await hasLeftRoomPresence(ctx, roomId, profileId))) {
+      visible.push(user);
+    }
+  }
+  return visible;
+}
+
 // ============================================
 // Internal Format Helper
 // ============================================
@@ -352,6 +386,11 @@ async function formatRoom(ctx: QueryCtx | MutationCtx, room: Doc<"rooms">) {
     ctx,
     roomPresenceId(String(room._id)),
     true
+  );
+  const visibleOnlineUsers = await filterVisibleRoomPresenceUsers(
+    ctx,
+    room._id,
+    onlineUsers
   );
 
   return {
@@ -414,7 +453,7 @@ async function formatRoom(ctx: QueryCtx | MutationCtx, room: Doc<"rooms">) {
           theme_color: community.themeColor,
         }
       : null,
-    participant_count: onlineUsers.length,
+    participant_count: visibleOnlineUsers.length,
     last_active_at: new Date(room.lastActiveAt).toISOString(),
     created_at: new Date(room._creationTime).toISOString(),
   };
@@ -640,9 +679,14 @@ export const getParticipants = query({
       roomPresenceId(String(args.roomId)),
       true
     );
+    const visibleOnlineUsers = await filterVisibleRoomPresenceUsers(
+      ctx,
+      args.roomId,
+      onlineUsers
+    );
 
-    const totalCount = onlineUsers.length;
-    const capped = onlineUsers
+    const totalCount = visibleOnlineUsers.length;
+    const capped = visibleOnlineUsers
       .filter((u) => u.userId)
       .slice(0, MAX_PARTICIPANTS_RETURNED);
 
@@ -723,6 +767,11 @@ export const getFriendsInRooms = query({
 
       // Extract the actual room ID from "room:{id}"
       const actualRoomId = roomPresence.roomId.replace("room:", "") as Id<"rooms">;
+      if (
+        await hasLeftRoomPresence(ctx, actualRoomId, friendship.friendId)
+      ) {
+        continue;
+      }
       const room = await ctx.db.get(actualRoomId);
       if (!room || !room.isActive) continue;
       if (room.communityId) continue;

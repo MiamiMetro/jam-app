@@ -34,6 +34,7 @@ import {
   useRoomHeartbeat,
   useGuestRoomHeartbeat,
   useDisconnectPresence,
+  useLeaveRoomPresence,
   useCreatePerformerJoinToken,
   useRefreshJamSession,
   useStartListenerMode,
@@ -102,6 +103,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   const roomHeartbeat = useRoomHeartbeat();
   const guestRoomHeartbeat = useGuestRoomHeartbeat();
   const disconnectPresence = useDisconnectPresence();
+  const leaveRoomPresence = useLeaveRoomPresence();
   const createPerformerJoinToken = useCreatePerformerJoinToken();
   const refreshJamSession = useRefreshJamSession();
   const startListenerMode = useStartListenerMode();
@@ -152,21 +154,41 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
   // Presence heartbeat — only beats while user is actively in this room
   const isInRoom = currentJamRoomHandle === handleToUse;
   const roomPresenceRole = isPerforming ? "performer" : "listener";
-  const sessionId = useId();
+  const reactSessionId = useId();
+  const sessionIdRef = useRef<string>(
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : reactSessionId
+  );
   const sessionTokenRef = useRef<string | null>(null);
+  const leaveRoomPresenceNow = useCallback((roomId?: string | null) => {
+    const sessionId = sessionIdRef.current;
+    const sessionToken = sessionTokenRef.current;
+    if (roomId && !isGuest) {
+      leaveRoomPresence({
+        roomId: roomId as Id<"rooms">,
+        sessionId,
+        sessionToken: sessionToken ?? undefined,
+      }).catch(() => {});
+    } else if (sessionToken) {
+      disconnectPresence({ sessionToken }).catch(() => {});
+    }
+    sessionTokenRef.current = null;
+    sessionIdRef.current =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${reactSessionId}-${Date.now()}`;
+  }, [disconnectPresence, isGuest, leaveRoomPresence, reactSessionId]);
+
   useEffect(() => {
     if (!room?.id || !isInRoom) {
       // Not in room — disconnect if we have a token
-      if (sessionTokenRef.current) {
-        disconnectPresence({ sessionToken: sessionTokenRef.current }).catch(
-          () => {}
-        );
-        sessionTokenRef.current = null;
-      }
+      leaveRoomPresenceNow(room?.id);
       return;
     }
     const HEARTBEAT_INTERVAL = 20_000;
     const doHeartbeat = () => {
+      const sessionId = sessionIdRef.current;
       const heartbeatFn = isGuest
         ? guestRoomHeartbeat({
             roomId: room.id as Id<"rooms">,
@@ -201,14 +223,9 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
     const timer = setInterval(doHeartbeat, HEARTBEAT_INTERVAL);
     return () => {
       clearInterval(timer);
-      if (sessionTokenRef.current) {
-        disconnectPresence({ sessionToken: sessionTokenRef.current }).catch(
-          () => {}
-        );
-        sessionTokenRef.current = null;
-      }
+      leaveRoomPresenceNow(room.id);
     };
-  }, [room?.id, isGuest, isInRoom, roomPresenceRole, roomHeartbeat, guestRoomHeartbeat, disconnectPresence, sessionId, setCurrentJamRoomHandle]);
+  }, [room?.id, isGuest, isInRoom, roomPresenceRole, roomHeartbeat, guestRoomHeartbeat, leaveRoomPresenceNow, setCurrentJamRoomHandle]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -259,15 +276,10 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         stopListenerMode(args).catch(() => {});
       }
     }
-    if (sessionTokenRef.current) {
-      disconnectPresence({ sessionToken: sessionTokenRef.current }).catch(
-        () => {}
-      );
-      sessionTokenRef.current = null;
-    }
+    leaveRoomPresenceNow(room?.id);
     setCurrentJamRoomHandle(null);
     navigate("/jams");
-  }, [isHost, room, publishSessionId, navigate, setCurrentJamRoomHandle, disconnectPresence, stopListenerMode]);
+  }, [isHost, room, publishSessionId, navigate, setCurrentJamRoomHandle, leaveRoomPresenceNow, stopListenerMode]);
 
   const handleReportRoom = useCallback(async () => {
     if (!room?.id) return;

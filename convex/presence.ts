@@ -136,6 +136,19 @@ async function updateRoomParticipantRole(
   }
 }
 
+async function getRoomPresenceLeave(
+  ctx: MutationCtx,
+  roomId: Id<"rooms">,
+  profileId: Id<"profiles">
+) {
+  return await ctx.db
+    .query("room_presence_leaves")
+    .withIndex("by_room_profile", (q) =>
+      q.eq("roomId", roomId).eq("profileId", profileId)
+    )
+    .first();
+}
+
 function clampHeartbeatInterval(interval: number | undefined) {
   if (interval === undefined) {
     return DEFAULT_PRESENCE_HEARTBEAT_INTERVAL_MS;
@@ -206,6 +219,14 @@ export const roomHeartbeat = mutation({
       await requireRoomJamAccess(ctx, room, profile);
     }
 
+    const leave = await getRoomPresenceLeave(ctx, args.roomId, profile._id);
+    if (leave?.sessionId === args.sessionId) {
+      throw new Error("ROOM_LEFT");
+    }
+    if (leave) {
+      await ctx.db.delete(leave._id);
+    }
+
     const roomPresenceId = `room:${args.roomId}`;
     const result = await presence.heartbeat(
       ctx,
@@ -219,6 +240,38 @@ export const roomHeartbeat = mutation({
       role,
     });
     return result;
+  },
+});
+
+export const leaveRoomPresence = mutation({
+  args: {
+    roomId: v.id("rooms"),
+    sessionId: v.string(),
+    sessionToken: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const profile = await requireAuth(ctx);
+    const now = Date.now();
+    const existing = await getRoomPresenceLeave(ctx, args.roomId, profile._id);
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        sessionId: args.sessionId,
+        leftAt: now,
+      });
+    } else {
+      await ctx.db.insert("room_presence_leaves", {
+        roomId: args.roomId,
+        profileId: profile._id,
+        sessionId: args.sessionId,
+        leftAt: now,
+      });
+    }
+
+    if (args.sessionToken) {
+      await presence.disconnect(ctx, args.sessionToken);
+    }
+
+    return { left: true };
   },
 });
 
@@ -278,4 +331,3 @@ export const setMyStatus = mutation({
     return { status: args.status };
   },
 });
-
