@@ -15,6 +15,7 @@
     "desktop:release:mac": "npm run release:mac --workspace jam-desktop",
     "mobile:dev": "npm run start --workspace jam-mobile",
     "mobile:ios": "npm run ios --workspace jam-mobile",
+    "mobile:ios:release": "npm run ios:release --workspace jam-mobile",
     "mobile:android": "npm run android --workspace jam-mobile",
     "mobile:web": "npm run web --workspace jam-mobile",
     "convex:dev": "convex dev",

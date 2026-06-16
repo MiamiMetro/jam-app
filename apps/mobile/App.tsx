@@ -11,12 +11,13 @@ import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { authClient } from "./src/lib/auth-client";
+import { runtimeConfig } from "./src/lib/runtime-config";
 import {
   MobileThemeProvider,
   useMobileTheme,
 } from "./src/theme/MobileTheme";
 
-const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
+const convex = new ConvexReactClient(runtimeConfig.convexUrl, {
   expectAuth: true,
   unsavedChangesWarning: false,
 });

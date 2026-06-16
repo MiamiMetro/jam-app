@@ -6,16 +6,12 @@ import {
 import { createAuthClient } from "better-auth/react";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { runtimeConfig } from "./runtime-config";
 
-const CONVEX_SITE_URL = process.env.EXPO_PUBLIC_CONVEX_SITE_URL;
 const APP_SCHEME = "jam";
 
-if (!CONVEX_SITE_URL) {
-  throw new Error("Missing EXPO_PUBLIC_CONVEX_SITE_URL environment variable");
-}
-
 export const authClient = createAuthClient({
-  baseURL: CONVEX_SITE_URL,
+  baseURL: runtimeConfig.convexSiteUrl,
   plugins: [
     convexClient(),
     ...(Platform.OS === "web"
@@ -29,4 +25,3 @@ export const authClient = createAuthClient({
         ]),
   ],
 });
-
