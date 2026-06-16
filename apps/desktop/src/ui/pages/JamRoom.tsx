@@ -516,7 +516,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
       const status = await window.electron?.getJamBroadcastStatus();
       if (!status) return;
       setBroadcastState(status.state);
-      if (status.state === "failed") {
+      if (status.state === "failed" || status.state === "exited") {
         setBroadcastError(status.error || "Native broadcaster failed");
       }
     };

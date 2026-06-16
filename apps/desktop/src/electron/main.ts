@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { spawn, ChildProcess } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync, type WriteStream } from 'fs';
 import { isDev } from './util.js';
 
 const { autoUpdater } = electronUpdater;
@@ -113,6 +113,8 @@ let jamBroadcastState: JamBroadcastState = 'idle';
 let jamBroadcastExitCode: number | null = null;
 let jamBroadcastError: string | undefined;
 let jamBroadcastHlsUrl: string | undefined;
+let jamBroadcastLogPath: string | undefined;
+let jamBroadcastLogStream: WriteStream | null = null;
 let jamBroadcastStopRequested = false;
 let updateStatus: UpdateStatus = { state: 'idle' };
 let updateCheckInFlight = false;
@@ -127,15 +129,27 @@ function readLogTail(filePath: string | undefined, maxChars = 2000) {
         if (!contents) {
             return undefined;
         }
-        return contents.slice(-maxChars);
+        return redactSensitiveLogText(contents.slice(-maxChars));
     } catch {
         return undefined;
     }
 }
 
+function redactSensitiveLogText(text: string) {
+    return text
+        .replace(/(passphrase=)[^&\s"]+/g, '$1[redacted]')
+        .replace(/(publish:[^:\s"]+:[^:\s"]+:)[^&\s"]+/g, '$1[redacted]');
+}
+
 function buildJamClientExitError(code: number | null) {
     const prefix = code === null ? 'Native jam client exited' : `Native jam client exited with code ${code}`;
     const logTail = readLogTail(jamClientLogPath);
+    return logTail ? `${prefix}. Recent log: ${logTail}` : prefix;
+}
+
+function buildJamBroadcastExitError(code: number | null) {
+    const prefix = code === null ? 'Native broadcaster exited' : `Native broadcaster exited with code ${code}`;
+    const logTail = readLogTail(jamBroadcastLogPath);
     return logTail ? `${prefix}. Recent log: ${logTail}` : prefix;
 }
 
@@ -244,6 +258,32 @@ function getBroadcasterExecutablePath() {
     return broadcasterPath;
 }
 
+function getResourceToolPath(executable: string) {
+    const candidates = isDev()
+        ? [path.join(process.cwd(), 'resources', 'client', executable)]
+        : [
+            path.join(process.resourcesPath, 'client', executable),
+            path.join(process.resourcesPath, 'resources', 'client', executable),
+        ];
+    return candidates.find((candidate) => existsSync(candidate));
+}
+
+function getFfmpegExecutablePath() {
+    const executable = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+    const resourcePath = getResourceToolPath(executable);
+    if (resourcePath) {
+        return resourcePath;
+    }
+
+    const candidates =
+        process.platform === 'darwin'
+            ? ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg']
+            : process.platform === 'linux'
+                ? ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg']
+                : [];
+    return candidates.find((candidate) => existsSync(candidate));
+}
+
 function isLaunchContext(value: unknown): value is JamClientLaunchContext {
     if (!value || typeof value !== 'object') return false;
     const context = value as Record<string, unknown>;
@@ -301,10 +341,58 @@ function buildJamClientArgs(context: JamClientLaunchContext) {
 }
 
 function buildJamBroadcastArgs(context: JamBroadcastLaunchContext) {
-    return [
+    const args = [
         '--ipc-port', String(context.ipcPort),
         '--srt-url', context.srtUrl,
     ];
+
+    const ffmpegPath = getFfmpegExecutablePath();
+    if (ffmpegPath) {
+        args.push('--ffmpeg', ffmpegPath);
+    }
+
+    return args;
+}
+
+function buildNativeChildEnv() {
+    const env = { ...process.env };
+    const pathKey = Object.keys(env).find((key) => key.toLowerCase() === 'path') ?? 'PATH';
+    const currentPath = env[pathKey] ?? '';
+    const extraPaths =
+        process.platform === 'darwin'
+            ? ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin']
+            : process.platform === 'linux'
+                ? ['/usr/local/bin', '/usr/bin', '/bin']
+                : [];
+    if (extraPaths.length > 0) {
+        env[pathKey] = [currentPath, ...extraPaths].filter(Boolean).join(path.delimiter);
+    }
+    return env;
+}
+
+function createJamBroadcastLogStream() {
+    const logDir = path.join(app.getPath('userData'), 'native-broadcast-logs');
+    mkdirSync(logDir, { recursive: true });
+    jamBroadcastLogPath = path.join(logDir, `broadcast-${new Date().toISOString().replace(/[:.]/g, '-')}.log`);
+    jamBroadcastLogStream = createWriteStream(jamBroadcastLogPath, { flags: 'a' });
+    jamBroadcastLogStream.write(`[${new Date().toISOString()}] launching native broadcaster\n`);
+    return jamBroadcastLogStream;
+}
+
+function closeJamBroadcastLogStream() {
+    const stream = jamBroadcastLogStream;
+    jamBroadcastLogStream = null;
+    if (stream) {
+        stream.end();
+    }
+}
+
+function attachJamBroadcastLogPipes(process: ChildProcess) {
+    if (!jamBroadcastLogStream) {
+        return;
+    }
+    process.stdout?.pipe(jamBroadcastLogStream, { end: false });
+    process.stderr?.pipe(jamBroadcastLogStream, { end: false });
 }
 
 function getJamBroadcastStatus() {
@@ -314,6 +402,7 @@ function getJamBroadcastStatus() {
             exitCode: null,
             error: jamBroadcastError,
             hlsUrl: jamBroadcastHlsUrl,
+            logPath: jamBroadcastLogPath,
         };
     }
     return {
@@ -321,6 +410,7 @@ function getJamBroadcastStatus() {
         exitCode: jamBroadcastExitCode,
         error: jamBroadcastError,
         hlsUrl: jamBroadcastHlsUrl,
+        logPath: jamBroadcastLogPath,
     };
 }
 
@@ -548,23 +638,30 @@ if (!gotTheLock) {
             jamBroadcastError = undefined;
             jamBroadcastHlsUrl = context.hlsUrl;
             jamBroadcastStopRequested = false;
+            createJamBroadcastLogStream();
             broadcasterProcess = spawn(broadcasterPath, buildJamBroadcastArgs(context), {
-                stdio: 'ignore',
+                stdio: ['ignore', 'pipe', 'pipe'],
                 windowsHide: true,
+                env: buildNativeChildEnv(),
             });
+            attachJamBroadcastLogPipes(broadcasterProcess);
             jamBroadcastState = 'running';
 
             broadcasterProcess.on('exit', (code) => {
                 jamBroadcastState = jamBroadcastStopRequested ? 'idle' : 'exited';
                 jamBroadcastExitCode = code;
+                jamBroadcastError = jamBroadcastStopRequested ? undefined : buildJamBroadcastExitError(code);
                 jamBroadcastStopRequested = false;
                 broadcasterProcess = null;
+                closeJamBroadcastLogStream();
             });
 
             broadcasterProcess.on('error', (error) => {
                 jamBroadcastState = 'failed';
-                jamBroadcastError = error.message;
+                const logTail = readLogTail(jamBroadcastLogPath);
+                jamBroadcastError = logTail ? `${error.message}. Recent log: ${logTail}` : error.message;
                 broadcasterProcess = null;
+                closeJamBroadcastLogStream();
             });
 
             return { success: true, ...getJamBroadcastStatus() };
@@ -572,6 +669,7 @@ if (!gotTheLock) {
             broadcasterProcess = null;
             jamBroadcastState = 'failed';
             jamBroadcastError = error instanceof Error ? error.message : 'Unknown error';
+            closeJamBroadcastLogStream();
             return { success: false, ...getJamBroadcastStatus(), error: jamBroadcastError };
         }
     });
