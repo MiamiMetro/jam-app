@@ -607,6 +607,21 @@ export const listCommunityRoomsPaginated = query({
 });
 
 const MAX_PARTICIPANTS_RETURNED = 100;
+type RoomPresenceRole = "listener" | "performer";
+
+async function getRoomPresenceRole(
+  ctx: QueryCtx,
+  roomId: Id<"rooms">,
+  profileId: Id<"profiles">
+): Promise<RoomPresenceRole> {
+  const role = await ctx.db
+    .query("room_participant_roles")
+    .withIndex("by_room_profile", (q) =>
+      q.eq("roomId", roomId).eq("profileId", profileId)
+    )
+    .first();
+  return role?.role ?? "listener";
+}
 
 /** Get participants of a room via presence (capped at 100) */
 export const getParticipants = query({
@@ -647,11 +662,15 @@ export const getParticipants = query({
             is_guest: true,
           };
         }
-        const profile = await ctx.db.get(u.userId as Id<"profiles">);
+        const profileId = u.userId as Id<"profiles">;
+        const [profile, role] = await Promise.all([
+          ctx.db.get(profileId),
+          getRoomPresenceRole(ctx, args.roomId, profileId),
+        ]);
         return {
           profile_id: u.userId,
           profile: profile ? formatPublicProfileIdentity(profile) : null,
-          role: "listener" as const,
+          role,
           is_guest: false,
         };
       })
@@ -1139,6 +1158,14 @@ export const deleteRoom = mutation({
       .take(500);
     for (const message of messages) {
       await ctx.db.delete(message._id);
+    }
+
+    const participantRoles = await ctx.db
+      .query("room_participant_roles")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .take(500);
+    for (const participantRole of participantRoles) {
+      await ctx.db.delete(participantRole._id);
     }
 
     await releaseUniqueLock(ctx, "room_handle", room.handle);

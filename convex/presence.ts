@@ -15,6 +15,10 @@ export const presenceStatusValidator = v.union(
   v.literal("away"),
   v.literal("busy")
 );
+const roomPresenceRoleValidator = v.union(
+  v.literal("listener"),
+  v.literal("performer")
+);
 
 const MIN_HEARTBEAT_INTERVAL_MS = 5_000;
 const MAX_HEARTBEAT_INTERVAL_MS = 120_000;
@@ -29,11 +33,25 @@ function roomListenAccess(room: Doc<"rooms">) {
   return room.listenAccess ?? (room.isPrivate ? "friends" : "anyone");
 }
 
-async function hasListenGrant(
+function roomJamAccess(room: Doc<"rooms">) {
+  return room.jamAccess ?? (room.isPrivate ? "friends" : "anyone");
+}
+
+async function hasRoomGrant(
   ctx: MutationCtx,
   roomId: Id<"rooms">,
-  profileId: Id<"profiles">
+  profileId: Id<"profiles">,
+  type: "listen" | "jam"
 ) {
+  const directGrant = await ctx.db
+    .query("room_access_grants")
+    .withIndex("by_room_profile_type", (q) =>
+      q.eq("roomId", roomId).eq("profileId", profileId).eq("type", type)
+    )
+    .first();
+  if (directGrant) return true;
+  if (type === "listen") return false;
+
   return Boolean(
     await ctx.db
       .query("room_access_grants")
@@ -42,6 +60,80 @@ async function hasListenGrant(
       )
       .first()
   );
+}
+
+async function requireRoomListenAccess(
+  ctx: MutationCtx,
+  room: Doc<"rooms">,
+  profile: Doc<"profiles">
+) {
+  if (room.hostId === profile._id) return;
+
+  const listenAccess = roomListenAccess(room);
+  if (listenAccess === "friends") {
+    const friends = await areFriends(ctx, profile._id, room.hostId);
+    if (!friends) throw new Error("ROOM_ACCESS_REQUIRED: Friends only");
+  } else if (listenAccess === "approved") {
+    const granted = await hasRoomGrant(ctx, room._id, profile._id, "listen");
+    if (!granted) throw new Error("ROOM_ACCESS_REQUIRED: Approval required");
+  }
+}
+
+async function requireRoomJamAccess(
+  ctx: MutationCtx,
+  room: Doc<"rooms">,
+  profile: Doc<"profiles">
+) {
+  if (room.hostId !== profile._id) {
+    const jamAccess = roomJamAccess(room);
+    if (jamAccess === "host") {
+      throw new Error("JAM_ACCESS_REQUIRED");
+    }
+    if (jamAccess === "friends") {
+      const friends = await areFriends(ctx, profile._id, room.hostId);
+      if (!friends) throw new Error("JAM_ACCESS_REQUIRED: Friends only");
+    } else if (jamAccess === "approved") {
+      const granted = await hasRoomGrant(ctx, room._id, profile._id, "jam");
+      if (!granted) throw new Error("JAM_ACCESS_REQUIRED: Approval required");
+    }
+  }
+
+  if (room.communityId) {
+    const communityId = room.communityId;
+    const membership = await ctx.db
+      .query("community_members")
+      .withIndex("by_community_and_profile", (q) =>
+        q.eq("communityId", communityId).eq("profileId", profile._id)
+      )
+      .first();
+    if (!membership) throw new Error("COMMUNITY_MEMBERSHIP_REQUIRED");
+  }
+}
+
+async function updateRoomParticipantRole(
+  ctx: MutationCtx,
+  roomId: Id<"rooms">,
+  profileId: Id<"profiles">,
+  role: "listener" | "performer"
+) {
+  const now = Date.now();
+  const existing = await ctx.db
+    .query("room_participant_roles")
+    .withIndex("by_room_profile", (q) =>
+      q.eq("roomId", roomId).eq("profileId", profileId)
+    )
+    .first();
+
+  if (existing) {
+    await ctx.db.patch(existing._id, { role, updatedAt: now });
+  } else {
+    await ctx.db.insert("room_participant_roles", {
+      roomId,
+      profileId,
+      role,
+      updatedAt: now,
+    });
+  }
 }
 
 function clampHeartbeatInterval(interval: number | undefined) {
@@ -98,34 +190,35 @@ export const roomHeartbeat = mutation({
     roomId: v.id("rooms"),
     sessionId: v.string(),
     interval: v.optional(v.number()),
+    role: v.optional(roomPresenceRoleValidator),
   },
   handler: async (ctx, args) => {
     const profile = await requireAuth(ctx);
     const interval = clampHeartbeatInterval(args.interval);
+    const role = args.role ?? "listener";
 
     const room = await ctx.db.get(args.roomId);
     if (!room) throw new Error("ROOM_NOT_FOUND");
     if (!room.isActive) throw new Error("ROOM_INACTIVE");
 
-    if (room.hostId !== profile._id) {
-      const listenAccess = roomListenAccess(room);
-      if (listenAccess === "friends") {
-        const friends = await areFriends(ctx, profile._id, room.hostId);
-        if (!friends) throw new Error("ROOM_ACCESS_REQUIRED: Friends only");
-      } else if (listenAccess === "approved") {
-        const granted = await hasListenGrant(ctx, args.roomId, profile._id);
-        if (!granted) throw new Error("ROOM_ACCESS_REQUIRED: Approval required");
-      }
+    await requireRoomListenAccess(ctx, room, profile);
+    if (role === "performer") {
+      await requireRoomJamAccess(ctx, room, profile);
     }
 
     const roomPresenceId = `room:${args.roomId}`;
-    return await presence.heartbeat(
+    const result = await presence.heartbeat(
       ctx,
       roomPresenceId,
       String(profile._id),
       args.sessionId,
       interval
     );
+    await updateRoomParticipantRole(ctx, args.roomId, profile._id, role);
+    await presence.updateRoomUser(ctx, roomPresenceId, String(profile._id), {
+      role,
+    });
+    return result;
   },
 });
 

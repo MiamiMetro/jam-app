@@ -151,6 +151,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
 
   // Presence heartbeat — only beats while user is actively in this room
   const isInRoom = currentJamRoomHandle === handleToUse;
+  const roomPresenceRole = isPerforming ? "performer" : "listener";
   const sessionId = useId();
   const sessionTokenRef = useRef<string | null>(null);
   useEffect(() => {
@@ -176,6 +177,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
             roomId: room.id as Id<"rooms">,
             sessionId,
             interval: HEARTBEAT_INTERVAL,
+            role: roomPresenceRole,
           });
       return heartbeatFn
         .then((result) => {
@@ -206,7 +208,7 @@ function JamRoom({ roomHandle }: JamRoomProps = {}) {
         sessionTokenRef.current = null;
       }
     };
-  }, [room?.id, isGuest, isInRoom, roomHeartbeat, guestRoomHeartbeat, disconnectPresence, sessionId, setCurrentJamRoomHandle]);
+  }, [room?.id, isGuest, isInRoom, roomPresenceRole, roomHeartbeat, guestRoomHeartbeat, disconnectPresence, sessionId, setCurrentJamRoomHandle]);
 
   // Auto-scroll chat
   useEffect(() => {
